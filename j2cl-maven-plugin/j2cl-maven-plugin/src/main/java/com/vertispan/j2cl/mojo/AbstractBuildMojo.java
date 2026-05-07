@@ -418,7 +418,16 @@ public abstract class AbstractBuildMojo extends AbstractCacheMojo {
         request.setRemoteRepositories(null);
 
         // A type will confuse maven here, since it will incorrectly treat it as packaging
-        Artifact deTypedDependency = new org.apache.maven.artifact.DefaultArtifact(mavenDependency.getGroupId(), mavenDependency.getArtifactId(), mavenDependency.getVersionRange(), mavenDependency.getScope(), "jar", mavenDependency.getClassifier(), mavenDependency.getArtifactHandler());
+        // For SNAPSHOTs, use the resolved version instead of version range to avoid null versions
+        Artifact deTypedDependency;
+        if (mavenDependency.isSnapshot() && mavenDependency.getVersion() != null) {
+            // Use resolved timestamped version for SNAPSHOTs to avoid null version issues
+            String resolvedVersion = mavenDependency.getVersion();
+            deTypedDependency = new org.apache.maven.artifact.DefaultArtifact(mavenDependency.getGroupId(), mavenDependency.getArtifactId(), resolvedVersion, mavenDependency.getScope(), "jar", mavenDependency.getClassifier(), mavenDependency.getArtifactHandler());
+        } else {
+            // For non-SNAPSHOTs, use version range as before
+            deTypedDependency = new org.apache.maven.artifact.DefaultArtifact(mavenDependency.getGroupId(), mavenDependency.getArtifactId(), mavenDependency.getVersionRange(), mavenDependency.getScope(), "jar", mavenDependency.getClassifier(), mavenDependency.getArtifactHandler());
+        }
         p = projectBuilder.build(deTypedDependency, true, request).getProject();
 
         // at this point, we know that the dependency is not in the reactor, but may not have the artifact, so
