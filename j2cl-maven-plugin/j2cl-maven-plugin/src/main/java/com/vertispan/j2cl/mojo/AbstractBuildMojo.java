@@ -425,7 +425,7 @@ public abstract class AbstractBuildMojo extends AbstractCacheMojo {
             String resolvedVersion = mavenDependency.getVersion();
             deTypedDependency = new org.apache.maven.artifact.DefaultArtifact(mavenDependency.getGroupId(), mavenDependency.getArtifactId(), resolvedVersion, mavenDependency.getScope(), "jar", mavenDependency.getClassifier(), mavenDependency.getArtifactHandler());
         } else {
-            // For non-SNAPSHOTs, use version range as before
+            // For non-SNAPSHOTs, use version range.
             deTypedDependency = new org.apache.maven.artifact.DefaultArtifact(mavenDependency.getGroupId(), mavenDependency.getArtifactId(), mavenDependency.getVersionRange(), mavenDependency.getScope(), "jar", mavenDependency.getClassifier(), mavenDependency.getArtifactHandler());
         }
         p = projectBuilder.build(deTypedDependency, true, request).getProject();
