@@ -149,7 +149,13 @@ public abstract class AbstractBuildMojo extends AbstractCacheMojo {
 
     private static String key(Artifact artifact) {
         // this is roughly DefaultArtifact.toString, minus scope, since we don't care what the scope is for the purposes of building projects
-        String key = artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + artifact.getBaseVersion();
+        // For SNAPSHOTs, use the resolved version (timestamped) to distinguish different builds, otherwise use base version
+        String version = artifact.getBaseVersion();
+        if (artifact.isSnapshot() && artifact.getVersion() != null && !artifact.getVersion().equals(version)) {
+            // Use resolved timestamped version for unique SNAPSHOT identification
+            version = artifact.getVersion();
+        }
+        String key = artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + version;
         if (artifact.getClassifier() != null) {
             key += ":" + artifact.getClassifier();
         }
