@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package autovalue
 
@@ -27,7 +28,7 @@ import kotlin.jvm.JvmStatic
 @WasAutoValue
 abstract class AutoValueWithGenerics<T> {
  abstract fun getBooleanField(): Boolean
-
+ 
  companion object {
   @JvmStatic
   internal fun <T_1> create_pp_autovalue(): AutoValueWithGenerics<T_1>? {

@@ -16,32 +16,19 @@
 
 package com.google.j2cl.jre.java.lang;
 
+import static org.junit.Assert.assertThrows;
+
 import junit.framework.TestCase;
 
 /** Unit tests for the Javascript emulation of the Float/float autoboxed fundamental type. */
 public class FloatTest extends TestCase {
 
   public void testBadStrings() {
-    try {
-      new Float("0.0e");
-      fail("constructor");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> new Float("0.0e"));
 
-    try {
-      Float.parseFloat("0.0e");
-      fail("parse");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Float.parseFloat("0.0e"));
 
-    try {
-      Float.valueOf("0x0e");
-      fail("valueOf");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Float.valueOf("0x0e"));
   }
 
   public void testCompare() {
@@ -90,6 +77,56 @@ public class FloatTest extends TestCase {
     assertFalse(Float.isInfinite(Float.NaN));
   }
 
+  public void testIsFinite() {
+    final float[] nonfiniteNumbers = {
+      Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, Float.NaN,
+    };
+    for (float value : nonfiniteNumbers) {
+      assertFalse(Float.isFinite(value));
+    }
+
+    final float[] finiteNumbers = {
+      -Float.MAX_VALUE,
+      Float.MAX_VALUE,
+      Float.MIN_VALUE,
+      -1.0f,
+      -0.5f,
+      -0.1f,
+      -0.0f,
+      0.0f,
+      0.1f,
+      0.5f,
+      1.0f,
+    };
+    for (float value : finiteNumbers) {
+      assertTrue(Float.isFinite(value));
+    }
+  }
+
+  public void testIsInfinite() {
+    assertTrue(Float.isInfinite(Float.NEGATIVE_INFINITY));
+    assertTrue(Float.isInfinite(Float.POSITIVE_INFINITY));
+
+    assertFalse(Float.isInfinite(Float.NaN));
+
+    final float[] finiteNumbers = {
+      -Float.MAX_VALUE,
+      Float.MAX_VALUE,
+      Float.MIN_VALUE,
+      -1.0f,
+      -0.5f,
+      -0.1f,
+      -0.0f,
+      0.0f,
+      0.1f,
+      0.5f,
+      1.0f,
+    };
+    for (float value : finiteNumbers) {
+      assertFalse(Float.isInfinite(value));
+    }
+  }
+
   public void testParse() {
     /*
      * Note: we must use appropriate deltas for a somewhat subtle reason.
@@ -113,10 +150,10 @@ public class FloatTest extends TestCase {
     // be able to get POSITIVE/NEGATIVE_INFINITY for out-of-range values, and
     // since all math in JS is done in double we can't rely on getting the
     // exact value back.
-//    assertEquals("Can't parse MAX_VALUE", Float.MAX_VALUE,
-//        Float.parseFloat(String.valueOf(Float.MAX_VALUE)), 1e31);
-//    assertEquals("Can't parse MIN_VALUE", Float.MIN_VALUE,
-//        Float.parseFloat(String.valueOf(Float.MIN_VALUE)), Float.MIN_VALUE);
+    //    assertEquals("Can't parse MAX_VALUE", Float.MAX_VALUE,
+    //        Float.parseFloat(String.valueOf(Float.MAX_VALUE)), 1e31);
+    //    assertEquals("Can't parse MIN_VALUE", Float.MIN_VALUE,
+    //        Float.parseFloat(String.valueOf(Float.MIN_VALUE)), Float.MIN_VALUE);
 
     // Test NaN/Infinity - issue 7713
     assertTrue(Float.isNaN(Float.parseFloat("+NaN")));
@@ -127,31 +164,11 @@ public class FloatTest extends TestCase {
     assertEquals(Float.NEGATIVE_INFINITY, Float.parseFloat("-Infinity"));
 
     // check for parsing some invalid values
-    try {
-      Float.parseFloat("nan");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Float.parseFloat("infinity");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Float.parseFloat("1.2.3");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Float.parseFloat("+-1.2");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Float.parseFloat("1e");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
+    assertThrows(NumberFormatException.class, () -> Float.parseFloat("nan"));
+    assertThrows(NumberFormatException.class, () -> Float.parseFloat("infinity"));
+    assertThrows(NumberFormatException.class, () -> Float.parseFloat("1.2.3"));
+    assertThrows(NumberFormatException.class, () -> Float.parseFloat("+-1.2"));
+    assertThrows(NumberFormatException.class, () -> Float.parseFloat("1e"));
   }
 
   public void testFloatBits() {
@@ -408,7 +425,7 @@ public class FloatTest extends TestCase {
     assertEquals(bits, Float.floatToIntBits(Float.intBitsToFloat(bits)));
     compareFloats(value, Float.intBitsToFloat(Float.floatToIntBits(value)));
   }
- 
+
   private void compareFloats(float expected, float actual) {
     if (Float.isNaN(expected) || Float.isNaN(actual)) {
       if (Float.isNaN(expected) && Float.isNaN(actual)) {

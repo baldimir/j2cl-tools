@@ -39,12 +39,16 @@ import com.google.j2cl.transpiler.ast.IfStatement;
 import com.google.j2cl.transpiler.ast.Label;
 import com.google.j2cl.transpiler.ast.LabeledStatement;
 import com.google.j2cl.transpiler.ast.LoopStatement;
+import com.google.j2cl.transpiler.ast.NullLiteral;
 import com.google.j2cl.transpiler.ast.NumberLiteral;
 import com.google.j2cl.transpiler.ast.PrimitiveTypes;
 import com.google.j2cl.transpiler.ast.ReturnStatement;
 import com.google.j2cl.transpiler.ast.RuntimeMethods;
 import com.google.j2cl.transpiler.ast.Statement;
 import com.google.j2cl.transpiler.ast.SwitchCase;
+import com.google.j2cl.transpiler.ast.SwitchCaseDefault;
+import com.google.j2cl.transpiler.ast.SwitchCaseExpressions;
+import com.google.j2cl.transpiler.ast.SwitchCasePattern;
 import com.google.j2cl.transpiler.ast.SwitchStatement;
 import com.google.j2cl.transpiler.ast.SynchronizedStatement;
 import com.google.j2cl.transpiler.ast.ThrowStatement;
@@ -223,14 +227,19 @@ final class StatementTranspiler {
         // Emit the code for each of the cases.
         for (SwitchCase switchCase : switchStatement.getCases()) {
           builder.newLine();
-          builder.append(
-              switchCase.isDefault()
-                  ? ";; default:"
-                  : ";; case "
-                      + switchCase.getCaseExpressions().stream()
-                          .map(Expression::toString)
-                          .collect(joining(","))
-                      + ":");
+          switch (switchCase) {
+            case SwitchCaseDefault s -> builder.append(";; default:");
+
+            case SwitchCaseExpressions s ->
+                builder.append(
+                    ";; case "
+                        + switchCase.getCaseExpressions().stream()
+                            .map(Expression::toString)
+                            .collect(joining(","))
+                        + ":");
+
+            case SwitchCasePattern s -> throw new IllegalStateException();
+          }
           renderStatements(switchCase.getStatements());
           builder.closeParens();
         }
@@ -379,17 +388,14 @@ final class StatementTranspiler {
             casePosition++) {
           // Emit conditions for each case.
           SwitchCase switchCase = switchStatement.getCases().get(casePosition);
-          if (switchCase.isDefault()) {
-            // Skip the default case, since all the other conditions need to be evaluated before,
-            // and the default case is handled by an unconditional branch after all other conditions
-            // are checked.
-            continue;
+          if (!switchCase.getCaseExpressions().isEmpty()) {
+            // If the condition for this case is met, jump to the start of the case, i.e. jump out
+            // of all of the previous enclosing blocks.
+            Expression condition =
+                createCaseCondition(
+                    switchCase.getCaseExpressions(), switchStatement.getExpression());
+            renderConditionalBranch(switchStatement.getSourcePosition(), condition, casePosition);
           }
-          // If the condition for this case is met, jump to the start of the case, i.e. jump out
-          // of all of the previous enclosing blocks.
-          Expression condition =
-              createCaseCondition(switchCase.getCaseExpressions(), switchStatement.getExpression());
-          renderConditionalBranch(switchStatement.getSourcePosition(), condition, casePosition);
         }
 
         // When no other condition was met, jump to the default case if exists.
@@ -410,7 +416,9 @@ final class StatementTranspiler {
             caseCondition =
                 RuntimeMethods.createStringEqualsMethodCall(switchCaseExpression, expression);
           } else {
-            checkState(switchCaseExpression.getTypeDescriptor().isPrimitive());
+            checkState(
+                switchCaseExpression.getTypeDescriptor().isPrimitive()
+                    || switchCaseExpression instanceof NullLiteral);
             caseCondition = expression.infixEquals(switchCaseExpression);
           }
           // Transform cases with more that one label short-circuit explicitly, since the backend
@@ -433,7 +441,7 @@ final class StatementTranspiler {
           condition =
               condition == null
                   ? caseCondition
-                  : ConditionalExpression.newBuilder()
+                  : ConditionalExpression.builder()
                       .setConditionExpression(condition)
                       .setTrueExpression(BooleanLiteral.get(true))
                       .setFalseExpression(caseCondition)

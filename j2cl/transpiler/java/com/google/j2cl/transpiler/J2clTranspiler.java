@@ -15,6 +15,7 @@ package com.google.j2cl.transpiler;
 
 import com.google.common.collect.ImmutableList;
 import com.google.j2cl.common.Problems;
+import com.google.j2cl.common.SourceUtils;
 import com.google.j2cl.transpiler.ast.AstUtils;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
 import com.google.j2cl.transpiler.ast.FieldDescriptor;
@@ -45,10 +46,12 @@ public class J2clTranspiler {
   private void transpileImpl() {
     if (options.getBackend().isWasm()) {
       // TODO(b/178738483): Remove hack that makes mangling backend dependent.
-      TypeDeclaration.setImplementWasmJsEnumSemantics();
-      // TODO(b/317164851): Remove hack that makes jsinfo ignored for non-native types in Wasm.
-      FieldDescriptor.setIgnoreNonNativeJsInfo();
-      MethodDescriptor.setIgnoreNonNativeJsInfo();
+      TypeDeclaration.setImplementWasmJsInteropSemantics();
+      if (!options.getEnableWasmCustomDescriptorsJsInterop()) {
+        // TODO(b/317164851): Remove hack that makes jsinfo ignored for non-native types in Wasm.
+        FieldDescriptor.setIgnoreNonNativeJsInfo();
+        MethodDescriptor.setIgnoreNonNativeJsInfo();
+      }
       // TODO(b/340930928): This is a temporary hack since JsFunction is not supported in Wasm.
       TypeDeclaration.setIgnoreJsFunctionAnnotations();
       // TODO(b/178738483): Remove hack that makes it possible to ignore DoNotAutobox in Wasm.
@@ -57,11 +60,17 @@ public class J2clTranspiler {
       MemberDescriptor.setClosureManglingPatterns();
     }
 
-    Library library =
+    try (Library library =
         options.getSources().isEmpty()
             ? Library.newEmpty()
-            : options.getFrontend().parse(options, problems);
-    try {
+            : options.getFrontend().parse(options, problems)) {
+
+      // TODO(b/506284703): Reconsider refactoring how sourcefiles are handled in general.
+      // Copy generated JS files from the APT directory to the output directory.
+      SourceUtils.getAllSources(options.getSourceGenPath())
+          .filter(f -> f.sourcePath().endsWith(".js") && !f.sourcePath().endsWith(".native.js"))
+          .forEach(f -> options.getOutput().copyFile(f.sourcePath(), f.targetPath()));
+
       problems.abortIfHasErrors();
       if (!library.isEmpty()) {
         desugarLibrary(library);
@@ -69,9 +78,6 @@ public class J2clTranspiler {
         normalizeLibrary(library);
       }
       options.getBackend().generateOutputs(options, library, problems);
-    } finally {
-      // Now we are done, release resources from the frontend if needed.
-      library.dispose();
     }
   }
 

@@ -15,28 +15,49 @@
  */
 package com.google.j2cl.transpiler.passes;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.j2cl.transpiler.ast.TypeDescriptors.isBoxedType;
+import static com.google.j2cl.transpiler.ast.TypeDescriptors.isJavaLangString;
+import static com.google.j2cl.transpiler.ast.TypeDescriptors.isNumericPrimitive;
 
+import com.google.common.collect.ImmutableList;
+import com.google.j2cl.common.InternalCompilerError;
+import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.AstUtils;
+import com.google.j2cl.transpiler.ast.Block;
+import com.google.j2cl.transpiler.ast.CastExpression;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
+import com.google.j2cl.transpiler.ast.ConditionalExpression;
 import com.google.j2cl.transpiler.ast.EmbeddedStatement;
 import com.google.j2cl.transpiler.ast.Expression;
 import com.google.j2cl.transpiler.ast.FieldAccess;
+import com.google.j2cl.transpiler.ast.IfStatement;
 import com.google.j2cl.transpiler.ast.Label;
 import com.google.j2cl.transpiler.ast.MethodCall;
+import com.google.j2cl.transpiler.ast.MultiExpression;
 import com.google.j2cl.transpiler.ast.Node;
+import com.google.j2cl.transpiler.ast.NullLiteral;
+import com.google.j2cl.transpiler.ast.NumberLiteral;
+import com.google.j2cl.transpiler.ast.PatternMatchExpression;
+import com.google.j2cl.transpiler.ast.PrimitiveTypes;
 import com.google.j2cl.transpiler.ast.RuntimeMethods;
+import com.google.j2cl.transpiler.ast.Statement;
 import com.google.j2cl.transpiler.ast.SwitchCase;
-import com.google.j2cl.transpiler.ast.SwitchConstruct;
+import com.google.j2cl.transpiler.ast.SwitchCaseDefault;
+import com.google.j2cl.transpiler.ast.SwitchCaseExpressions;
+import com.google.j2cl.transpiler.ast.SwitchCasePattern;
 import com.google.j2cl.transpiler.ast.SwitchExpression;
 import com.google.j2cl.transpiler.ast.SwitchStatement;
 import com.google.j2cl.transpiler.ast.TypeDescriptor;
 import com.google.j2cl.transpiler.ast.TypeDescriptors;
+import com.google.j2cl.transpiler.ast.Variable;
+import com.google.j2cl.transpiler.ast.VariableDeclarationExpression;
 import com.google.j2cl.transpiler.ast.YieldStatement;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Makes switch statements to comply with Java semantics. */
@@ -45,19 +66,21 @@ public class NormalizeSwitchConstructs extends NormalizationPass {
   public void applyTo(CompilationUnit compilationUnit) {
     removeSwitchExpressions(compilationUnit);
     normalizeSwitchStatements(compilationUnit);
+    // Switch with patterns are rewritten using instanceof patterns that need to be desugared.
+    new DesugarInstanceOfPatterns().applyTo(compilationUnit);
   }
 
   /** Transform switch expressions into switch statements that are embedded in expressions. */
   private static void removeSwitchExpressions(CompilationUnit compilationUnit) {
     compilationUnit.accept(
         new AbstractRewriter() {
-          Map<SwitchExpression, Label> assignedLabelBySwitchExpression = new HashMap<>();
+          final Map<SwitchExpression, Label> assignedLabelBySwitchExpression = new HashMap<>();
 
           @Override
           public Expression rewriteSwitchExpression(SwitchExpression switchExpression) {
-            return EmbeddedStatement.newBuilder()
+            return EmbeddedStatement.builder()
                 .setStatement(
-                    SwitchStatement.Builder.from(switchExpression)
+                    SwitchStatement.builderFrom(switchExpression)
                         .build()
                         .encloseWithLabel(getLabel(switchExpression)))
                 .setTypeDescriptor(switchExpression.getTypeDescriptor())
@@ -68,14 +91,14 @@ public class NormalizeSwitchConstructs extends NormalizationPass {
           public Node rewriteYieldStatement(YieldStatement yieldStatement) {
             SwitchExpression enclosingSwitchExpression =
                 (SwitchExpression) getParent(SwitchExpression.class::isInstance);
-            return YieldStatement.Builder.from(yieldStatement)
+            return yieldStatement.toBuilder()
                 .setLabelReference(getLabel(enclosingSwitchExpression).createReference())
                 .build();
           }
 
           private Label getLabel(SwitchExpression switchExpression) {
             return assignedLabelBySwitchExpression.computeIfAbsent(
-                checkNotNull(switchExpression), s -> Label.newBuilder().setName("SWITCH").build());
+                checkNotNull(switchExpression), s -> Label.builder().setName("SWITCH").build());
           }
         });
   }
@@ -92,32 +115,228 @@ public class NormalizeSwitchConstructs extends NormalizationPass {
     compilationUnit.accept(
         new AbstractRewriter() {
           @Override
-          public SwitchStatement rewriteSwitchStatement(SwitchStatement switchStatement) {
-            return normalizeSwitchConstruct(switchStatement);
-          }
-
-          private <T extends SwitchConstruct<T>> T normalizeSwitchConstruct(T switchConstruct) {
-            Expression expression = switchConstruct.getExpression();
+          public Statement rewriteSwitchStatement(SwitchStatement switchStatement) {
+            Expression expression = switchStatement.getExpression();
             TypeDescriptor expressionTypeDescriptor = expression.getTypeDescriptor();
 
-            if (TypeDescriptors.isJavaLangString(expressionTypeDescriptor)
-                || (AstUtils.isJsEnumBoxingSupported() && expressionTypeDescriptor.isJsEnum())) {
-              // Switch on strings and unboxed JsEnums should throw on null.
-              return switchConstruct.toBuilder()
+            if (switchStatement.hasPatterns()
+                || (isBoxedType(expressionTypeDescriptor) && switchStatement.allowsNulls())) {
+              return convertToIntegerSwitch(switchStatement);
+            }
+
+            boolean isBoxableJsEnum =
+                AstUtils.isJsEnumBoxingSupported() && expressionTypeDescriptor.isJsEnum();
+
+            if (!switchStatement.allowsNulls()
+                && (isJavaLangString(expressionTypeDescriptor)
+                    || isBoxableJsEnum
+                    || isBoxedType(expressionTypeDescriptor))) {
+              // Switch on strings and unboxed JsEnums should throw on null, unless they are
+              // explicitly handled.
+              return switchStatement.toBuilder()
                   .setExpression(
-                      RuntimeMethods.createCheckNotNullCall(switchConstruct.getExpression()))
+                      isBoxedType(expressionTypeDescriptor)
+                              && isNumericPrimitive(expressionTypeDescriptor.toUnboxedType())
+                          // Trigger unboxing which will also implicitly accomplish the null check.
+                          ? CastExpression.builder()
+                              .setCastTypeDescriptor(PrimitiveTypes.INT)
+                              .setExpression(expression)
+                              .build()
+                          : RuntimeMethods.createCheckNotNullCall(switchStatement.getExpression()))
                   .build();
             }
 
-            if (expressionTypeDescriptor.isEnum()) {
-              return convertEnumSwitchConstruct(switchConstruct);
+            // Boxable JsEnums are left untouched since they are handled directly in JavaScript
+            // (which is the only backend that currently supports them). Regular enum switches are
+            // converted to integer switches on their ordinals.
+            if (expressionTypeDescriptor.isEnum() && !isBoxableJsEnum) {
+              return convertEnumSwitchStatement(switchStatement);
             }
 
-            checkArgument(TypeDescriptors.isBoxedOrPrimitiveType(expressionTypeDescriptor));
-            // Switch on primitives do not require conversions.
-            return switchConstruct;
+            return switchStatement;
           }
         });
+  }
+
+  /**
+   * Rewrite a switch with patterns into a if nest that does the evaluation and selects a case by
+   * its index and a switch on that index. This way the control flow inside the switch, like
+   * unlabeled breaks, don't need to be resolved.
+   */
+  private Statement convertToIntegerSwitch(SwitchStatement switchStatement) {
+    var initializationStatements = new ArrayList<Statement>();
+
+    var selector = switchStatement.getExpression();
+    if (!switchStatement.allowsNulls()) {
+      // If the switch does not allow nulls perform the null check.
+      selector = RuntimeMethods.createCheckNotNullCall(selector);
+    }
+    SourcePosition sourcePosition = switchStatement.getSourcePosition();
+    if (!selector.isIdempotent()) {
+      // This is the temporary variable to avoid repeated evaluation of the original selector
+      // expression.
+      selector =
+          createTemporaryVariable(
+                  sourcePosition,
+                  "$selector",
+                  selector.getTypeDescriptor(),
+                  /* initializer= */ selector,
+                  initializationStatements)
+              .createReference();
+    }
+
+    var caseIndexVariable =
+        createTemporaryVariable(
+            sourcePosition,
+            "$caseIndex",
+            PrimitiveTypes.INT,
+            /* initializer= */ null,
+            initializationStatements);
+
+    // Create a conditional expression that returns the case index.
+    //
+    // if (... first case expression evaluation ...) {
+    //   $caseSelector = 0;
+    // } else if (... second case expression evaluation ...) {
+    //    ...
+    // } else if (... last case expression evaluation ...) {
+    //   $caseSelector = last;
+    // }
+    List<SwitchCase> cases = switchStatement.getCases();
+    Statement caseIndexSelectionLogic =
+        createCaseSelectorLogic(cases, selector, caseIndexVariable, 0);
+
+    // Rewrite the cases for the resulting switch using integer selector.
+    //   case 0:
+    //     ... original case 0 statements ...
+    //
+    //            ...
+    //
+    //   case N:
+    //     ... original case N statements ...
+    //
+    //   default:
+    //     ... original default case statements ...
+    // }
+    for (int i = 0; i < cases.size(); i++) {
+      SwitchCase switchCase = cases.get(i);
+      cases.set(
+          i,
+          switchCase.isDefault()
+              // No need to rewrite the default case.
+              ? switchCase
+              // Rewrite the corresponding `case Pattern when guard` into `case index`.
+              : SwitchCaseExpressions.builder()
+                  .setCaseExpressions(ImmutableList.of(NumberLiteral.fromInt(i)))
+                  .setStatements(switchCase.getStatements())
+                  .setCanFallthrough(switchCase.canFallthrough())
+                  .build());
+    }
+
+    return Block.builder()
+        // T $selector = <selector expression>;
+        .addStatements(initializationStatements)
+        .addStatements(caseIndexSelectionLogic)
+        // switch (< case index expression >) {
+        //   ...rewritten cases ...
+        // }
+        .addStatements(
+            switchStatement.toBuilder()
+                .setAllowsNulls(false)
+                .setExpression(caseIndexVariable.createReference())
+                .build())
+        .build();
+  }
+
+  private static Variable createTemporaryVariable(
+      SourcePosition sourcePosition,
+      String name,
+      TypeDescriptor typeDescriptor,
+      Expression initializer,
+      List<Statement> initializationStatements) {
+    var selectorVariable =
+        Variable.builder().setName(name).setTypeDescriptor(typeDescriptor).setFinal(true).build();
+    initializationStatements.add(
+        VariableDeclarationExpression.builder()
+            .addVariableDeclaration(selectorVariable, initializer)
+            .build()
+            .makeStatement(sourcePosition));
+    return selectorVariable;
+  }
+
+  /**
+   * Construct a conditional that tests the pattern and returns the case index.
+   *
+   * <pre>{@code
+   * if ($selector instanceof Pattern p && guard))
+   *     $caseIndex = caseNumber;
+   * else  <next case condition>
+   *     ...
+   * }</pre>
+   */
+  private Statement createCaseSelectorLogic(
+      List<SwitchCase> cases, Expression selector, Variable caseIndexVariable, int currentIndex) {
+
+    Statement caseIndexAssignment =
+        caseIndexVariable
+            .infixAssign(NumberLiteral.fromInt(currentIndex))
+            .makeStatement(SourcePosition.NONE)
+            .ensureBlock();
+
+    if (currentIndex == cases.size() || cases.get(currentIndex).isDefault()) {
+      return caseIndexAssignment;
+    }
+
+    SwitchCase switchCase = cases.get(currentIndex);
+    return IfStatement.builder()
+        .setConditionExpression(createCaseCondition(selector, switchCase))
+        .setThenStatement(caseIndexAssignment)
+        .setElseStatement(
+            createCaseSelectorLogic(cases, selector, caseIndexVariable, currentIndex + 1))
+        .setSourcePosition(cases.get(currentIndex).getSourcePosition())
+        .build();
+  }
+
+  /** Creates the condition for switch case in a switch with patterns. */
+  private static Expression createCaseCondition(Expression selector, SwitchCase switchCase) {
+    return switch (switchCase) {
+      case SwitchCaseExpressions s -> createExpressionsCondition(selector, s.getCaseExpressions());
+
+      case SwitchCasePattern s -> createPatternCondition(selector, s);
+
+      case SwitchCaseDefault s -> throw new IllegalArgumentException();
+    };
+  }
+
+  private static Expression createExpressionsCondition(
+      Expression selector, List<Expression> expressions) {
+    Expression expression = expressions.getFirst();
+    Expression condition =
+        (expression instanceof NullLiteral || expression.getTypeDescriptor().isEnum())
+            // nulls and enums can be compared by reference.
+            ? selector.clone().infixEquals(expression)
+            // strings and primitives are compared using `equals.`
+            : RuntimeMethods.createObjectsEqualsMethodCall(selector.clone(), expression);
+
+    return expressions.size() > 1
+        ? condition.infixOr(
+            createExpressionsCondition(selector, expressions.subList(1, expressions.size())))
+        : condition;
+  }
+
+  private static Expression createPatternCondition(Expression selector, SwitchCasePattern s) {
+    Expression condition =
+        // $selector instanceof Pattern p
+        PatternMatchExpression.builder()
+            .setExpression(selector.clone())
+            .setPattern(s.getPattern())
+            .build();
+    Expression guard = s.getGuard();
+    if (guard == null) {
+      return condition;
+    }
+    // condition && guard.
+    return condition.infixAnd(guard);
   }
 
   /**
@@ -128,34 +347,73 @@ public class NormalizeSwitchConstructs extends NormalizationPass {
    * <li>1. avoid referring to enum objects on case clauses,
    * <li>2. throw if the expression is null to comply with Java semantics.
    */
-  private static <T extends SwitchConstruct<T>> T convertEnumSwitchConstruct(T switchConstruct) {
-    return switchConstruct.toBuilder()
-        .setExpression(
-            MethodCall.Builder.from(
-                    TypeDescriptors.get().javaLangEnum.getMethodDescriptor("ordinal"))
-                .setQualifier(switchConstruct.getExpression())
-                .build())
+  private static SwitchStatement convertEnumSwitchStatement(SwitchStatement switchStatement) {
+    boolean hasCaseNull = switchStatement.allowsNulls();
+
+    var switchExpression = MultiExpression.builder();
+
+    Expression expression = switchStatement.getExpression();
+    if (hasCaseNull && !expression.isIdempotent()) {
+      // Avoid evaluating the switch expression twice.
+      //
+      // ($switchExpr = expression, ...)
+      Variable tempVariable =
+          Variable.builder()
+              .setTypeDescriptor(expression.getTypeDescriptor())
+              .setFinal(true)
+              .setName("$switchExpression")
+              .build();
+      switchExpression.addExpressions(
+          VariableDeclarationExpression.builder()
+              .addVariableDeclaration(tempVariable, expression)
+              .build());
+      expression = tempVariable.createReference();
+    }
+
+    switchExpression.addExpressions(
+        hasCaseNull
+            // ($switchExpr == null ? -1 : $switchExpr.ordinal())
+            ? ConditionalExpression.builder()
+                .setConditionExpression(expression.clone().infixEqualsNull())
+                .setTypeDescriptor(PrimitiveTypes.INT)
+                .setTrueExpression(NumberLiteral.fromInt(NULL_ENUM_ORDINAL))
+                .setFalseExpression(getOrdinalMethodCall(expression))
+                .build()
+            : getOrdinalMethodCall(expression));
+
+    return switchStatement.toBuilder()
+        .setExpression(switchExpression.build())
         .setCases(
-            switchConstruct.getCases().stream()
+            switchStatement.getCases().stream()
                 .map(NormalizeSwitchConstructs::convertToOrdinalCase)
                 .collect(toImmutableList()))
         .build();
   }
 
+  // An integer value that can never be the ordinal of an enum, is used to represent null.
+  private static final int NULL_ENUM_ORDINAL = -1;
+
+  private static MethodCall getOrdinalMethodCall(Expression expression) {
+    return MethodCall.builderFrom(TypeDescriptors.get().javaLangEnum.getMethodDescriptor("ordinal"))
+        .setQualifier(expression)
+        .build();
+  }
+
   private static SwitchCase convertToOrdinalCase(SwitchCase switchCase) {
-    if (switchCase.isDefault()) {
-      return switchCase;
-    }
     for (int i = 0; i < switchCase.getCaseExpressions().size(); i++) {
-      FieldAccess enumFieldAccess = (FieldAccess) switchCase.getCaseExpressions().get(i);
-      switchCase
-          .getCaseExpressions()
-          .set(
-              i,
-              FieldAccess.Builder.from(enumFieldAccess)
-                  .setTarget(
-                      AstUtils.getEnumOrdinalConstantFieldDescriptor(enumFieldAccess.getTarget()))
-                  .build());
+      Expression caseExpression = switchCase.getCaseExpressions().get(i);
+      if (caseExpression instanceof FieldAccess enumFieldAccess) {
+        caseExpression =
+            enumFieldAccess.toBuilder()
+                .setTarget(
+                    AstUtils.getEnumOrdinalConstantFieldDescriptor(enumFieldAccess.getTarget()))
+                .build();
+      } else if (caseExpression instanceof NullLiteral) {
+        caseExpression = NumberLiteral.fromInt(NULL_ENUM_ORDINAL);
+      } else {
+        throw new InternalCompilerError("Unexpected case expression: %s", caseExpression);
+      }
+      switchCase.getCaseExpressions().set(i, caseExpression);
     }
     return switchCase;
   }

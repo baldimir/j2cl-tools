@@ -6,7 +6,7 @@
 
     <groupId>org.kie.j2cl.tools</groupId>
     <artifactId>j2cl-parent</artifactId>
-    <version>v20250822-1</version>
+    <version>v20260527-1</version>
     <packaging>pom</packaging>
 
     <name>J2CL parent</name>
@@ -69,7 +69,6 @@
         <module>ast</module>
         <module>frontend</module>
         <module>frontend-common</module>
-        <module>frontend-jdt</module>
         <module>frontend-javac</module>
 
         <module>backend</module>
@@ -213,84 +212,6 @@
                 <artifactId>escapevelocity</artifactId>
                 <version>1.1</version>
             </dependency>
-
-            <dependency>
-                <groupId>org.eclipse.jdt</groupId>
-                <artifactId>org.eclipse.jdt.core</artifactId>
-                <version>3.22.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.core.commands</artifactId>
-                <version>3.12.300</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.core.contenttype</artifactId>
-                <version>3.9.600</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.core.expressions</artifactId>
-                <version>3.9.400</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.core.filesystem</artifactId>
-                <version>1.11.200</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.core.jobs</artifactId>
-                <version>3.15.600</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.core.resources</artifactId>
-                <version>3.22.200</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.core.runtime</artifactId>
-                <version>3.33.100</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.equinox.app</artifactId>
-                <version>1.7.400</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.equinox.common</artifactId>
-                <version>3.20.100</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.equinox.preferences</artifactId>
-                <version>3.11.400</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.equinox.registry</artifactId>
-                <version>3.12.400</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.osgi</artifactId>
-                <version>3.23.100</version>
-            </dependency>
-            <dependency>
-                <groupId>org.eclipse.platform</groupId>
-                <artifactId>org.eclipse.text</artifactId>
-                <version>3.14.300</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.osgi</groupId>
-                <artifactId>org.osgi.service.prefs</artifactId>
-                <version>1.1.2</version>
-            </dependency>
-
             <dependency>
                 <groupId>org.kie.j2cl.tools</groupId>
                 <artifactId>closure-compiler-unshaded</artifactId>

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package interfaces
 
@@ -42,42 +43,52 @@ open class Main {
   val si: SubInterface = Implementor()
   si.interfaceMethod()
   si.defaultMethod(null)
+  val si2: SubInterface = SubImplementor()
+  si2.interfaceMethod()
+  (si2 as Main.SubImplementor?)!!.interfaceMethod()
+  (si2 as Main.AbstractImplementor?)!!.interfaceMethod()
  }
-
+ 
  fun interface Interface<T> {
   fun interfaceMethod()
-
+  
   fun defaultMethod(t: T) {
    this.privateMethod_private_interfaces_Main_Interface(t)
   }
-
+  
   fun privateMethod_private_interfaces_Main_Interface(t: T) {}
-
+  
   companion object {
    const val a: Int = 1
-
+   
    const val b: Int = 2
-
+   
    @JvmStatic
    fun staticInterfaceMethod() {}
   }
  }
-
+ 
  fun interface SubInterface: Interface<String?> {
   override fun defaultMethod(s: String?) {
    super<Interface>.defaultMethod(s)
   }
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  open inner class Implementor internal constructor(): SubInterface, Interface<String?> {
   override fun interfaceMethod() {}
  }
-
+ 
  abstract inner class AbstractImplementor internal constructor(): SubInterface
-
+ 
+ open inner class SubImplementor internal constructor(): Main.AbstractImplementor() {
+  final override fun interfaceMethod() {}
+ }
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  enum class EnumImplementor: SubInterface {
   ONE;
-
+  
   override fun interfaceMethod() {}
  }
 }

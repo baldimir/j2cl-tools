@@ -1,0 +1,66 @@
+goog.module('recordclass.RecordClass.RecordSpecializingInterface$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+const PropertyAccessors = goog.require('recordclass.RecordClass.PropertyAccessors$impl');
+
+/**
+ * @final
+ * @implements {PropertyAccessors<?string>}
+ */
+class RecordSpecializingInterface extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {?string} @nodts*/
+  this.f_parametric__recordclass_RecordClass_RecordSpecializingInterface_;
+  /**@type {?string} @nodts*/
+  this.f_nonParametric__recordclass_RecordClass_RecordSpecializingInterface_;
+ }
+ /** @nodts @return {!RecordSpecializingInterface} */
+ static $create__java_lang_String__java_lang_String(/** ?string */ parametric, /** ?string */ nonParametric) {
+  RecordSpecializingInterface.$clinit();
+  let $instance = new RecordSpecializingInterface();
+  $instance.$ctor__recordclass_RecordClass_RecordSpecializingInterface__java_lang_String__java_lang_String__void(parametric, nonParametric);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_RecordSpecializingInterface__java_lang_String__java_lang_String__void(/** ?string */ parametric, /** ?string */ nonParametric) {
+  this.$ctor__java_lang_Record__void();
+  this.f_parametric__recordclass_RecordClass_RecordSpecializingInterface_ = parametric;
+  this.f_nonParametric__recordclass_RecordClass_RecordSpecializingInterface_ = nonParametric;
+  $J2CL_PRESERVE$(this.f_parametric__recordclass_RecordClass_RecordSpecializingInterface_, this.f_nonParametric__recordclass_RecordClass_RecordSpecializingInterface_);
+ }
+ /** @nodts @return {?string} */
+ m_parametric__java_lang_String() {
+  return this.f_parametric__recordclass_RecordClass_RecordSpecializingInterface_;
+ }
+ /** @override @nodts @return {?string} */
+ m_nonParametric__java_lang_String() {
+  return this.f_nonParametric__recordclass_RecordClass_RecordSpecializingInterface_;
+ }
+ //Bridge method.
+ /** @final @override @nodts @return {?string} */
+ m_parametric__java_lang_Object() {
+  return this.m_parametric__java_lang_String();
+ }
+ /** @nodts */
+ static $clinit() {
+  RecordSpecializingInterface.$clinit = () =>{};
+  RecordSpecializingInterface.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof RecordSpecializingInterface;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+PropertyAccessors.$markImplementor(RecordSpecializingInterface);
+$Util.$setClassMetadata(RecordSpecializingInterface, 'recordclass.RecordClass$RecordSpecializingInterface');
+
+exports = RecordSpecializingInterface;
+
+//# sourceMappingURL=RecordClass$RecordSpecializingInterface.js.map

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -22,51 +23,55 @@ import kotlin.String
 import kotlin.Suppress
 
 open class AccidentalOverride {
- abstract inner class SuperClass internal constructor() {
+ internal abstract inner class SuperClass internal constructor() {
   open fun accidentalOverride() {}
  }
-
- interface Interface {
+ 
+ internal interface Interface {
   fun accidentalOverride() {}
-
+  
   fun abstractAccidentalOverride() {}
  }
-
- open inner class TestImplicitOverride internal constructor(): AccidentalOverride.SuperClass(), Interface {
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
+ internal open inner class TestImplicitOverride internal constructor(): AccidentalOverride.SuperClass(), Interface {
   override fun accidentalOverride() {
    super<SuperClass>.accidentalOverride()
   }
  }
-
- open inner class TestExplicitOverride internal constructor(): AccidentalOverride.SuperClass(), Interface {
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
+ internal open inner class TestExplicitOverride internal constructor(): AccidentalOverride.SuperClass(), Interface {
   override fun accidentalOverride() {
    super<SuperClass>.accidentalOverride()
   }
  }
-
- abstract inner class SubClass internal constructor(): AccidentalOverride.SuperClass() {
+ 
+ internal abstract inner class SubClass internal constructor(): AccidentalOverride.SuperClass() {
   abstract fun abstractAccidentalOverride()
  }
-
- abstract inner class TestImplicitOverrideInAbstractClass internal constructor(): AccidentalOverride.SubClass(), Interface {
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
+ internal abstract inner class TestImplicitOverrideInAbstractClass internal constructor(): AccidentalOverride.SubClass(), Interface {
+  override fun accidentalOverride() {
+   super<SubClass>.accidentalOverride()
+  }
+  
   abstract override fun abstractAccidentalOverride()
-
-  override fun accidentalOverride() {
-   super<SubClass>.accidentalOverride()
-  }
  }
-
- abstract inner class TestExplicitOverrideInAbstractClass internal constructor(): AccidentalOverride.SubClass(), Interface {
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
+ internal abstract inner class TestExplicitOverrideInAbstractClass internal constructor(): AccidentalOverride.SubClass(), Interface {
   override fun accidentalOverride() {
    super<SubClass>.accidentalOverride()
   }
-
+  
   abstract override fun abstractAccidentalOverride()
  }
 }
 
-interface Parent {
+internal interface Parent {
  fun <T: String> test(t: T)
 }
 
-interface Child: Parent
+internal interface Child: Parent

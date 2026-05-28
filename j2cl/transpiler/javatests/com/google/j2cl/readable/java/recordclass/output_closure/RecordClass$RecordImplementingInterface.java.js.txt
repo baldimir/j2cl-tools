@@ -1,0 +1,8 @@
+goog.module('recordclass.RecordClass.RecordImplementingInterface');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+goog.require('recordclass.RecordClass.I');
+
+const RecordImplementingInterface = goog.require('recordclass.RecordClass.RecordImplementingInterface$impl');
+exports = RecordImplementingInterface;

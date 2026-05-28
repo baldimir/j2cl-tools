@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package staticinitializers
 
@@ -26,19 +27,19 @@ open class StaticInitializers {
  companion object {
   @JvmField
   var a: Int = 5
-
+  
   @JvmField
   var b: Int = StaticInitializers.a * 2
-
+  
   @JvmField
   val c: Int
-
+  
   init {
    StaticInitializers.a = 10
    c = StaticInitializers.a + StaticInitializers.b
    val duplicated: Int = StaticInitializers.c
   }
-
+  
   init {
    val duplicated_1: Int = 1
   }

@@ -51,6 +51,11 @@ class ClassWithCompanion extends j_l_Object {
   ClassWithCompanion.$clinit();
   return 2;
  }
+ /** @nodts @return {number} */
+ static m_getStaticInternalProperty__int() {
+  ClassWithCompanion.$clinit();
+  return ClassWithCompanion.f_staticInternalProperty__jvmstatic_ClassWithCompanion_;
+ }
  /** @nodts */
  static m_staticInternalFunction__void() {
   ClassWithCompanion.$clinit();
@@ -98,6 +103,7 @@ class ClassWithCompanion extends j_l_Object {
   ClassWithCompanion.f_foo__jvmstatic_ClassWithCompanion_ = JvmStaticKt.m_f__java_lang_Object__java_lang_Object(Companion.f_Companion__jvmstatic_ClassWithCompanion_Companion);
   ClassWithCompanion.f_bar__jvmstatic_ClassWithCompanion_ = ClassWithCompanion_$1.$create__();
   ClassWithCompanion.f_staticProperty__jvmstatic_ClassWithCompanion_ = 1;
+  ClassWithCompanion.f_staticInternalProperty__jvmstatic_ClassWithCompanion_ = 3;
   ClassWithCompanion.f_staticJsProperty__jvmstatic_ClassWithCompanion_ = 2;
   ClassWithCompanion.f_staticJsPropertyWithGetter__jvmstatic_ClassWithCompanion_ = 2;
  }
@@ -120,6 +126,8 @@ ClassWithCompanion.f_foo__jvmstatic_ClassWithCompanion_;
 ClassWithCompanion.f_bar__jvmstatic_ClassWithCompanion_;
 /**@type {number} @nodts*/
 ClassWithCompanion.f_staticProperty__jvmstatic_ClassWithCompanion_ = 0;
+/**@type {number} @nodts*/
+ClassWithCompanion.f_staticInternalProperty__jvmstatic_ClassWithCompanion_ = 0;
 /**@type {number} @nodts*/
 ClassWithCompanion.f_staticJsProperty__jvmstatic_ClassWithCompanion_ = 0;
 /**@type {number} @nodts*/

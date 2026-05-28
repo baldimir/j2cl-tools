@@ -261,6 +261,25 @@ public class Nullability {
       void acceptsNonNullStrng(String i) {}
     }
   }
+
+  // Repro for b/443782901
+  @NullMarked
+  static class WithNullableParameterInConstructor {
+    WithNullableParameterInConstructor(@Nullable String s) {}
+
+    static void m() {
+      var o = new WithNullableParameterInConstructor(null) {};
+    }
+  }
+
+  // TODO(b/451682710): Remove this when it becomes a compile error.
+  @JsNonNull
+  interface NonNullInterface {}
+
+  void testNonNullOnType(
+      NonNullInterface unannotated,
+      @JsNonNull NonNullInterface annotatedNonNull,
+      @Nullable NonNullInterface annotatedNullable) {}
 }
 
 interface Marker {}

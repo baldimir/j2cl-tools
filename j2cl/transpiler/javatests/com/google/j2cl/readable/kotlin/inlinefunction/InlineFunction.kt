@@ -16,9 +16,8 @@
 package inlinefunction
 
 class MyClass(var f: Int) {
-  fun addAndReturn(i: Int): Int {
-    f += i
-    return f
+  fun double() {
+    f *= 2
   }
 }
 
@@ -26,7 +25,7 @@ inline fun topLevelInlineFunction(myClass: MyClass, action: (Int) -> Int): Int {
   return action(myClass.f)
 }
 
-inline fun <T> doSomethingOn(target: T, block: (T) -> Unit) = block(target)
+inline fun <T, R> doSomethingOn(target: T, block: (T) -> R) = block(target)
 
 class ClassWithInlineFun(var e: Int) {
   inline fun inlineFun(action: (Int) -> Int): Int {
@@ -41,11 +40,12 @@ class ClassWithInlineFun(var e: Int) {
     return sum
   }
 
-  inline fun inlineFunWithAnonymousObject(): Int {
+  inline fun inlineFunWithAnonymousObject(captureParam: Int): Int {
+    val capture = 5
     val delegate =
       object {
         fun compute(): Int {
-          return e * 2
+          return (e + capture + captureParam) * 2
         }
       }
     return delegate.compute()
@@ -78,7 +78,7 @@ inline fun MyClass.extensionInlineFunctionNoReturn(action: (Int) -> Int) {
 fun testInlining() {
   val a = topLevelInlineFunction(MyClass(2)) { it * 2 }
   val b = ClassWithInlineFun(5).inlineFun { it * 3 }
-  val c = ClassWithInlineFun(5).inlineFunWithAnonymousObject()
+  val c = ClassWithInlineFun(5).inlineFunWithAnonymousObject(5)
   val d = ClassWithInlineFun(5).inlineFunWithAnonymousObjectAndTypeParam(5)
   val e = MyClass(5).extensionInlineFunction { it * 4 }
   MyClass(5).extensionInlineFunctionNoReturn { it * 5 }
@@ -100,14 +100,21 @@ fun testInliningWithLocalClass() {
     }
 }
 
+inline fun runNTimes(n: Int, action: () -> Unit) {
+  for (i in 0..<n) {
+    action()
+  }
+}
+
 fun testFunctionRef() {
   val foo = MyClass(2)
-  topLevelInlineFunction(foo, foo::addAndReturn)
+  doSomethingOn(foo, MyClass::double)
 
-  // TODO(b/405183980): Uncomment when this doesn't crash the frontend.
-  // doSomethingOn(MyClass(2)) {
-  //   topLevelInlineFunction(it, it::addAndReturn)
-  // }
+  val result =
+    doSomethingOn(MyClass(2)) {
+      runNTimes(5, it::double)
+      it.f
+    }
 }
 
 inline fun <reified T> castTo(obj: Any?): T = obj as T
@@ -242,6 +249,71 @@ internal abstract class Repro<N> {
   }
 }
 
-internal fun Repro<String>.findNext(): String? {
+internal abstract class StringRepro : Repro<String>()
+
+internal abstract class StringReproChild : StringRepro()
+
+internal abstract class ParametrizedReproChild<T> : Repro<T>()
+
+internal abstract class StringParametrizedReproChild : ParametrizedReproChild<String>()
+
+internal abstract class ParametrizedContainerReproChild<T> : Repro<Container<T>>()
+
+internal fun <S : Repro<String>> S.find0(): String? {
   return get()
+}
+
+internal fun StringRepro.find1(): String? {
+  return get()
+}
+
+internal fun StringReproChild.find2(): String? {
+  return get()
+}
+
+internal fun <S : StringReproChild> S.find3(): String? {
+  return get()
+}
+
+internal fun <S : ParametrizedReproChild<String>> S.find4(): String? {
+  return get()
+}
+
+internal fun <S : ParametrizedReproChild<*>> S.findWithStarProjection(): String? {
+  return get() as String?
+}
+
+internal fun <S : ParametrizedContainerReproChild<String>> S.find5(): String? {
+  return get()?.t
+}
+
+internal fun <S : StringParametrizedReproChild> S.find6(): String? {
+  return get()
+}
+
+internal fun <T : ParametrizedReproChild<String>, S : T> S.find7(t: T): String? {
+  return get()
+}
+
+inline fun executeBlock(block: () -> Unit) = block()
+
+fun testInlineBreakContinue() {
+  var i = 0
+  while (true) {
+    executeBlock {
+      i++
+      if (i < 10) {
+        continue
+      }
+      break
+    }
+  }
+  outer@ while (true) {
+    executeBlock {
+      while (true) {
+        i++
+        break@outer
+      }
+    }
+  }
 }

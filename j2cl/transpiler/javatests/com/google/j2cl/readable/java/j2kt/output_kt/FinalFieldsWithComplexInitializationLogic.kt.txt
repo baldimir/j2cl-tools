@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -23,7 +24,7 @@ import kotlin.Suppress
 
 open class FinalFieldsWithComplexInitializationLogic {
  private val finalField: Int
-
+ 
  internal constructor(i: Int) {
   when (i) {
    1 -> {

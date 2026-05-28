@@ -7,6 +7,8 @@ Should only be used for importing annotation byte code, otherwise may result
 in hard to debug errors!
 """
 
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_java//java:defs.bzl", "JavaInfo")
 load(":provider.bzl", "J2ktInfo")
 
@@ -30,14 +32,14 @@ def _j2kt_jvm_import_impl(ctx):
 
 def _j2kt_native_import_impl(ctx):
     kt_native_infos = []
-    swift_infos = []
+    swift_interop_infos = []
     default_files = [ctx.attr.jar[DefaultInfo].files]
     opt_providers = []
 
     return [
         DefaultInfo(files = depset(transitive = default_files)),
         create_J2ktInfo_for_java_import(ctx.attr.jar[JavaInfo]),
-    ] + kt_native_infos + swift_infos + opt_providers
+    ] + kt_native_infos + swift_interop_infos + opt_providers
 
 j2kt_jvm_import = rule(
     implementation = _j2kt_jvm_import_impl,

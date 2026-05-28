@@ -19,7 +19,6 @@ import static com.google.common.base.Predicates.notNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Streams;
 import com.google.j2cl.common.EntryPointPattern;
 import com.google.j2cl.common.Problems;
 import com.google.j2cl.common.SourcePosition;
@@ -33,6 +32,9 @@ import javax.annotation.Nullable;
  * (instead of the original entry points). The forwarding methods perform necessary conversions
  * between {@code java.lang.String} and Wasm strings.
  */
+// TODO(b/482402363) This helper class can be removed after updating test infra and moving the
+// traversal logic into BazelJ2wasmExportsGenerator. Currently, this common logic is shared between
+// the external pipeline and the test-specific one so that the test is valid.
 public class WasmEntryPointBridgesCreator {
   private final ImmutableList<EntryPointPattern> entryPointPatterns;
   private final Set<EntryPointPattern> unmatchedEntryPointPatterns;
@@ -47,18 +49,15 @@ public class WasmEntryPointBridgesCreator {
     this.problems = problems;
   }
 
-  public void generateBridges(Library library) {
+  public void validateEntryPoints(Library library) {
     library
         .streamTypes()
         .forEach(
             type -> {
               for (Method method : type.getMethods()) {
-                Method exportBridgeMethod =
-                    generateBridge(method.getDescriptor(), method.getSourcePosition());
-                if (exportBridgeMethod == null) {
-                  continue;
-                }
-                type.addMember(exportBridgeMethod);
+                // isEntryPoint also checks that the regular expressions used to select entrypoints
+                // are consistent.
+                var unused = isEntryPoint(method.getDescriptor());
               }
             });
 
@@ -84,7 +83,7 @@ public class WasmEntryPointBridgesCreator {
   }
 
   @Nullable
-  public Method generateBridge(MethodDescriptor methodDescriptor) {
+  private Method generateBridge(MethodDescriptor methodDescriptor) {
     return generateBridge(methodDescriptor, SourcePosition.NONE);
   }
 
@@ -94,42 +93,8 @@ public class WasmEntryPointBridgesCreator {
       return null;
     }
 
-    if (!exportedMethodNames.add(methodDescriptor.getName())) {
-      problems.error(
-          "More than one method are exported with the same name '%s'.", methodDescriptor.getName());
-      return null;
-    }
-
-    MethodDescriptor bridgeMethodDescriptor = createExportBridgeDescriptor(methodDescriptor);
-    List<Variable> parameters =
-        AstUtils.createParameterVariables(bridgeMethodDescriptor.getParameterTypeDescriptors());
-
-    ImmutableList<Expression> arguments =
-        Streams.zip(
-                parameters.stream(),
-                methodDescriptor.getParameterTypeDescriptors().stream(),
-                WasmEntryPointBridgesCreator::convertArgumentIfNeeded)
-            .collect(toImmutableList());
-
-    TypeDescriptor returnType = methodDescriptor.getReturnTypeDescriptor();
-
-    return Method.newBuilder()
-        .setMethodDescriptor(bridgeMethodDescriptor)
-        .setWasmExportName(methodDescriptor.getName())
-        .setParameters(parameters)
-        .addStatements(
-            convertReturnIfNeeded(
-                AstUtils.createForwardingStatement(
-                    sourcePosition,
-                    /* qualifier= */ null,
-                    methodDescriptor,
-                    /* isStaticDispatch= */ true,
-                    arguments,
-                    returnType),
-                returnType))
-        .setJsDocDescription("Wasm entry point forwarding method.")
-        .setSourcePosition(sourcePosition)
-        .build();
+    return WasmExportBridgesUtils.generateBridge(
+        methodDescriptor, sourcePosition, MethodDescriptor.MethodOrigin.SYNTHETIC_WASM_ENTRY_POINT);
   }
 
   private boolean isEntryPoint(MethodDescriptor methodDescriptor) {
@@ -146,50 +111,17 @@ public class WasmEntryPointBridgesCreator {
           methodDescriptor.getEnclosingTypeDescriptor().getQualifiedSourceName(),
           methodDescriptor.getName())) {
         unmatchedEntryPointPatterns.remove(entryPointPattern);
+
+        if (!exportedMethodNames.add(methodDescriptor.getName())) {
+          problems.error(
+              "More than one method are exported with the same name '%s'.",
+              methodDescriptor.getName());
+        }
+
         return true;
       }
     }
+
     return false;
-  }
-
-  /** Creates the argument expression, containing any necessary conversions. */
-  private static Expression convertArgumentIfNeeded(
-      Variable parameter, TypeDescriptor targetArgumentDescriptor) {
-    Expression reference = parameter.createReference();
-    if (TypeDescriptors.isJavaLangString(targetArgumentDescriptor)) {
-      return RuntimeMethods.createStringFromJsStringMethodCall(reference);
-    }
-    return reference;
-  }
-
-  private static Statement convertReturnIfNeeded(
-      Statement statement, TypeDescriptor targetReturnTypeDescriptor) {
-    if (TypeDescriptors.isJavaLangString(targetReturnTypeDescriptor)) {
-      ReturnStatement returnStatement = (ReturnStatement) statement;
-      return ReturnStatement.Builder.from(returnStatement)
-          .setExpression(
-              RuntimeMethods.createJsStringFromStringMethodCall(returnStatement.getExpression()))
-          .build();
-    }
-    return statement;
-  }
-
-  private static MethodDescriptor createExportBridgeDescriptor(MethodDescriptor descriptor) {
-    return MethodDescriptor.Builder.from(descriptor)
-        .setName(descriptor.getName() + "__$export")
-        .setReturnTypeDescriptor(
-            replaceStringWithNativeString(descriptor.getReturnTypeDescriptor()))
-        .updateParameterTypeDescriptors(
-            descriptor.getParameterTypeDescriptors().stream()
-                .map(WasmEntryPointBridgesCreator::replaceStringWithNativeString)
-                .collect(toImmutableList()))
-        .build();
-  }
-
-  private static TypeDescriptor replaceStringWithNativeString(TypeDescriptor typeDescriptor) {
-    if (TypeDescriptors.isJavaLangString(typeDescriptor)) {
-      return TypeDescriptors.getNativeStringType().toNullable(typeDescriptor.isNullable());
-    }
-    return typeDescriptor;
   }
 }

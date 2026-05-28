@@ -40,7 +40,7 @@ import javax.annotation.Nullable;
  */
 @Visitable
 @AutoValue
-public abstract class IntersectionTypeDescriptor extends TypeDescriptor {
+public abstract non-sealed class IntersectionTypeDescriptor extends TypeDescriptor {
 
   public abstract ImmutableList<TypeDescriptor> getIntersectionTypeDescriptors();
 
@@ -131,7 +131,7 @@ public abstract class IntersectionTypeDescriptor extends TypeDescriptor {
       return this;
     }
 
-    return IntersectionTypeDescriptor.newBuilder()
+    return IntersectionTypeDescriptor.builder()
         .setIntersectionTypeDescriptors(
             getIntersectionTypeDescriptors().stream()
                 .map(TypeDescriptor::toNullable)
@@ -145,7 +145,7 @@ public abstract class IntersectionTypeDescriptor extends TypeDescriptor {
       return this;
     }
 
-    return IntersectionTypeDescriptor.newBuilder()
+    return IntersectionTypeDescriptor.builder()
         .setIntersectionTypeDescriptors(
             getIntersectionTypeDescriptors().stream()
                 .map(TypeDescriptor::toNonNullable)
@@ -179,7 +179,7 @@ public abstract class IntersectionTypeDescriptor extends TypeDescriptor {
     ImmutableList<TypeDescriptor> newIntersections =
         replaceTypeDescriptors(intersections, fn, seen);
     if (!intersections.equals(newIntersections)) {
-      return newBuilder().setIntersectionTypeDescriptors(newIntersections).build();
+      return builder().setIntersectionTypeDescriptors(newIntersections).build();
     }
     return this;
   }
@@ -192,7 +192,7 @@ public abstract class IntersectionTypeDescriptor extends TypeDescriptor {
       return this;
     }
 
-    return newBuilder()
+    return builder()
         .setIntersectionTypeDescriptors(
             getIntersectionTypeDescriptors().stream()
                 .map(
@@ -242,7 +242,7 @@ public abstract class IntersectionTypeDescriptor extends TypeDescriptor {
     return Visitor_IntersectionTypeDescriptor.visit(processor, this);
   }
 
-  public static Builder newBuilder() {
+  public static Builder builder() {
     return new AutoValue_IntersectionTypeDescriptor.Builder();
   }
 

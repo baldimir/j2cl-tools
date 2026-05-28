@@ -100,6 +100,7 @@ def j2kt_generate_unit_test(name, test_class, deps, platform = "J2KT-JVM", tags 
             tags = tags + ["ide-test-intermediate"],
             gen_by_xplat = True,
             exec_properties = exec_properties,
+            generate_framework = False,
         )
 
 def _extract_kotlin_srcjar(ctx):
@@ -116,6 +117,7 @@ def _extract_kotlin_srcjar(ctx):
         inputs = [ctx.file.input_jar],
         outputs = [output_dir],
         command = "unzip -q %s *.kt -d %s" % (ctx.file.input_jar.path, output_dir.path),
+        mnemonic = "J2ktExtractKotlinSrcjar",
     )
 
     return [DefaultInfo(files = depset([output_dir]))]

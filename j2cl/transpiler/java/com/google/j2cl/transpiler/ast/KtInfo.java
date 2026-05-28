@@ -24,13 +24,11 @@ import javax.annotation.Nullable;
 /** Kotlin member information. */
 @AutoValue
 public abstract class KtInfo {
-  public static final KtInfo NONE = KtInfo.newBuilder().build();
+  public static final KtInfo NONE = KtInfo.builder().build();
 
   public abstract boolean isProperty();
 
   public abstract boolean isDisabled();
-
-  public abstract boolean isUninitializedWarningSuppressed();
 
   public abstract boolean isThrows();
 
@@ -39,12 +37,8 @@ public abstract class KtInfo {
 
   public abstract Builder toBuilder();
 
-  public static Builder newBuilder() {
-    return new AutoValue_KtInfo.Builder()
-        .setProperty(false)
-        .setDisabled(false)
-        .setThrows(false)
-        .setUninitializedWarningSuppressed(false);
+  public static Builder builder() {
+    return new AutoValue_KtInfo.Builder().setProperty(false).setDisabled(false).setThrows(false);
   }
 
   /** The builder. */
@@ -53,8 +47,6 @@ public abstract class KtInfo {
     public abstract Builder setProperty(boolean isProperty);
 
     public abstract Builder setDisabled(boolean isDisabled);
-
-    public abstract Builder setUninitializedWarningSuppressed(boolean isLateInit);
 
     public abstract Builder setName(String name);
 

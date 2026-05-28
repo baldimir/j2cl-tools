@@ -13,6 +13,7 @@ java_library(
     deps = [
         "//third_party:error_prone_annotations",
         "//third_party:guava",
+        "//third_party:jscomp",
         "//transpiler/java/com/google/j2cl/common",
         "//transpiler/java/com/google/j2cl/transpiler/ast",
     ],
@@ -24,6 +25,7 @@ javadoc_library(
     deps = [
         "//third_party:error_prone_annotations",
         "//third_party:guava",
+        "//third_party:jscomp",
         "//transpiler/java/com/google/j2cl/common",
         "//transpiler/java/com/google/j2cl/transpiler/ast",
     ],

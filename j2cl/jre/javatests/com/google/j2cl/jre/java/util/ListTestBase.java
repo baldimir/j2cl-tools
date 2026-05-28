@@ -15,11 +15,19 @@
  */
 package com.google.j2cl.jre.java.util;
 
+import static java.util.Arrays.asList;
+import static org.junit.Assert.assertThrows;
+
+import com.google.j2cl.jre.testing.J2ktIncompatible;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -172,70 +180,22 @@ public abstract class ListTestBase extends TestArrayList {
     assertEquals(testList, Arrays.asList(2, 6, 4));
     checkListSizeAndContent(testList, 2, 6, 4);
 
-    try {
-      testList.remove(3);
-      fail("Expected remove to fail");
-    } catch (IndexOutOfBoundsException e) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> testList.remove(3));
 
     checkListSizeAndContent(wrappedList, 1, 2, 6, 4, 5);
     testList.set(0, 7);
     checkListSizeAndContent(testList, 7, 6, 4);
     checkListSizeAndContent(wrappedList, 1, 7, 6, 4, 5);
 
-    try {
-      wrappedList.subList(-1, 5);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
-
-    try {
-      wrappedList.subList(0, 15);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
-
-    try {
-      wrappedList.subList(5, 1);
-      fail("expected IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-    }
-
-    try {
-      wrappedList.subList(0, 1).add(2, 5);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
-
-    try {
-      wrappedList.subList(0, 1).add(-1, 5);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
-
-    try {
-      wrappedList.subList(0, 1).get(1);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
-
-    try {
-      wrappedList.subList(0, 1).get(-1);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
-
-    try {
-      wrappedList.subList(0, 1).set(2, 2);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
-
-    try {
-      wrappedList.subList(0, 1).set(-1, 5);
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException e) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(-1, 5));
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(0, 15));
+    assertThrows(IllegalArgumentException.class, () -> wrappedList.subList(5, 1));
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(0, 1).add(2, 5));
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(0, 1).add(-1, 5));
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(0, 1).get(1));
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(0, 1).get(-1));
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(0, 1).set(2, 2));
+    assertThrows(IndexOutOfBoundsException.class, () -> wrappedList.subList(0, 1).set(-1, 5));
   }
 
   /** Test add() method for list returned by List<E>.subList() method. */
@@ -293,11 +253,7 @@ public abstract class ListTestBase extends TestArrayList {
     assertEquals(4, baseList.size());
     assertEquals(3, baseList.get(1).intValue());
 
-    try {
-      sublist.remove(1);
-      fail("Expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> sublist.remove(1));
 
     assertFalse(sublist.remove(Integer.valueOf(4)));
 
@@ -355,6 +311,87 @@ public abstract class ListTestBase extends TestArrayList {
         assertEquals(i, elem.intValue());
       }
     }
+  }
+
+  public void testForeach() {
+    List<String> list = makeEmptyStringList();
+    list.forEach(e -> fail());
+    assertThrows(NullPointerException.class, () -> list.forEach(null));
+
+    var list2 = makeEmptyStringList();
+    list2.addAll(asList("a", "b", "c"));
+    ArrayList<String> visited = new ArrayList<>();
+    list2.forEach(visited::add);
+    assertEquals(asList("a", "b", "c"), visited);
+  }
+
+  public void testRemoveIf() {
+    List<String> list = makeEmptyStringList();
+
+    var l = list;
+    assertThrows(NullPointerException.class, () -> l.removeIf(null));
+
+    list = makeEmptyStringList();
+    list.addAll(asList("a", "b", "c"));
+    assertFalse(list.removeIf(e -> false));
+    assertEquals(asList("a", "b", "c"), list);
+
+    assertFalse(list.removeIf(Predicate.isEqual("")));
+    assertEquals(asList("a", "b", "c"), list);
+
+    assertTrue(list.removeIf(Predicate.isEqual("b")));
+    assertEquals(asList("a", "c"), list);
+
+    list.add("d");
+    assertTrue(list.removeIf(e -> e.equals("a") || e.equals("c")));
+    assertEquals(asList("d"), list);
+
+    assertTrue(list.removeIf(Predicate.isEqual("d")));
+    assertFalse(list.removeIf(Predicate.isEqual("d")));
+    assertTrue(list.isEmpty());
+
+    Collections.addAll(list, "a", "b");
+    assertFalse(list.removeIf(Objects::isNull));
+    assertEquals(asList("a", "b"), list);
+  }
+
+  @J2ktIncompatible // Not nullable according to Jspecify
+  public void testReplaceAll_null() {
+    List<String> list = makeEmptyStringList();
+
+    assertThrows(NullPointerException.class, () -> list.replaceAll(null));
+  }
+
+  public void testReplaceAll() {
+    List<String> list = makeEmptyStringList();
+
+    list.replaceAll(UnaryOperator.identity());
+    assertTrue(list.isEmpty());
+
+    Collections.addAll(list, "a", "b");
+    list.replaceAll(UnaryOperator.identity());
+    assertEquals(asList("a", "b"), list);
+
+    list.replaceAll(e -> e + "0");
+    assertEquals(asList("a0", "b0"), list);
+
+    list.add("c");
+    list.replaceAll(e -> e + "1");
+    assertEquals(asList("a01", "b01", "c1"), list);
+  }
+
+  public void testSort() {
+    List<String> list = makeEmptyStringList();
+    list.sort(null);
+
+    Collections.addAll(list, "b", "a", "c");
+    list.sort(null);
+    assertEquals(asList("a", "b", "c"), list);
+
+    list = makeEmptyStringList();
+    Collections.addAll(list, "b", "a", "c");
+    list.sort(Collections.reverseOrder());
+    assertEquals(asList("c", "b", "a"), list);
   }
 
   private <T extends @Nullable Object> void checkListSizeAndContent(List<T> in, int... expected) {

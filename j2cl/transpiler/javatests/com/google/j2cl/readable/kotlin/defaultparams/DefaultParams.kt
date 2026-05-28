@@ -21,7 +21,7 @@ open class DefaultParams(val a: Int = 1, val b: Int) {
   open fun foo(c: Int = 20) {}
 }
 
-class Subclass : DefaultParams {
+class Subclass : DefaultParams, DefaultParamInterface<String> {
   constructor() : super(b = 2)
 
   constructor(a: Int, b: Int) : super(a, b)
@@ -29,6 +29,10 @@ class Subclass : DefaultParams {
   override fun foo(c: Int) {
     super.foo(c + 10)
   }
+
+  override fun parentInterfaceFun(a: Int) {}
+
+  override fun <V> withTypeParameters(a: String?, b: V?): String? = a
 }
 
 fun testConstructors() {
@@ -55,6 +59,37 @@ fun testExtFun() {
   DefaultParams(b = 2).extFunWithDefault(123)
 }
 
+fun testLocalFun() {
+  fun localFun(a: Int, b: Int = 1) = a + b
+  localFun(10)
+  localFun(10, 20)
+
+  fun localFunWithNonPrimitive(o: Any? = Any(), unused: Any? = null) = o
+
+  val someValue = Any()
+  localFunWithNonPrimitive()
+  localFunWithNonPrimitive(someValue)
+  localFunWithNonPrimitive("test")
+
+  val nestedObj =
+    object {
+      fun doSomething() {
+        fun nestedLocalFun(a: Int, b: Int = 1) = a + b
+
+        nestedLocalFun(10)
+        nestedLocalFun(10, 20)
+
+        // Also try calling the local funs from the outer scope
+        localFun(10)
+        localFun(10, 20)
+
+        localFunWithNonPrimitive()
+        localFunWithNonPrimitive(someValue)
+        localFunWithNonPrimitive("test")
+      }
+    }
+}
+
 fun complexDefault(
   a: Int,
   b: Int =
@@ -70,6 +105,14 @@ fun testComplexDefault() {
   complexDefault(a = -1)
   complexDefault(a = 1)
   complexDefault(a = 1, b = 123)
+}
+
+fun captureDefault(str: String = "defaulted", f: () -> String = { "f: $str" }): String = f()
+
+fun testCapturedDefault() {
+  captureDefault()
+  captureDefault("foo")
+  captureDefault("foo") { "bar" }
 }
 
 fun identityOrCreate(o: Any? = Any(), unused: Any = Any()) = o
@@ -141,12 +184,6 @@ fun testVarargs() {
   optionalVarargsWithLeadingOptional(20)
 }
 
-interface IFoo {
-  fun defaultMethod(a: Int = 1) = a
-
-  fun interfaceMethod(a: Int = 2): Int
-}
-
 class FooImpl : IFoo {
   override fun interfaceMethod(a: Int) = a
 }
@@ -163,4 +200,34 @@ fun testInterface() {
   FooImpl().interfaceMethod()
   FooImpl().interfaceMethod(2)
   FooImplWithDefaultOverride().defaultMethod(2)
+}
+
+open class GenericSubclass<Z> : DefaultParams(1), DefaultParamInterface<Z> {
+  override fun parentInterfaceFun(a: Int) = foo()
+
+  override fun <V> withTypeParameters(a: Z?, b: V?): Z? = null
+}
+
+class ChildClass : GenericSubclass<String>()
+
+fun <T : GenericSubclass<String>> T.callDefault() = withTypeParameters<Int>()
+
+class OuterClass<T> {
+  inner class InnerClass<U> {
+    fun foo(a: U? = null): T? = null
+  }
+}
+
+fun testGenerics() {
+  var result = GenericSubclass<String>().withTypeParameters<Int>()
+  result = ChildClass().withTypeParameters<Int>()
+
+  result = GenericSubclass<String>().callDefault()
+  result = ChildClass().callDefault()
+
+  val inner = OuterClass<IFoo>().InnerClass<String>()
+  val s = inner.foo()
+
+  val i = (ChildClass() as DefaultParamInterface<*>).withTypeParameters<Int>()
+  val j = (ChildClass() as DefaultParamInterface<*>).withTypeParameters<Int>(null)
 }

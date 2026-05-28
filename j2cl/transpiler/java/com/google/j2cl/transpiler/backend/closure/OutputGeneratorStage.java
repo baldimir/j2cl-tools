@@ -16,17 +16,25 @@
 package com.google.j2cl.transpiler.backend.closure;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Streams;
 import com.google.j2cl.common.OutputUtils;
 import com.google.j2cl.common.OutputUtils.Output;
 import com.google.j2cl.common.Problems;
 import com.google.j2cl.common.Problems.FatalError;
 import com.google.j2cl.common.SourcePosition;
+import com.google.j2cl.common.SourceUtils;
 import com.google.j2cl.common.SourceUtils.FileInfo;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
 import com.google.j2cl.transpiler.ast.Library;
 import com.google.j2cl.transpiler.ast.Type;
 import com.google.j2cl.transpiler.ast.TypeDeclaration;
+import com.google.j2cl.transpiler.backend.common.ReadableSourceMapGenerator;
+import com.google.j2cl.transpiler.backend.common.SourceFile;
+import com.google.j2cl.transpiler.backend.common.SourceMapGenerator;
 import com.google.j2cl.transpiler.backend.libraryinfo.LibraryInfoBuilder;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -44,6 +52,7 @@ public class OutputGeneratorStage {
   private final Problems problems;
   private final Output output;
   private final Path libraryInfoOutputPath;
+  private final Path sourceGenPath;
   private final boolean shouldGenerateReadableSourceMaps;
   private final boolean shouldGenerateReadableLibraryInfo;
   private final boolean generateKytheIndexingMetadata;
@@ -52,6 +61,7 @@ public class OutputGeneratorStage {
       List<FileInfo> nativeJavaScriptFiles,
       Output output,
       Path libraryInfoOutputPath,
+      Path sourceGenPath,
       boolean shouldGenerateReadableLibraryInfo,
       boolean shouldGenerateReadableSourceMaps,
       boolean generateKytheIndexingMetadata,
@@ -59,6 +69,7 @@ public class OutputGeneratorStage {
     this.nativeJavaScriptFiles = nativeJavaScriptFiles;
     this.output = output;
     this.libraryInfoOutputPath = libraryInfoOutputPath;
+    this.sourceGenPath = sourceGenPath;
     this.shouldGenerateReadableLibraryInfo = shouldGenerateReadableLibraryInfo;
     this.shouldGenerateReadableSourceMaps = shouldGenerateReadableSourceMaps;
     this.generateKytheIndexingMetadata = generateKytheIndexingMetadata;
@@ -67,12 +78,15 @@ public class OutputGeneratorStage {
 
   public void generateOutputs(Library library) {
 
-    // The map must be ordered because it will be iterated over later and if it was not ordered then
-    // our output would be unstable. Actually this one can't actually destabilize output but since
-    // it's being safely iterated over now it's best to guard against it being unsafely iterated
-    // over in the future.
+    ImmutableList<FileInfo> allNativeFiles =
+        Streams.concat(
+                nativeJavaScriptFiles.stream(),
+                SourceUtils.getAllSources(sourceGenPath)
+                    .filter(f -> f.sourcePath().endsWith(".native.js")))
+            .collect(toImmutableList());
+
     NativeJavaScriptFileResolver nativeJavaScriptFileResolver =
-        NativeJavaScriptFileResolver.create(nativeJavaScriptFiles, problems);
+        NativeJavaScriptFileResolver.create(allNativeFiles, problems);
     LibraryInfoBuilder libraryInfoBuilder = new LibraryInfoBuilder();
 
     for (CompilationUnit compilationUnit : library.getCompilationUnits()) {
@@ -120,9 +134,9 @@ public class OutputGeneratorStage {
           // Inline metadata so that Kythe can create edges between these files and the Java source
           // file.
           javaScriptHeaderSource +=
-              renderKytheIndexingMetadata(jsHeaderGenerator.getSourceMappings());
+              renderKytheIndexingMetadata(compilationUnit, jsHeaderGenerator.getSourceMappings());
           javaScriptImplementationSource +=
-              renderKytheIndexingMetadata(jsImplGenerator.getSourceMappings());
+              renderKytheIndexingMetadata(compilationUnit, jsImplGenerator.getSourceMappings());
         } else {
           String sourceMap = renderSourceMap(type, jsImplGenerator.getSourceMappings());
 
@@ -186,6 +200,7 @@ public class OutputGeneratorStage {
   private static final String READABLE_MAPPINGS_SUFFIX = ".js.mappings";
 
   private String renderKytheIndexingMetadata(
+      CompilationUnit compilationUnit,
       Map<SourcePosition, SourcePosition> javaSourcePositionByOutputSourcePosition) {
     KytheIndexingMetadata metadata = new KytheIndexingMetadata();
 
@@ -194,15 +209,25 @@ public class OutputGeneratorStage {
       SourcePosition javaSourcePosition = entry.getValue();
       SourcePosition javaScriptSourcePosition = entry.getKey();
 
+      // Skip if the source position is not in the compilation unit.
+      if (javaSourcePosition.getFilePath() == null
+          || !javaSourcePosition.getFilePath().equals(compilationUnit.getFilePath())) {
+        continue;
+      }
+
+      if (!javaSourcePosition.hasValidPositions()
+          || !javaScriptSourcePosition.hasValidPositions()) {
+        continue;
+      }
+
       metadata.addAnchorAnchor(
           javaSourcePosition.getStartFilePosition().getByteOffset(),
           javaSourcePosition.getEndFilePosition().getByteOffset(),
           javaScriptSourcePosition.getStartFilePosition().getByteOffset(),
           javaScriptSourcePosition.getEndFilePosition().getByteOffset(),
-          null, // sourceCorpus
+          /* sourceCorpus= */ null,
           javaSourcePosition.getFilePath(),
-          null // sourceRoot
-          );
+          /* sourceRoot= */ null);
     }
 
     return String.format("%n// Kythe Indexing Metadata:%n// %s", metadata.toJson());
@@ -212,8 +237,9 @@ public class OutputGeneratorStage {
   private String renderSourceMap(
       Type type, Map<SourcePosition, SourcePosition> javaSourcePositionByOutputSourcePosition) {
     try {
-      return SourceMapGeneratorStage.generateSourceMaps(
-          type, javaSourcePositionByOutputSourcePosition);
+      return SourceMapGenerator.generateSourceMaps(
+          type.getDeclaration().getSimpleBinaryName() + SOURCE_MAP_SUFFIX,
+          javaSourcePositionByOutputSourcePosition);
     } catch (IOException e) {
       problems.fatal(FatalError.CANNOT_WRITE_FILE, e.getMessage());
       return null;
@@ -228,12 +254,16 @@ public class OutputGeneratorStage {
       NativeJavaScriptFile nativeJavaScriptFile) {
     checkArgument(
         !j2clUnit.isSynthetic(), "Cannot generate sourcemap for synthetic CompilationUnit");
+    var sourceFilesBuilder =
+        ImmutableSet.<SourceFile>builder().add(SourceFile.fromPath(j2clUnit.getFilePath()));
+    if (nativeJavaScriptFile != null) {
+      sourceFilesBuilder.add(nativeJavaScriptFile);
+    }
     String readableOutput =
         ReadableSourceMapGenerator.generate(
             javaSourcePositionByOutputSourcePosition,
             javaScriptImplementationFileContents,
-            nativeJavaScriptFile,
-            j2clUnit.getFilePath(),
+            sourceFilesBuilder.build(),
             problems);
     if (!readableOutput.isEmpty()) {
       String readableSourceMapRelativePath =

@@ -22,6 +22,7 @@ import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.common.visitor.Processor;
 import com.google.j2cl.common.visitor.Visitable;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /** Base class for expressions. */
 @Visitable
@@ -84,6 +85,15 @@ public abstract class Expression extends Node implements Cloneable<Expression> {
   }
 
   /**
+   * Return the compile-time constant as a literal if it is compile-time constant expression, {@code
+   * null} otherwise.
+   */
+  @Nullable
+  public Literal getConstantValue() {
+    return null;
+  }
+
+  /**
    * Returns true if the expression can be used in the left hand side of an assignment. {@see JLS
    * 15.26}
    */
@@ -133,7 +143,7 @@ public abstract class Expression extends Node implements Cloneable<Expression> {
 
   /** Returns expression prefixed with unary operator {@code prefixOperator}. */
   public Expression prefix(PrefixOperator prefixOperator) {
-    return PrefixExpression.newBuilder().setOperator(prefixOperator).setOperand(this).build();
+    return PrefixExpression.builder().setOperator(prefixOperator).setOperand(this).build();
   }
 
   /** Returns expression with not-null assertion operator. */
@@ -143,7 +153,7 @@ public abstract class Expression extends Node implements Cloneable<Expression> {
 
   /** Returns expression postfixed with unary operator {@code postfixOperator}. */
   public Expression postfix(PostfixOperator postfixOperator) {
-    return PostfixExpression.newBuilder().setOperator(postfixOperator).setOperand(this).build();
+    return PostfixExpression.builder().setOperator(postfixOperator).setOperand(this).build();
   }
 
   /** Return the logical or of this expression and {@code rhs}. */
@@ -208,8 +218,13 @@ public abstract class Expression extends Node implements Cloneable<Expression> {
     return infix(BinaryOperator.MINUS, this, rhs);
   }
 
+  /** Returns an expression representing {@code this = value}. */
+  public BinaryExpression infixAssign(Expression value) {
+    return infix(BinaryOperator.ASSIGN, this, value);
+  }
+
   private static BinaryExpression infix(BinaryOperator operator, Expression lhs, Expression rhs) {
-    return BinaryExpression.newBuilder()
+    return BinaryExpression.builder()
         .setOperator(operator)
         .setLeftOperand(lhs)
         .setRightOperand(rhs)
@@ -219,13 +234,13 @@ public abstract class Expression extends Node implements Cloneable<Expression> {
   /** Returns a member reference to the prototype field using this expression as its qualifier. */
   public Expression getPrototypeFieldAccess() {
     FieldDescriptor prototypeFieldDescriptor =
-        FieldDescriptor.newBuilder()
+        FieldDescriptor.builder()
             .setOriginalJsInfo(JsInfo.RAW_FIELD)
             .setEnclosingTypeDescriptor(TypeDescriptors.get().javaLangObject)
             .setTypeDescriptor(TypeDescriptors.get().javaLangObject)
             .setName("prototype")
             .build();
-    return FieldAccess.Builder.from(prototypeFieldDescriptor).setQualifier(this).build();
+    return FieldAccess.builderFrom(prototypeFieldDescriptor).setQualifier(this).build();
   }
 
   /**
@@ -286,7 +301,7 @@ public abstract class Expression extends Node implements Cloneable<Expression> {
   /**
    * Precedence and associativity of expressions.
    *
-   * <p>Details of Java precednce can be found in <a
+   * <p>Details of Java precedence can be found in <a
    * href="https://docs.oracle.com/javase/specs/jls/se7/html/jls-15.html#jls-15.7">JLS 15.7 -
    * 15.26</a>
    */

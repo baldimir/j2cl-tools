@@ -14,12 +14,14 @@
  * the License.
  */
 @file:Suppress("JAVA_MODULE_DOES_NOT_DEPEND_ON_MODULE")
+@file:OptIn(UnsafeDuringIrConstructionAPI::class)
 
 package com.google.j2cl.transpiler.frontend.kotlin
 
 import com.google.common.collect.ImmutableList
 import com.google.j2cl.common.SourcePosition
 import com.google.j2cl.transpiler.ast.Annotation
+import com.google.j2cl.transpiler.ast.AnnotationValue
 import com.google.j2cl.transpiler.ast.ArrayConstant
 import com.google.j2cl.transpiler.ast.ArrayTypeDescriptor
 import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor
@@ -36,7 +38,6 @@ import com.google.j2cl.transpiler.ast.TypeDeclaration.SourceLanguage.KOTLIN
 import com.google.j2cl.transpiler.ast.TypeDescriptor
 import com.google.j2cl.transpiler.ast.TypeDescriptors
 import com.google.j2cl.transpiler.ast.TypeDescriptors.SingletonBuilder
-import com.google.j2cl.transpiler.ast.TypeDescriptors.isKotlinNothing
 import com.google.j2cl.transpiler.ast.TypeLiteral
 import com.google.j2cl.transpiler.ast.TypeVariable
 import com.google.j2cl.transpiler.ast.Visibility
@@ -48,8 +49,6 @@ import com.google.j2cl.transpiler.frontend.kotlin.ir.getAllAnnotations
 import com.google.j2cl.transpiler.frontend.kotlin.ir.getAllTypeParameters
 import com.google.j2cl.transpiler.frontend.kotlin.ir.getJsEnumInfo
 import com.google.j2cl.transpiler.frontend.kotlin.ir.getJsInfo
-import com.google.j2cl.transpiler.frontend.kotlin.ir.getJsMemberAnnotationInfo
-import com.google.j2cl.transpiler.frontend.kotlin.ir.getParameters
 import com.google.j2cl.transpiler.frontend.kotlin.ir.getTypeSubstitutionMap
 import com.google.j2cl.transpiler.frontend.kotlin.ir.hasVoidReturn
 import com.google.j2cl.transpiler.frontend.kotlin.ir.isAbstract
@@ -61,17 +60,23 @@ import com.google.j2cl.transpiler.frontend.kotlin.ir.isFunctionalInterface
 import com.google.j2cl.transpiler.frontend.kotlin.ir.isJsFunction
 import com.google.j2cl.transpiler.frontend.kotlin.ir.isJsOptional
 import com.google.j2cl.transpiler.frontend.kotlin.ir.isJsType
+import com.google.j2cl.transpiler.frontend.kotlin.ir.isNative
 import com.google.j2cl.transpiler.frontend.kotlin.ir.isNativeJsField
+import com.google.j2cl.transpiler.frontend.kotlin.ir.isSealed
+import com.google.j2cl.transpiler.frontend.kotlin.ir.isSynthetic
 import com.google.j2cl.transpiler.frontend.kotlin.ir.j2clKind
 import com.google.j2cl.transpiler.frontend.kotlin.ir.j2clVisibility
+import com.google.j2cl.transpiler.frontend.kotlin.ir.jsName
+import com.google.j2cl.transpiler.frontend.kotlin.ir.jsNamespace
 import com.google.j2cl.transpiler.frontend.kotlin.ir.methods
 import com.google.j2cl.transpiler.frontend.kotlin.ir.overriddenSpecialBridgeSignatures
 import com.google.j2cl.transpiler.frontend.kotlin.ir.resolveName
+import com.google.j2cl.transpiler.frontend.kotlin.ir.sanitizeName
 import com.google.j2cl.transpiler.frontend.kotlin.ir.sanitizedName
 import com.google.j2cl.transpiler.frontend.kotlin.ir.simpleSourceName
 import com.google.j2cl.transpiler.frontend.kotlin.ir.singleAbstractMethod
 import com.google.j2cl.transpiler.frontend.kotlin.ir.typeSubstitutionMap
-import org.jetbrains.kotlin.backend.common.defaultArgumentsOriginalFunction
+import org.jetbrains.kotlin.backend.common.defaultArgumentsDispatchFunction
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.SpecialBridge
@@ -84,6 +89,7 @@ import org.jetbrains.kotlin.ir.declarations.IrAnnotationContainer
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
 import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
 import org.jetbrains.kotlin.ir.declarations.IrField
@@ -100,6 +106,7 @@ import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrVararg
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
+import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrStarProjection
 import org.jetbrains.kotlin.ir.types.IrType
@@ -122,6 +129,7 @@ import org.jetbrains.kotlin.ir.util.classId
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.dump
 import org.jetbrains.kotlin.ir.util.eraseTypeParameters
+import org.jetbrains.kotlin.ir.util.fields
 import org.jetbrains.kotlin.ir.util.file
 import org.jetbrains.kotlin.ir.util.hasAnnotation
 import org.jetbrains.kotlin.ir.util.isAnnotation
@@ -130,14 +138,13 @@ import org.jetbrains.kotlin.ir.util.isAnonymousObject
 import org.jetbrains.kotlin.ir.util.isFakeOverride
 import org.jetbrains.kotlin.ir.util.isFromJava
 import org.jetbrains.kotlin.ir.util.isInterface
-import org.jetbrains.kotlin.ir.util.isKFunction
 import org.jetbrains.kotlin.ir.util.isLocal
-import org.jetbrains.kotlin.ir.util.isReal
 import org.jetbrains.kotlin.ir.util.isStatic
 import org.jetbrains.kotlin.ir.util.isSuspend
 import org.jetbrains.kotlin.ir.util.isTypeParameter
 import org.jetbrains.kotlin.ir.util.isVararg
 import org.jetbrains.kotlin.ir.util.kotlinFqName
+import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.ir.util.packageFqName
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.parentClassOrNull
@@ -182,12 +189,12 @@ internal class KotlinEnvironment(
         // Add mappings for primitive arrays types.
         val arrayType = pluginContext.irBuiltIns.primitiveArrayForType[it.key]!!.defaultType
         typeDescriptorByIrType[arrayType] =
-          ArrayTypeDescriptor.newBuilder()
+          ArrayTypeDescriptor.builder()
             .setComponentTypeDescriptor(it.value)
             .setNullable(false)
             .build()
         typeDescriptorByIrType[arrayType.makeNullable()] =
-          ArrayTypeDescriptor.newBuilder()
+          ArrayTypeDescriptor.builder()
             .setComponentTypeDescriptor(it.value)
             .setNullable(true)
             .build()
@@ -223,7 +230,7 @@ internal class KotlinEnvironment(
     irClass ?: return null
 
     return typeDeclarationByIrClass.getOrPut(irClass) {
-      TypeDeclaration.newBuilder()
+      TypeDeclaration.builder()
         .setClassComponents(irClass.getClassComponents())
         .setKind(irClass.j2clKind)
         .setAnnotation(irClass.isAnnotationClass)
@@ -243,6 +250,22 @@ internal class KotlinEnvironment(
             irClass.enumEntries.map(::getDeclaredFieldDescriptor) +
               irClass.getDeclaredFields().map(::getDeclaredFieldDescriptor).toList()
           )
+        }
+        .setRecordComponentAccessorsDescriptorFactory { t ->
+          if (t.isJavaRecord) {
+            // TODO(b/503338755): Make sure we have good coverage for potential edge cases.
+            ImmutableList.copyOf(
+              t.declaredFieldDescriptors.map { f ->
+                t.declaredMethodDescriptors.first {
+                  it.name == f.name &&
+                    it.parameterDescriptors.isEmpty() &&
+                    it.returnTypeDescriptor.isSameBaseType(f.typeDescriptor)
+                }
+              }
+            )
+          } else {
+            ImmutableList.of()
+          }
         }
         .setSuperTypeDescriptorFactory { _ ->
           irClass.superClass?.let { getSuperTypeDescriptor(it.makeNullable()) }
@@ -268,17 +291,15 @@ internal class KotlinEnvironment(
         .setFunctionalInterface(irClass.isFunctionalInterface)
         .setHasAbstractModifier(irClass.isAbstract)
         .setFinal(irClass.isFinal)
+        .setSealed(irClass.isSealed)
         .setLocal(irClass.isLocal && !irClass.isAnonymousObject)
         .setAnonymous(irClass.isAnonymousObject)
         .setJsType(irClass.isJsType)
         .setJsFunctionInterface(irClass.isJsFunction)
         .setJsEnumInfo(irClass.getJsEnumInfo())
-        .apply {
-          val jsMemberAnnotation = irClass.getJsMemberAnnotationInfo()
-          setCustomizedJsNamespace(jsMemberAnnotation?.namespace)
-          setSimpleJsName(jsMemberAnnotation?.name)
-          setNative(jsMemberAnnotation?.isNative ?: false)
-        }
+        .setSimpleJsName(irClass.jsName)
+        .setCustomizedJsNamespace(irClass.jsNamespace)
+        .setNative(irClass.isNative)
         .setAnnotationsFactory { createAnnotations(irClass) }
         .build()
     }
@@ -297,7 +318,7 @@ internal class KotlinEnvironment(
             continue
           }
           add(
-            Annotation.newBuilder()
+            Annotation.builder()
               .setTypeDescriptor(typeDescriptor)
               .addAnnotationValues(annotationCtorCall)
               .build()
@@ -309,7 +330,7 @@ internal class KotlinEnvironment(
   private fun Annotation.Builder.addAnnotationValues(
     annotationCtorCall: IrConstructorCall
   ): Annotation.Builder {
-    fun IrExpression?.toAnnotationValue(): Literal? {
+    fun IrExpression?.toAnnotationValue(): AnnotationValue? {
       fun createArrayConstant(type: IrType, values: List<IrExpression>): ArrayConstant? {
         val translatedValues = values.map { it.toAnnotationValue() }
         // TODO(b/397460318, b/395716783): Remove this null check once we handle all member value
@@ -317,7 +338,7 @@ internal class KotlinEnvironment(
         if (translatedValues.contains(null)) {
           return null
         }
-        return ArrayConstant.newBuilder()
+        return ArrayConstant.builder()
           .setTypeDescriptor(createArrayTypeDescriptor(type))
           .setValueExpressions(translatedValues)
           .build()
@@ -343,9 +364,10 @@ internal class KotlinEnvironment(
       }
     }
 
-    for (i in 0 until annotationCtorCall.valueArgumentsCount) {
-      val name = annotationCtorCall.symbol.owner.valueParameters[i].sanitizedName
-      val translatedValue = annotationCtorCall.getValueArgument(i).toAnnotationValue() ?: continue
+    val annotationCtor = annotationCtorCall.symbol.owner
+    for ((parameter, argument) in annotationCtor.parameters zip annotationCtorCall.arguments) {
+      val name = parameter.sanitizedName
+      val translatedValue = argument.toAnnotationValue() ?: continue
       addValue(name, translatedValue)
     }
     return this
@@ -353,7 +375,7 @@ internal class KotlinEnvironment(
 
   private fun createPackageDeclaration(packageName: String) =
     // Caching is left to PackageDeclaration.Builder since construction is trivial.
-    PackageDeclaration.newBuilder()
+    PackageDeclaration.builder()
       .setName(packageName)
       .setCustomizedJsNamespace(packageInfoCache.getJsNamespace(packageName))
       .build()
@@ -446,7 +468,7 @@ internal class KotlinEnvironment(
         { createIntersectionTypeDescriptor(irTypeParameter.superTypes) }
       }
 
-    return TypeVariable.newBuilder()
+    return TypeVariable.builder()
       .setName(irTypeParameter.sanitizedName)
       .setUniqueKey(irTypeParameter.uniqueKey)
       .setUpperBoundTypeDescriptorFactory(upperBoundFactory)
@@ -457,12 +479,12 @@ internal class KotlinEnvironment(
   }
 
   private fun createIntersectionTypeDescriptor(types: List<IrType>): IntersectionTypeDescriptor =
-    IntersectionTypeDescriptor.newBuilder()
+    IntersectionTypeDescriptor.builder()
       .setIntersectionTypeDescriptors(types.map(::getReferenceTypeDescriptor))
       .build()
 
   private fun createArrayTypeDescriptor(arrayType: IrType) =
-    ArrayTypeDescriptor.newBuilder()
+    ArrayTypeDescriptor.builder()
       .setComponentTypeDescriptor(
         getReferenceTypeDescriptor(arrayType.getArrayElementType(pluginContext.irBuiltIns))
       )
@@ -614,12 +636,13 @@ internal class KotlinEnvironment(
         }
 
       val isConstructor = irFunction is IrConstructor
-      val parameterDescriptors = ImmutableList.builder<MethodDescriptor.ParameterDescriptor>()
+      val parameterDescriptorsBuilder =
+        ImmutableList.builder<MethodDescriptor.ParameterDescriptor>()
 
       if (irFunction.isSuspend) {
         // Add the implicit continuation parameter so our type model is correct.
-        parameterDescriptors.add(
-          MethodDescriptor.ParameterDescriptor.newBuilder()
+        parameterDescriptorsBuilder.add(
+          MethodDescriptor.ParameterDescriptor.builder()
             .setTypeDescriptor(
               TypeDescriptors.get()
                 .kotlinCoroutinesContinuation!!
@@ -630,8 +653,8 @@ internal class KotlinEnvironment(
       }
 
       val parameters =
-        if (specialBridge == null) irFunction.getParameters()
-        else specialBridge.overridden.getParameters()
+        if (specialBridge == null) irFunction.nonDispatchParameters
+        else specialBridge.overridden.nonDispatchParameters
 
       parameters.withIndex().forEach { (index, param) ->
         var type = param.type
@@ -642,13 +665,15 @@ internal class KotlinEnvironment(
             specialBridge.substitutedParameterTypes?.get(param.indexInParameters)
           type = substitutedType?.eraseToScope(visibleTypeParameters) ?: type.eraseTypeParameters()
         }
-        parameterDescriptors.add(
-          MethodDescriptor.ParameterDescriptor.newBuilder()
+        parameterDescriptorsBuilder.add(
+          MethodDescriptor.ParameterDescriptor.builder()
             .setTypeDescriptor(getTypeDescriptor(type))
             // A parameter is only considered optional if it has a default initializer AND it's
-            // default bridge function.
+            // default bridge function, or is its own dispatch function.
             .setOptional(
-              param.defaultValue != null && irFunction.defaultArgumentsOriginalFunction != null
+              param.defaultValue != null &&
+                (irFunction.origin == IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER ||
+                  irFunction == irFunction.defaultArgumentsDispatchFunction)
             )
             .setJsOptional(param.isJsOptional)
             .setAnnotations(createAnnotations(param))
@@ -657,22 +682,32 @@ internal class KotlinEnvironment(
         )
       }
 
+      val jsInfo = irFunction.getJsInfo()
       val visibility = irFunction.j2clVisibility
       val isStatic = (irFunction.isStatic || irFunction.parent !is IrDeclaration) && !isConstructor
       val isNative =
         irFunction.isExternal ||
-          (!irFunction.getJsInfo().isJsOverlay &&
-            enclosingTypeDescriptor.isNative &&
-            irFunction.isAbstract)
+          (!jsInfo.isJsOverlay && enclosingTypeDescriptor.isNative && irFunction.isAbstract)
       val isLocal = irFunction.visibility.delegate == Visibilities.Local
       val enclosingMethodDescriptor =
         if (isLocal) getDeclaredMethodDescriptor(irFunction.parent as IrFunction) else null
+      val name = irFunction.resolveName(jvmBackendContext)
+      val parametersDescriptors = parameterDescriptorsBuilder.build()
 
-      MethodDescriptor.newBuilder()
+      // TODO(b/503338755): Make sure we have good coverage for potential edge cases.
+      val isRecordComponentAccessor =
+        enclosingMethodDescriptor == null &&
+          enclosingTypeDescriptor.typeDeclaration.isJavaRecord &&
+          parametersDescriptors.isEmpty() &&
+          irFunction.parentAsClass.getDeclaredFields().any {
+            it.name.asString() == name && irFunction.returnType == it.type
+          }
+
+      MethodDescriptor.builder()
         .setEnclosingTypeDescriptor(enclosingTypeDescriptor)
         .setEnclosingMethodDescriptor(enclosingMethodDescriptor)
-        .setName(irFunction.resolveName(jvmBackendContext))
-        .setParameterDescriptors(parameterDescriptors.build())
+        .setName(name)
+        .setParameterDescriptors(parametersDescriptors)
         .setReturnTypeDescriptor(
           if (irFunction.hasVoidReturn) {
             PrimitiveTypes.VOID
@@ -691,6 +726,7 @@ internal class KotlinEnvironment(
         .setVisibility(visibility)
         .setConstructor(isConstructor)
         .setStatic(isStatic)
+        .setSynthetic(irFunction.isSynthetic)
         .setAbstract(irFunction.isAbstract)
         .setFinal(irFunction.isFinal)
         .setNative(isNative)
@@ -700,8 +736,9 @@ internal class KotlinEnvironment(
             !visibility.isPrivate &&
             !isStatic
         )
+        .setRecordComponentAccessor(isRecordComponentAccessor)
         .setTypeParameterTypeDescriptors(irFunction.typeParameters.map(::getTypeVariable))
-        .setOriginalJsInfo(irFunction.getJsInfo())
+        .setOriginalJsInfo(jsInfo)
         .setAnnotations(createAnnotations(irFunction))
         .setSuspendFunction(irFunction.isSuspend)
         .build()
@@ -740,8 +777,9 @@ internal class KotlinEnvironment(
         // type.
         constantValue = fieldTypeDescriptor.defaultValue
       }
+      val isVolatile = irField.annotations.hasAnnotation(FqName("kotlin.concurrent.Volatile"))
 
-      FieldDescriptor.newBuilder()
+      FieldDescriptor.builder()
         .setEnclosingTypeDescriptor(getEnclosingTypeDescriptor(irField))
         .setName(irField.sanitizedName)
         .setTypeDescriptor(fieldTypeDescriptor)
@@ -755,14 +793,16 @@ internal class KotlinEnvironment(
         // already enforced the final semantics.
         .setFinal(irField.isFinal && !irField.isNativeJsField)
         .setStatic(irField.isStatic || irField.parent !is IrDeclaration)
+        .setSynthetic(irField.isSynthetic)
         .setOriginalJsInfo(irField.getJsInfo())
         .setAnnotations(createAnnotations(irField))
+        .setVolatile(isVolatile)
         .build()
     }
   }
 
   fun getDeclaredFieldDescriptor(irEnumEntry: IrEnumEntry): FieldDescriptor =
-    FieldDescriptor.newBuilder()
+    FieldDescriptor.builder()
       .setEnclosingTypeDescriptor(getEnclosingTypeDescriptor(irEnumEntry))
       .setName(irEnumEntry.sanitizedName)
       .setTypeDescriptor(getEnclosingTypeDescriptor(irEnumEntry)!!.toNonNullable())
@@ -837,7 +877,7 @@ internal class KotlinEnvironment(
         enclosingParentClassComponent + "${index}$name"
       }
     } else {
-      classId!!.relativeClassName.pathSegments().map { it.asString() }
+      classId!!.relativeClassName.pathSegments().map { it.sanitizeName() }
     }
   }
 
@@ -892,7 +932,7 @@ internal class KotlinEnvironment(
 
     check(
       (originalTypeParams.size == replacementTypeParams.size &&
-        arguments.size == replacementTypeParams.size) || this.isKFunction()
+        arguments.size == replacementTypeParams.size)
     ) {
       """
       |Mismatch in number of parameters for original type ${classSymbol.owner.kotlinFqName} mapped
@@ -909,11 +949,6 @@ internal class KotlinEnvironment(
     val replacementArguments =
       when {
         !useDeclarationVariance -> arguments
-        // KFunction is a special case where there's a mismatch in the number of original type
-        // params,
-        // replacement type params, and number of arguments. We're not going to attempt to rewrite
-        // these.
-        isKFunction() -> arguments
         else ->
           remapDeclarationTypeVarianceOntoArguments(
             arguments,
@@ -923,17 +958,11 @@ internal class KotlinEnvironment(
       }
 
     // Return a new copy of the type with the builtin class symbol in place of the original symbol.
-    return IrSimpleTypeImpl(
-      builtinClass,
-      nullability,
-      replacementArguments,
-      annotations,
-      abbreviation,
-    )
+    return IrSimpleTypeImpl(builtinClass, nullability, replacementArguments, annotations)
   }
 
   fun IrClass.getDeclaredFields(): Set<IrField> {
-    var fields = declarations.filterIsInstance<IrField>().filter { it.isReal }.toSet()
+    val fields = declarations.filterIsInstance<IrField>().filter { !it.isSynthetic }.toMutableSet()
 
     val companion = declarations.filterIsInstance<IrClass>().firstOrNull(IrClass::isCompanion)
     if (companion != null) {
@@ -946,7 +975,13 @@ internal class KotlinEnvironment(
 
     if (isFromJava()) {
       // Fields from Java class are represented as Kotlin properties.
-      fields += declarations.filterIsInstance<IrProperty>().mapNotNull(IrProperty::backingField)
+      fields +=
+        declarations
+          .filterIsInstance<IrProperty>()
+          // If a field is on a parent type, all the subtypes will have IrProperty declarations that
+          // override from the parent. We can safely ignore these.
+          .filter { it.overriddenSymbols.isEmpty() }
+          .mapNotNull(IrProperty::backingField)
     }
     return fields
   }
@@ -956,16 +991,15 @@ private fun remapDeclarationTypeVarianceOntoArguments(
   arguments: List<IrTypeArgument>,
   originalTypeParams: List<IrTypeParameter>,
   replacementTypeParams: List<IrTypeParameter>,
-) =
-  arguments.mapIndexed { index, argument ->
-    if (
-      argument is IrTypeProjection &&
-        originalTypeParams[index].variance != Variance.INVARIANT &&
-        replacementTypeParams[index].variance == Variance.INVARIANT &&
-        argument.variance == Variance.INVARIANT
-    ) {
-      makeTypeProjection(argument.type, originalTypeParams[index].variance)
-    } else {
-      argument
-    }
+) = arguments.mapIndexed { index, argument ->
+  if (
+    argument is IrTypeProjection &&
+      originalTypeParams[index].variance != Variance.INVARIANT &&
+      replacementTypeParams[index].variance == Variance.INVARIANT &&
+      argument.variance == Variance.INVARIANT
+  ) {
+    makeTypeProjection(argument.type, originalTypeParams[index].variance)
+  } else {
+    argument
   }
+}

@@ -1,0 +1,7 @@
+goog.module('unnamedvariables.UnnamedVariables.$1R');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const $1R = goog.require('unnamedvariables.UnnamedVariables.$1R$impl');
+exports = $1R;

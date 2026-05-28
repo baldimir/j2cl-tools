@@ -38,6 +38,11 @@ public class ThrowStatement extends Statement {
   }
 
   @Override
+  public boolean terminatesAbruptly() {
+    return true;
+  }
+
+  @Override
   public ThrowStatement clone() {
     return new ThrowStatement(getSourcePosition(), expression.clone());
   }
@@ -47,20 +52,20 @@ public class ThrowStatement extends Statement {
     return Visitor_ThrowStatement.visit(processor, this);
   }
 
-  public static Builder newBuilder() {
+  public Builder toBuilder() {
+    return builder()
+        .setSourcePosition(this.getSourcePosition())
+        .setExpression(this.getExpression());
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
-  /** A Builder for throw statement. */
+  /** A Builder for ThrowStatement. */
   public static class Builder {
     private SourcePosition sourcePosition;
     private Expression expression;
-
-    public static Builder from(ThrowStatement synchronizedStatement) {
-      return new Builder()
-          .setSourcePosition(synchronizedStatement.getSourcePosition())
-          .setExpression(synchronizedStatement.getExpression());
-    }
 
     public Builder setSourcePosition(SourcePosition sourcePosition) {
       this.sourcePosition = sourcePosition;

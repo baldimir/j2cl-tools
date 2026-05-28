@@ -45,12 +45,12 @@ fun main(vararg unused: String) {
   testInlinedLocalClassSemantics()
   testInlineFactoryFunctionWithCrossinlineLambda()
   testDefaultParams()
+  testBreakContinue()
 }
 
 class MyClass(var f: Int) {
-  fun addAndReturn(i: Int): Int {
-    f += i
-    return f
+  fun double() {
+    f *= 2
   }
 }
 
@@ -58,7 +58,7 @@ inline fun topLevelInlineFunction(myClass: MyClass, action: (Int) -> Int): Int {
   return action(myClass.f)
 }
 
-inline fun <T> doSomethingOn(target: T, block: (T) -> Unit) = block(target)
+inline fun <T, R> doSomethingOn(target: T, block: (T) -> R) = block(target)
 
 inline fun MyClass.extensionInlineFunction(action: (Int) -> Int): Int {
   var sum = f
@@ -171,6 +171,17 @@ fun testReifiedParameter() {
   assertEquals(3, someInt)
 }
 
+private inline fun inlineFunWithAnonymousObject(captureParam: Int): Int {
+  val capture = 5
+  val delegate =
+    object {
+      fun compute(): Int {
+        return (capture + captureParam) * 2
+      }
+    }
+  return delegate.compute()
+}
+
 private fun testInliningWithLocalClass() {
   val a =
     topLevelInlineFunction(MyClass(2)) {
@@ -181,6 +192,9 @@ private fun testInliningWithLocalClass() {
     }
 
   assertTrue(a == 4)
+
+  val b = inlineFunWithAnonymousObject(5)
+  assertTrue(b == 20)
 }
 
 private fun testCrossModuleInlining() {
@@ -221,15 +235,23 @@ fun testPropertyInlining() {
   assertTrue(value == 5)
 }
 
+inline fun runNTimes(n: Int, action: () -> Unit) {
+  for (i in 0..<n) {
+    action()
+  }
+}
+
 fun testFunctionRef() {
   val foo = MyClass(2)
-  assertTrue(4 == topLevelInlineFunction(foo, foo::addAndReturn))
-  assertTrue(4 == foo.f)
+  doSomethingOn(foo, MyClass::double)
+  assertEquals(4, foo.f)
 
-  // TODO(b/405183980): Uncomment when this doesn't crash the frontend.
-  // assertTrue(4 == doSomethingOn(MyClass(2)) {
-  //   topLevelInlineFunction(it, it::addAndReturn)
-  // })
+  val result =
+    doSomethingOn(MyClass(1)) {
+      runNTimes(4, it::double)
+      it.f
+    }
+  assertEquals(16, result)
 }
 
 inline fun (() -> String).test(): (() -> String) = { invoke() + this.invoke() + this() }
@@ -428,4 +450,30 @@ private fun testDefaultParams() {
   assertEquals(15, inlineFunWithDefaultsAndDefaultVarargs(1))
   assertEquals(33, inlineFunWithDefaultsAndDefaultVarargs(1, 20))
   assertEquals(141, inlineFunWithDefaultsAndDefaultVarargs(1, 20, 30, 40, 50))
+}
+
+inline fun executeBlock(block: () -> Unit) = block()
+
+fun testBreakContinue() {
+  var i = 0
+  while (true) {
+    executeBlock {
+      i++
+      if (i < 10) {
+        continue
+      }
+      break
+    }
+  }
+  assertEquals(10, i)
+
+  outer@ while (true) {
+    executeBlock {
+      while (true) {
+        i++
+        break@outer
+      }
+    }
+  }
+  assertEquals(11, i)
 }

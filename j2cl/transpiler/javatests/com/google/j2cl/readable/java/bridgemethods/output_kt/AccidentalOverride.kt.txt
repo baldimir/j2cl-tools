@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package bridgemethods
 
@@ -31,12 +32,13 @@ open class A<T, S> internal constructor() {
  open fun `fun`(s: S): T {
   return null as T
  }
-
+ 
  open fun get(): T {
   return null as T
  }
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class B internal constructor(): A<Number?, String?>(), I<Int?, String?> {
  override fun `fun`(s: String?): Int? {
   return Int(1)
@@ -45,8 +47,9 @@ open class B internal constructor(): A<Number?, String?>(), I<Int?, String?> {
 
 interface SpecializedInterface {
  fun `fun`(s: String?): String?
-
+ 
  fun get(): String?
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class AccidentalOverride internal constructor(): A<String?, String?>(), SpecializedInterface

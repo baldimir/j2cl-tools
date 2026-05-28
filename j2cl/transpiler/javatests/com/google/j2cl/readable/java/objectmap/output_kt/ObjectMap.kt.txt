@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package objectmap
 
@@ -33,7 +34,7 @@ open class ObjectMap<T> {
   internal fun <T_1> create_pp_objectmap(): ObjectMap<T_1>? {
    return null
   }
-
+  
   @JvmStatic
   @JsOverlay
   internal fun createForString_pp_objectmap(): ObjectMap<String?>? {

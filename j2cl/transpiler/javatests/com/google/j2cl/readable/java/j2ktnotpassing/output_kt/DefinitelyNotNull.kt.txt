@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2ktnotpassing
 
@@ -27,32 +28,32 @@ open class DefinitelyNotNull {
   internal open fun <S: T> reverse_pp_j2ktnotpassing(): Ordering<S> {
    throw RuntimeException()
   }
-
+  
   internal open fun <S: T> nullsLast_pp_j2ktnotpassing(): Ordering<S?> {
    throw RuntimeException()
   }
  }
-
+ 
  inner class NullsFirstOrdering<T> constructor(ordering: Ordering<in T>): Ordering<T?>() {
   @JvmField
   internal val ordering_pp_j2ktnotpassing: Ordering<in T>
-
+  
   init {
    this.ordering_pp_j2ktnotpassing = ordering
   }
-
+  
   public fun <S: T?> reverse(): Ordering<S> {
    return this.ordering_pp_j2ktnotpassing.reverse_pp_j2ktnotpassing().nullsLast_pp_j2ktnotpassing<S>() as Ordering<S>
   }
-
+  
   public fun <S: T?> nullsLast(): Ordering<S?> {
-   return this.ordering_pp_j2ktnotpassing.nullsLast_pp_j2ktnotpassing<S?>()
+   return this.ordering_pp_j2ktnotpassing.nullsLast_pp_j2ktnotpassing<S>()
   }
-
+  
   override fun <S: T?> reverse_pp_j2ktnotpassing(): Ordering<S> {
    return this.reverse()
   }
-
+  
   override fun <S: T?> nullsLast_pp_j2ktnotpassing(): Ordering<S?> {
    return this.nullsLast()
   }

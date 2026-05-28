@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -30,8 +31,8 @@ open class OptionalFromNullableProblem {
    Optional.fromNullable_pp_j2kt<T & Any>(value)
   }
  }
-
- open class Optional<T: Any> internal constructor() {
+ 
+ internal open class Optional<T: Any> internal constructor() {
   companion object {
    @JvmStatic
    internal fun <T: Any> fromNullable_pp_j2kt(t: T?): Optional<T> {

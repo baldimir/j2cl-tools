@@ -15,6 +15,7 @@
  */
 package com.google.j2cl.transpiler.ast;
 
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.common.visitor.Processor;
 import com.google.j2cl.common.visitor.Visitable;
@@ -43,8 +44,18 @@ public class Block extends Statement {
   }
 
   @Override
+  public boolean terminatesAbruptly() {
+    return statements.stream().anyMatch(Statement::terminatesAbruptly);
+  }
+
+  @Override
+  public Block ensureBlock() {
+    return this;
+  }
+
+  @Override
   public Block clone() {
-    return Block.newBuilder()
+    return Block.builder()
         .setSourcePosition(getSourcePosition())
         .setStatements(AstUtils.clone(statements))
         .build();
@@ -55,7 +66,13 @@ public class Block extends Statement {
     return Visitor_Block.visit(processor, this);
   }
 
-  public static Builder newBuilder() {
+  public Builder toBuilder() {
+    return builder()
+        .setSourcePosition(this.getSourcePosition())
+        .setStatements(this.getStatements());
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
@@ -66,36 +83,41 @@ public class Block extends Statement {
     // execute.
     private SourcePosition sourcePosition = SourcePosition.NONE;
 
-    public static Builder from(Block block) {
-      return newBuilder()
-          .setSourcePosition(block.getSourcePosition())
-          .setStatements(block.getStatements());
-    }
-
+    @CanIgnoreReturnValue
     public Builder setStatements(Statement... statements) {
       return setStatements(Arrays.asList(statements));
     }
 
+    @CanIgnoreReturnValue
     public Builder setStatements(Collection<Statement> statements) {
       this.statements.clear();
       return addStatements(statements);
     }
 
+    @CanIgnoreReturnValue
     public Builder addStatement(Statement statement) {
       this.statements.add(statement);
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder addStatement(int index, Statement statement) {
       this.statements.add(index, statement);
       return this;
     }
 
+    @CanIgnoreReturnValue
+    public Builder addStatements(Statement... statements) {
+      return addStatements(Arrays.asList(statements));
+    }
+
+    @CanIgnoreReturnValue
     public Builder addStatements(Collection<Statement> statements) {
       this.statements.addAll(statements);
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder setSourcePosition(SourcePosition sourcePosition) {
       this.sourcePosition = sourcePosition;
       return this;

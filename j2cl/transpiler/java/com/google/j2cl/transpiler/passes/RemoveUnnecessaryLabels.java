@@ -15,7 +15,6 @@
  */
 package com.google.j2cl.transpiler.passes;
 
-
 import com.google.common.collect.Iterables;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.AbstractVisitor;
@@ -68,7 +67,7 @@ public class RemoveUnnecessaryLabels extends NormalizationPass {
     compilationUnit.accept(
         new AbstractRewriter() {
           // Collect the labels associated with `do {...} while (false)` loops to convert any
-          // continue statements targetting the loop into break statements since in this situation
+          // continue statements targeting the loop into break statements since in this situation
           // they are equivalent and the label might end up attached to a non-looping statement.
           private final Set<Label> labelsToConvert = new HashSet<>();
 
@@ -85,7 +84,7 @@ public class RemoveUnnecessaryLabels extends NormalizationPass {
             if (!labelsToConvert.contains(continueStatement.getLabelReference().getTarget())) {
               return continueStatement;
             }
-            return BreakStatement.Builder.from(continueStatement).build();
+            return BreakStatement.builderFrom(continueStatement).build();
           }
 
           @Override
@@ -135,12 +134,9 @@ public class RemoveUnnecessaryLabels extends NormalizationPass {
               return labeledStatement;
             }
 
-            return Block.newBuilder()
+            return Block.builder()
                 .addStatements(allStatementsButLast)
-                .addStatement(
-                    LabeledStatement.Builder.from(labeledStatement)
-                        .setStatement(lastStatement)
-                        .build())
+                .addStatement(labeledStatement.toBuilder().setStatement(lastStatement).build())
                 .build();
           }
 
@@ -240,7 +236,7 @@ public class RemoveUnnecessaryLabels extends NormalizationPass {
               return yieldStatement;
             }
 
-            return YieldStatement.Builder.from(yieldStatement)
+            return yieldStatement.toBuilder()
                 .setLabelReference(replacementLabel.createReference())
                 .build();
           }

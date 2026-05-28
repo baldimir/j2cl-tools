@@ -39,8 +39,12 @@ public abstract class BreakOrContinueStatement extends Statement {
     return labelReference != null && labelReference.getTarget() == label;
   }
 
-  public abstract <S extends BreakOrContinueStatement, B extends Builder<S, B>>
-      Builder<S, B> toBuilder();
+  @Override
+  public boolean terminatesAbruptly() {
+    return true;
+  }
+
+  public abstract Builder<?, ?> toBuilder();
 
   /** Abstract builder class for BreakOrContinueStatement. */
   public abstract static class Builder<

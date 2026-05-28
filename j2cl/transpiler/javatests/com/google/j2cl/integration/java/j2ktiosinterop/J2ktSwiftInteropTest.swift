@@ -14,7 +14,7 @@
  * the License.
  */
 import XCTest
-import third_party_java_src_j2cl_transpiler_javatests_com_google_j2cl_integration_java_j2ktiosinterop_J2ktSwiftInteropFramework
+import third_party_java_src_j2cl_transpiler_javatests_com_google_j2cl_integration_java_j2ktiosinterop_j2ktiosinterop_j2objc
 
 /// J2KT interop test for Swift.
 final class J2ktSwiftInteropTest: XCTestCase {
@@ -23,8 +23,7 @@ final class J2ktSwiftInteropTest: XCTestCase {
 
     obj = J2ktiosinteropDefaultNames()
     obj = J2ktiosinteropDefaultNames(int: 1)
-    // TODO(b/374280337): Should be J2ktiosinteropDefaultNames(int:with:)
-    obj = J2ktiosinteropDefaultNames(int: 1, withNSString: "")
+    obj = J2ktiosinteropDefaultNames(int: 1, with: "")
 
     obj.method()
     obj.booleanMethod(withBoolean: true)
@@ -46,16 +45,21 @@ final class J2ktSwiftInteropTest: XCTestCase {
     obj.classMethod(with: nil)
     obj.stringIterableMethod(with: nil)
     obj.intStringMethod(with: 1, with: "")
+    obj.customNamesMethod(with: nil)
+    obj.defaultNamesMethod(with: nil)
 
     obj.genericMethod(withId: nil)
-    obj.genericStringMethod(with: "")
+    obj.genericStringMethod(with: nil)
+    obj.genericStringAndComparableStringMethod(with: nil)
+    obj.genericLongMethod(with: nil)
+    obj.genericLongAndComparableLongMethod(with: nil)
 
     obj.overloadedMethod(withId: nil)
-    obj.overloadedMethod(with: 1 as jint)
-    obj.overloadedMethod(withLong: 1 as jlong)
+    obj.overloadedMethod(with: 1 as Int32)
+    obj.overloadedMethod(withLong: 1 as Int64)
 
-    obj.overloadedMethod(with: 1 as jfloat)
-    obj.overloadedMethod(with: 1 as jdouble)
+    obj.overloadedMethod(with: 1 as Float)
+    obj.overloadedMethod(with: 1 as Double)
     obj.overloadedMethod(with: "")
 
     var i: Int32
@@ -64,13 +68,29 @@ final class J2ktSwiftInteropTest: XCTestCase {
     i = obj.intField_
     obj.intField_ = i
 
-    i = J2ktiosinteropDefaultNamesCompanion.shared.STATIC_FINAL_INT_FIELD_
-    i = J2ktiosinteropDefaultNamesCompanion.shared.staticIntField_
-    J2ktiosinteropDefaultNamesCompanion.shared.staticIntField_ = i
+    // Unsupported because of b/441110909.
+    // i = J2ktiosinteropDefaultNamesCompanion.shared.STATIC_FINAL_INT_FIELD_
+    // i = J2ktiosinteropDefaultNamesCompanion.shared.staticIntField_
+    // J2ktiosinteropDefaultNamesCompanion.shared.staticIntField_ = i
 
-    J2ktiosinteropDefaultNamesCompanion.shared.staticMethod()
-    J2ktiosinteropDefaultNamesCompanion.shared.staticIntMethod(with: 1)
-    J2ktiosinteropDefaultNamesCompanion.shared.staticIntStringMethod(with: 1, with: "")
+    // J2ktiosinteropDefaultNamesCompanion.shared.staticMethod()
+    // J2ktiosinteropDefaultNamesCompanion.shared.staticIntMethod(with: 1)
+    // J2ktiosinteropDefaultNamesCompanion.shared.staticIntStringMethod(with: 1, with: "")
+
+    // @Throws-annotated methods (supposedly) throw in Swift and need to be wrapped in `try!`.
+    try! obj.throwsMethod()
+    try! obj.throwsMethod(with: "")
+    // Unsupported because of b/441110909.
+    // try! J2ktiosinteropDefaultNamesCompanion.shared.staticThrowsMethod()
+    // try! J2ktiosinteropDefaultNamesCompanion.shared.staticThrowsMethod(with: "")
+  }
+
+  func testOnlyImplicitDefaultConstructor() {
+    let _ = J2ktiosinteropOnlyImplicitDefaultConstructor()
+  }
+
+  func testOnlyExplicitDefaultConstructor() {
+    let _ = J2ktiosinteropOnlyExplicitDefaultConstructor()
   }
 
   func testSpecialNames() {
@@ -90,12 +110,12 @@ final class J2ktSwiftInteropTest: XCTestCase {
   func testCustomNames() {
     var obj: Custom
 
-    obj = Custom(Index: 1)
-    obj = Custom(Index: 1, name: "")
+    obj = Custom(index: 1)
+    obj = Custom(index: 1, name: "")
 
     obj = Custom()
-    obj = Custom(Long: 1)
-    obj = Custom(Long: 1, withNSString: "")
+    obj = Custom(long: 1)
+    obj = Custom(long: 1, with: "")
 
     obj.customMethod()
     obj.customIntMethod(WithInt: 1)
@@ -108,16 +128,135 @@ final class J2ktSwiftInteropTest: XCTestCase {
     obj.customLongMethod(withLong: 1)
     obj.customLongStringMethod(withLong: 1, with: "")
 
-    CustomCompanion.shared.customStaticMethod()
-    CustomCompanion.shared.customStaticIntMethod(WithIndex: 1)
-    CustomCompanion.shared.customStaticIntStringMethod(WithIndex: 1, name: "")
+    obj.customCustomNamesMethod(with: nil)
+    obj.customDefaultNamesMethod(with: nil)
 
-    CustomCompanion.shared.customStaticLongMethod(withLong: 1)
-    CustomCompanion.shared.customStaticLongStringMethod(withLong: 1, with: "")
+    obj.customObjectiveCSwiftStringMethod(with: "")
+    obj.customSwiftStringMethod(with: "")
+
+    Custom.Companion.shared.customStaticMethod()
+    Custom.Companion.shared.customStaticIntMethod(WithIndex: 1)
+    Custom.Companion.shared.customStaticIntStringMethod(WithIndex: 1, name: "")
+
+    Custom.Companion.shared.customStaticLongMethod(withLong: 1)
+    Custom.Companion.shared.customStaticLongStringMethod(withLong: 1, with: "")
+
+    obj.lowercase("")
+    Custom.Companion.shared.staticlowercase("")
   }
 
   func testEnumNames() {
-    let _ = J2ktiosinteropEnumNames.ONE
-    let _ = J2ktiosinteropEnumNames.TWO
+    let _ = J2ktiosinteropEnumNames_get_ONE()
+    let _ = J2ktiosinteropEnumNames_get_TWO()
+
+    // Not exposed in Swift
+    // let _ = J2ktiosinteropEnumNames_fromOrdinal(J2ktiosinteropEnumNames_Enum_ONE)
+    // let _ = J2ktiosinteropEnumNames_fromOrdinal(J2ktiosinteropEnumNames_Enum_TWO)
+
+    // let _ = J2ktiosinteropEnumNames_Enum_ONE
+    // let _ = J2ktiosinteropEnumNames_Enum_TWO
+
+    // let _ = J2ktiosinteropEnumNames.valueOf(with:"ONE")
+    // let _ = J2ktiosinteropEnumNames.valueOf(with:"TWO")
+
+    let values = J2ktiosinteropEnumNames.values()
+    let _ = values.get(index: 0)
+    let _ = values.get(index: 1)
+  }
+
+  func testEnumComparison() {
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() === J2ktiosinteropEnumNames_get_ONE())
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() !== J2ktiosinteropEnumNames_get_TWO())
+
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() == J2ktiosinteropEnumNames_get_ONE())
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() != J2ktiosinteropEnumNames_get_TWO())
+
+    // Kotlin Enum is not Comparable in Objective-C.
+    // XCTAssertEqual(
+    //   J2ktiosinteropEnumNames_get_ONE().compareTo(withId: J2ktiosinteropEnumNames_get_ONE()), 0)
+    // XCTAssertEqual(
+    //   J2ktiosinteropEnumNames_get_ONE().compareTo(withId: J2ktiosinteropEnumNames_get_TWO()), -1)
+    // XCTAssertEqual(
+    //   J2ktiosinteropEnumNames_get_TWO().compareTo(withId: J2ktiosinteropEnumNames_get_ONE()), 1)
+  }
+
+  func testNativeDefaultName() {
+    let obj = J2ktiosinteropNativeDefaultName()
+    let _ = obj.nativeInstanceMethod()
+    let _ = J2ktiosinteropNativeDefaultName.Companion.shared.nativeStaticMethod()
+    J2ktiosinteropNativeDefaultName.Companion.shared.nativeParameter(with: obj)
+    let _ = J2ktiosinteropNativeDefaultName.Companion.shared.nativeReturnType()
+  }
+
+  func testNativeCustomName() {
+    // Unsupported because of b/441110909.
+    // let obj = CustomNativeClass()
+    // let _ = obj.nativeInstanceMethod()
+    // let _ = CustomNativeClass.Companion.shared.nativeStaticMethod()
+    // CustomNativeClass.Companion.shared.nativeParameter(with: obj)
+    // let _ = CustomNativeClass.Companion.shared.nativeReturnType()
+  }
+
+  func testPlatform() {
+    XCTAssertEqual(J2ktiosinteropPlatform_get_NAME(), "J2KT")
+  }
+
+  func testNullability() {
+    J2ktiosinteropNullability_acceptNullableWithId_(nil)
+    J2ktiosinteropNullability_acceptNullableWithNonNullBoundWithId_(nil)
+    J2ktiosinteropNullability_acceptWithNullableBoundWithId_(nil)
+    J2ktiosinteropNullability_acceptNullableWithNullableBoundWithId_(nil)
+  }
+
+  func testOverrides() {
+    let parent = J2ktiosinteropObjectiveCNameOverrides_Parent()
+    XCTAssertEqual(parent.parent(), "parent")
+    let child = J2ktiosinteropObjectiveCNameOverrides_Child()
+    XCTAssertEqual(child.parent(), "parent/child")
+    XCTAssertEqual(child.child(), "child")
+  }
+
+  func testDataClassRecord() {
+    let record = J2ktiosinteropDataClassRecord(int: 123, with: "foo")
+    // TODO(b/445545563): Uncomment once Java records are translated to Kotlin data classes with
+    // @JvmRecord annotation.
+    // XCTAssertTrue(record is JavaLangRecord)
+    XCTAssertEqual(record.a(), 123)
+    XCTAssertEqual(record.b(), "foo")
+    // TODO(b/501052309): Uncomment once fixed.
+    // XCTAssertTrue(record.description.contains("DataClassRecord"))
+    XCTAssertTrue(record.description.contains("1"))
+    XCTAssertTrue(record.description.contains("foo"))
+
+    let record2 = J2ktiosinteropDataClassRecord(int: 123, with: "foo")
+    XCTAssertEqual(record, record2)
+    XCTAssertEqual(record.hash, record2.hash)
+  }
+
+  func testNonDataClassRecord() {
+    let record = J2ktiosinteropNonDataClassRecord(int: 123, with: "foo")
+    // TODO(b/501069312): Uncomment when fixed.
+    // XCTAssertTrue(record is JavaLangRecord)
+    XCTAssertEqual(record.a(), 124)
+    XCTAssertEqual(record.b(), "foo")
+    // TODO(b/501052309): Uncomment once fixed.
+    // XCTAssertTrue(record.description.contains("NonDataClassRecord"))
+    XCTAssertTrue(record.description.contains("1"))
+    XCTAssertTrue(record.description.contains("foo"))
+
+    let record2 = J2ktiosinteropNonDataClassRecord(int: 123, with: "foo")
+    XCTAssertEqual(record, record2)
+    XCTAssertEqual(record.hash, record2.hash)
+  }
+
+  func testRecordImplementingAccessors() {
+    let record: J2ktiosinteropRecordImplementingAccessors =
+      J2ktiosinteropRecordImplementingAccessors(int: 123, with: "foo")
+    XCTAssertEqual(record.i(), 124)
+    XCTAssertEqual(record.s(), "foo")
+
+    let accessors: J2ktiosinteropRecordAccessors = record
+    XCTAssertEqual(accessors.i(), 124)
+    XCTAssertEqual(accessors.s(), "foo")
   }
 }

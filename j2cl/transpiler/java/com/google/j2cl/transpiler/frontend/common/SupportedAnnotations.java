@@ -22,20 +22,41 @@ public class SupportedAnnotations {
 
   private static final ImmutableSet<String> RECOGNIZED_ANNOTATIONS_QUALIFIED_NAMES =
       ImmutableSet.of(
+          // go/keep-sorted start
           "com.google.apps.xplat.testing.parameterized.RunParameterized",
           "com.google.auto.value.AutoValue",
           "com.google.auto.value.AutoValue.Builder",
+          "com.google.errorprone.annotations.CanIgnoreReturnValue",
+          "com.google.errorprone.annotations.ResultIgnorabilityUnspecified",
+          "com.google.j2kt.annotations.HiddenFromObjC",
+          "com.google.j2kt.annotations.KtNative",
+          "com.google.j2kt.annotations.Throws",
+          "com.google.j2objc.annotations.ObjectiveCKmpMethod",
+          "com.google.j2objc.annotations.ObjectiveCName",
+          "com.google.j2objc.annotations.Property",
+          "com.google.j2objc.annotations.Property.Suppress",
+          "com.google.j2objc.annotations.SwiftName",
+          "dagger.Inject",
           "java.lang.Deprecated",
           "java.lang.FunctionalInterface",
           "java.lang.SuppressWarnings",
           "javaemul.internal.annotations.DoNotAutobox",
           "javaemul.internal.annotations.HasNoSideEffects",
+          "javaemul.internal.annotations.KtDisabled",
+          "javaemul.internal.annotations.KtIn",
+          "javaemul.internal.annotations.KtName",
+          "javaemul.internal.annotations.KtNative",
+          "javaemul.internal.annotations.KtOut",
+          "javaemul.internal.annotations.KtProperty",
           "javaemul.internal.annotations.UncheckedCast",
           "javaemul.internal.annotations.Wasm",
           "javaemul.lang.annotations.WasAutoValue",
           "javaemul.lang.annotations.WasAutoValue.Builder",
+          "javax.inject.Inject",
           "kotlin.Deprecated",
-          "org.junit.runner.RunWith");
+          "org.junit.runner.RunWith"
+          // go/keep-sorted end
+          );
 
   public static boolean isSupportedAnnotation(String qualifiedName) {
     return RECOGNIZED_ANNOTATIONS_QUALIFIED_NAMES.contains(qualifiedName);

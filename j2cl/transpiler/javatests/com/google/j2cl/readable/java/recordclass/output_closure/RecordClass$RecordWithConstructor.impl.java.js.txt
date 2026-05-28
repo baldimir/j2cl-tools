@@ -1,0 +1,58 @@
+goog.module('recordclass.RecordClass.RecordWithConstructor$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class RecordWithConstructor extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {number} @nodts*/
+  this.f_a__recordclass_RecordClass_RecordWithConstructor_ = 0;
+  /**@type {number} @nodts*/
+  this.f_b__recordclass_RecordClass_RecordWithConstructor_ = 0;
+ }
+ /** @nodts @return {!RecordWithConstructor} */
+ static $create__int__int(/** number */ a, /** number */ b) {
+  RecordWithConstructor.$clinit();
+  let $instance = new RecordWithConstructor();
+  $instance.$ctor__recordclass_RecordClass_RecordWithConstructor__int__int__void(a, b);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_RecordWithConstructor__int__int__void(/** number */ a, /** number */ b) {
+  this.$ctor__java_lang_Record__void();
+  this.f_a__recordclass_RecordClass_RecordWithConstructor_ = a + 1 | 0;
+  this.f_b__recordclass_RecordClass_RecordWithConstructor_ = b - 1 | 0;
+  $J2CL_PRESERVE$(this.f_a__recordclass_RecordClass_RecordWithConstructor_, this.f_b__recordclass_RecordClass_RecordWithConstructor_);
+ }
+ /** @nodts @return {number} */
+ m_a__int() {
+  return this.f_a__recordclass_RecordClass_RecordWithConstructor_;
+ }
+ /** @nodts @return {number} */
+ m_b__int() {
+  return this.f_b__recordclass_RecordClass_RecordWithConstructor_;
+ }
+ /** @nodts */
+ static $clinit() {
+  RecordWithConstructor.$clinit = () =>{};
+  RecordWithConstructor.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof RecordWithConstructor;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(RecordWithConstructor, 'recordclass.RecordClass$RecordWithConstructor');
+
+exports = RecordWithConstructor;
+
+//# sourceMappingURL=RecordClass$RecordWithConstructor.js.map

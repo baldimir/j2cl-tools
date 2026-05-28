@@ -23,9 +23,13 @@ import static com.google.j2cl.transpiler.ast.TypeDescriptors.isPrimitiveVoid;
 import static java.util.stream.Collectors.toCollection;
 
 import com.google.common.base.Predicates;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.j2cl.common.FilePosition;
+import com.google.j2cl.common.Problems;
 import com.google.j2cl.common.SourcePosition;
+import com.google.j2cl.transpiler.ast.AnyPattern;
 import com.google.j2cl.transpiler.ast.ArrayAccess;
 import com.google.j2cl.transpiler.ast.ArrayCreationReference;
 import com.google.j2cl.transpiler.ast.ArrayLength;
@@ -34,6 +38,7 @@ import com.google.j2cl.transpiler.ast.ArrayTypeDescriptor;
 import com.google.j2cl.transpiler.ast.AssertStatement;
 import com.google.j2cl.transpiler.ast.AstUtils;
 import com.google.j2cl.transpiler.ast.BinaryExpression;
+import com.google.j2cl.transpiler.ast.BindingPattern;
 import com.google.j2cl.transpiler.ast.Block;
 import com.google.j2cl.transpiler.ast.BooleanLiteral;
 import com.google.j2cl.transpiler.ast.BreakStatement;
@@ -53,11 +58,9 @@ import com.google.j2cl.transpiler.ast.ForStatement;
 import com.google.j2cl.transpiler.ast.FunctionExpression;
 import com.google.j2cl.transpiler.ast.IfStatement;
 import com.google.j2cl.transpiler.ast.InstanceOfExpression;
-import com.google.j2cl.transpiler.ast.JsConstructorReference;
 import com.google.j2cl.transpiler.ast.Label;
 import com.google.j2cl.transpiler.ast.LabelReference;
 import com.google.j2cl.transpiler.ast.LabeledStatement;
-import com.google.j2cl.transpiler.ast.Literal;
 import com.google.j2cl.transpiler.ast.LocalClassDeclarationStatement;
 import com.google.j2cl.transpiler.ast.Method;
 import com.google.j2cl.transpiler.ast.MethodCall;
@@ -66,16 +69,22 @@ import com.google.j2cl.transpiler.ast.MethodReference;
 import com.google.j2cl.transpiler.ast.NewArray;
 import com.google.j2cl.transpiler.ast.NewInstance;
 import com.google.j2cl.transpiler.ast.NumberLiteral;
+import com.google.j2cl.transpiler.ast.Pattern;
+import com.google.j2cl.transpiler.ast.PatternMatchExpression;
 import com.google.j2cl.transpiler.ast.PostfixExpression;
 import com.google.j2cl.transpiler.ast.PrefixExpression;
 import com.google.j2cl.transpiler.ast.PrimitiveTypeDescriptor;
 import com.google.j2cl.transpiler.ast.PrimitiveTypes;
+import com.google.j2cl.transpiler.ast.RecordPattern;
 import com.google.j2cl.transpiler.ast.ReturnStatement;
 import com.google.j2cl.transpiler.ast.RuntimeMethods;
 import com.google.j2cl.transpiler.ast.Statement;
 import com.google.j2cl.transpiler.ast.StringLiteral;
 import com.google.j2cl.transpiler.ast.SuperReference;
 import com.google.j2cl.transpiler.ast.SwitchCase;
+import com.google.j2cl.transpiler.ast.SwitchCaseDefault;
+import com.google.j2cl.transpiler.ast.SwitchCaseExpressions;
+import com.google.j2cl.transpiler.ast.SwitchCasePattern;
 import com.google.j2cl.transpiler.ast.SwitchExpression;
 import com.google.j2cl.transpiler.ast.SwitchStatement;
 import com.google.j2cl.transpiler.ast.SynchronizedStatement;
@@ -95,7 +104,10 @@ import com.google.j2cl.transpiler.ast.VariableDeclarationFragment;
 import com.google.j2cl.transpiler.ast.WhileStatement;
 import com.google.j2cl.transpiler.ast.YieldStatement;
 import com.google.j2cl.transpiler.frontend.common.AbstractCompilationUnitBuilder;
+import com.google.j2cl.transpiler.frontend.common.Utf8ByteOffsetConverter;
+import com.sun.source.tree.CaseTree.CaseKind;
 import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.DefaultCaseLabelTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.Tree.Kind;
 import com.sun.tools.javac.code.Flags;
@@ -106,6 +118,7 @@ import com.sun.tools.javac.code.Symbol.TypeVariableSymbol;
 import com.sun.tools.javac.code.Symbol.VarSymbol;
 import com.sun.tools.javac.code.Type.MethodType;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.JCTree.JCAnyPattern;
 import com.sun.tools.javac.tree.JCTree.JCArrayAccess;
 import com.sun.tools.javac.tree.JCTree.JCAssert;
 import com.sun.tools.javac.tree.JCTree.JCAssign;
@@ -119,6 +132,7 @@ import com.sun.tools.javac.tree.JCTree.JCCatch;
 import com.sun.tools.javac.tree.JCTree.JCClassDecl;
 import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
 import com.sun.tools.javac.tree.JCTree.JCConditional;
+import com.sun.tools.javac.tree.JCTree.JCConstantCaseLabel;
 import com.sun.tools.javac.tree.JCTree.JCContinue;
 import com.sun.tools.javac.tree.JCTree.JCDoWhileLoop;
 import com.sun.tools.javac.tree.JCTree.JCEnhancedForLoop;
@@ -133,11 +147,15 @@ import com.sun.tools.javac.tree.JCTree.JCLabeledStatement;
 import com.sun.tools.javac.tree.JCTree.JCLambda;
 import com.sun.tools.javac.tree.JCTree.JCLiteral;
 import com.sun.tools.javac.tree.JCTree.JCMemberReference;
+import com.sun.tools.javac.tree.JCTree.JCMemberReference.ReferenceKind;
 import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
 import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
 import com.sun.tools.javac.tree.JCTree.JCNewArray;
 import com.sun.tools.javac.tree.JCTree.JCNewClass;
 import com.sun.tools.javac.tree.JCTree.JCParens;
+import com.sun.tools.javac.tree.JCTree.JCPattern;
+import com.sun.tools.javac.tree.JCTree.JCPatternCaseLabel;
+import com.sun.tools.javac.tree.JCTree.JCRecordPattern;
 import com.sun.tools.javac.tree.JCTree.JCReturn;
 import com.sun.tools.javac.tree.JCTree.JCStatement;
 import com.sun.tools.javac.tree.JCTree.JCSwitch;
@@ -152,6 +170,9 @@ import com.sun.tools.javac.tree.JCTree.JCWhileLoop;
 import com.sun.tools.javac.tree.JCTree.JCYield;
 import com.sun.tools.javac.tree.JCTree.Tag;
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -159,18 +180,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeKind;
 
 /** Creates a J2CL Java AST from the AST provided by JavaC. */
 @SuppressWarnings("ASTHelpersSuggestions")
 public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   private final JavaEnvironment environment;
+  private final Problems problems;
+
   private final Map<VariableElement, Variable> variableByVariableElement = new HashMap<>();
   // Keeps track of labels that are currently in scope. Even though labels cannot have the
   // same name if they are nested in the same method body, labels with the same name could
@@ -178,9 +199,12 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   // classes or lambdas.
   private final Map<String, Deque<Label>> labelsInScope = new HashMap<>();
   private JCCompilationUnit javacUnit;
+  private Utf8ByteOffsetConverter byteOffsetConverter;
 
-  CompilationUnitBuilder(JavaEnvironment environment) {
+  CompilationUnitBuilder(JavaEnvironment environment, Problems problems) {
     this.environment = environment;
+    this.problems = problems;
+    this.problems.abortIfCancelled();
   }
 
   /**
@@ -222,56 +246,54 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private void convertTypeBody(Type type, List<JCTree> bodyDeclarations) {
+    problems.abortIfCancelled();
     for (JCTree bodyDeclaration : bodyDeclarations) {
-      if (bodyDeclaration instanceof JCVariableDecl fieldDeclaration) {
-        type.addMember(convertFieldDeclaration(fieldDeclaration));
-      } else if (bodyDeclaration instanceof JCMethodDecl methodDeclaration) {
-        if ((methodDeclaration.mods.flags & Flags.GENERATEDCONSTR) != 0
-            && (methodDeclaration.mods.flags & Flags.ANONCONSTR) == 0) {
-          // Skip constructors that are generated by javac. This allows to differentiate between
-          // a user written empty constructor and an implicit (generated) constructor.
-          // J2CL already has logic to synthesize default constructors for JDT.
-          // TODO(b/135123615): When the migration is completed, the pass synthesizing default
-          // constructors can be removed by adding isGenerated or isSynthetic to Method.
-          continue;
+      switch (bodyDeclaration) {
+        case JCVariableDecl fieldDeclaration ->
+            type.addMember(convertFieldDeclaration(fieldDeclaration));
+
+        case JCMethodDecl methodDeclaration -> {
+          if ((methodDeclaration.mods.flags & Flags.GENERATEDCONSTR) != 0
+              && (methodDeclaration.mods.flags & Flags.ANONCONSTR) == 0) {
+            // Skip constructors that are generated by javac. This allows to differentiate between
+            // a user written empty constructor and an implicit (generated) constructor.
+            // ImplementRecordClasses pass synthesizes default constructors for records.
+            // TODO(b/135123615): When the migration is completed, the pass synthesizing default
+            // constructors can be removed by adding isGenerated or isSynthetic to Method.
+            continue;
+          }
+          type.addMember(convertMethodDeclaration(methodDeclaration));
         }
-        type.addMember(convertMethodDeclaration(methodDeclaration));
-        // } else if (bodyDeclaration instanceof AnnotationTypeMemberDeclaration) {
-        //   AnnotationTypeMemberDeclaration memberDeclaration =
-        //       (AnnotationTypeMemberDeclaration) bodyDeclaration;
-        //   type.addMethod(convert(memberDeclaration));
-      } else if (bodyDeclaration instanceof JCBlock initializer) {
-        Block block = convertBlock(initializer);
-        if (initializer.isStatic()) {
-          type.addStaticInitializerBlock(block);
-        } else {
-          type.addInstanceInitializerBlock(block);
+
+        case JCBlock initializer -> {
+          Block block = convertBlock(initializer);
+          if (initializer.isStatic()) {
+            type.addStaticInitializerBlock(block);
+          } else {
+            type.addInstanceInitializerBlock(block);
+          }
         }
-      } else if (bodyDeclaration instanceof JCClassDecl nestedTypeDeclaration) {
-        // Nested class
-        type.addType(convertClassDeclaration(nestedTypeDeclaration));
-      } else {
-        throw internalCompilerError(
-            "Unimplemented translation for BodyDeclaration type: %s.",
-            bodyDeclaration.getClass().getName());
+
+        case JCClassDecl nestedTypeDeclaration ->
+            // Nested class
+            type.addType(convertClassDeclaration(nestedTypeDeclaration));
+
+        default ->
+            throw internalCompilerError(
+                "Unimplemented translation for BodyDeclaration type: %s.",
+                bodyDeclaration.getClass().getName());
       }
+      problems.abortIfCancelled();
     }
   }
 
   private Field convertFieldDeclaration(JCVariableDecl fieldDeclaration) {
     Expression initializer;
     VariableElement variableElement = fieldDeclaration.sym;
-    Object constantValue = variableElement.getConstantValue();
-    if (constantValue == null) {
-      initializer = convertExpressionOrNull(fieldDeclaration.getInitializer());
-    } else {
-      initializer = convertConstantToLiteral(variableElement);
-    }
-    return Field.Builder.from(
-            environment.createFieldDescriptor(variableElement, fieldDeclaration.type))
+    initializer = convertExpressionOrNull(fieldDeclaration.getInitializer());
+    return Field.builderFrom(environment.createFieldDescriptor(variableElement))
         .setInitializer(initializer)
-        .setSourcePosition(getSourcePosition(fieldDeclaration))
-        .setNameSourcePosition(getNamePosition(fieldDeclaration))
+        .setSourcePosition(getNamePosition(fieldDeclaration))
         .build();
   }
 
@@ -282,22 +304,20 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       parameters.add(createVariable(parameter, true));
     }
 
-    // If a method has no body, initialize the body with an empty list of statements.
-    Block body =
-        methodDeclaration.getBody() == null
-            ? Block.newBuilder().setSourcePosition(getSourcePosition(methodDeclaration)).build()
-            : convertBlock(methodDeclaration.getBody());
+    Method.Builder builder =
+        newMethodBuilder(methodDeclaration.sym)
+            .setSourcePosition(getNamePosition(methodDeclaration))
+            .setParameters(parameters);
 
-    return newMethodBuilder(methodDeclaration.sym)
-        .setBodySourcePosition(body.getSourcePosition())
-        .setSourcePosition(getNamePosition(methodDeclaration))
-        .setParameters(parameters)
-        .addStatements(body.getStatements())
-        .build();
+    if (methodDeclaration.getBody() != null) {
+      builder.setBody(convertBlock(methodDeclaration.getBody()));
+    }
+
+    return builder.build();
   }
 
   private Block convertBlock(JCBlock block) {
-    return Block.newBuilder()
+    return Block.builder()
         .setSourcePosition(getSourcePosition(block))
         .setStatements(
             block.getStatements().stream()
@@ -308,12 +328,20 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private Variable createVariable(JCVariableDecl variableDeclaration, boolean isParameter) {
-    VariableElement variableElement = variableDeclaration.sym;
+    VarSymbol variableElement = variableDeclaration.sym;
+    String name =
+        variableElement.getSimpleName().isEmpty()
+            ? "_"
+            : variableElement.getSimpleName().toString();
+    boolean isExplicitlyTyped =
+        !variableDeclaration.isImplicitlyTyped() && !variableDeclaration.declaredUsingVar();
     Variable variable =
         environment.createVariable(
-            getNamePosition(variableElement.getSimpleName().toString(), variableDeclaration),
+            getNamePosition(name, variableDeclaration),
+            name,
             variableElement,
             isParameter,
+            isExplicitlyTyped,
             inNullMarkedScope());
     variableByVariableElement.put(variableElement, variable);
     return variable;
@@ -321,13 +349,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
 
   private Method.Builder newMethodBuilder(ExecutableElement methodElement) {
     MethodDescriptor methodDescriptor = environment.createMethodDescriptor(methodElement);
-    return Method.newBuilder().setMethodDescriptor(methodDescriptor);
-  }
-
-  private Literal convertConstantToLiteral(VariableElement variableElement) {
-    return Literal.fromValue(
-        variableElement.getConstantValue(),
-        environment.createTypeDescriptor(variableElement.asType()));
+    return Method.builder().setMethodDescriptor(methodDescriptor);
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////
@@ -335,7 +357,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   //////////////////////////////////////////////////////////////////////////////////////////////
 
   private AssertStatement convertAssert(JCAssert statement) {
-    return AssertStatement.newBuilder()
+    return AssertStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
         .setExpression(convertExpression(statement.getCondition()))
         .setMessage(convertExpressionOrNull(statement.getDetail()))
@@ -343,10 +365,10 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private LabeledStatement convertLabeledStatement(JCLabeledStatement statement) {
-    Label label = Label.newBuilder().setName(statement.getLabel().toString()).build();
+    Label label = Label.builder().setName(statement.getLabel().toString()).build();
     labelsInScope.computeIfAbsent(label.getName(), n -> new ArrayDeque<>()).push(label);
     LabeledStatement labeledStatment =
-        LabeledStatement.newBuilder()
+        LabeledStatement.builder()
             .setSourcePosition(getSourcePosition(statement))
             .setLabel(label)
             .setStatement(convertStatement(statement.getStatement()))
@@ -356,14 +378,14 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private BreakStatement convertBreak(JCBreak statement) {
-    return BreakStatement.newBuilder()
+    return BreakStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
         .setLabelReference(getLabelReferenceOrNull(statement.getLabel()))
         .build();
   }
 
   private ContinueStatement convertContinue(JCContinue statement) {
-    return ContinueStatement.newBuilder()
+    return ContinueStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
         .setLabelReference(getLabelReferenceOrNull(statement.getLabel()))
         .build();
@@ -375,9 +397,9 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private DoWhileStatement convertDoWhileLoop(JCDoWhileLoop statement) {
-    return DoWhileStatement.newBuilder()
+    return DoWhileStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
-        .setConditionExpression(convertConditionRemovingOuterParentheses(statement.getCondition()))
+        .setConditionExpression(convertExpression(statement.getCondition()))
         .setBody(convertStatement(statement.getStatement()))
         .build();
   }
@@ -387,7 +409,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private ForStatement convertForLoop(JCForLoop statement) {
-    return ForStatement.newBuilder()
+    return ForStatement.builder()
         // The order here is important since initializers can define new variables
         // These can be used in the expression, updaters or the body
         // This is why we need to process initializers first
@@ -418,7 +440,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
 
   private ImmutableList<Expression> convertVariableDeclarations(List<JCStatement> statements) {
     return ImmutableList.of(
-        VariableDeclarationExpression.newBuilder()
+        VariableDeclarationExpression.builder()
             .addVariableDeclarationFragments(
                 statements.stream()
                     .map(s -> createVariableDeclarationFragment((JCVariableDecl) s))
@@ -434,7 +456,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private ForEachStatement convertEnhancedForLoop(JCEnhancedForLoop statement) {
-    return ForEachStatement.newBuilder()
+    return ForEachStatement.builder()
         .setLoopVariable(createVariable(statement.getVariable(), false))
         .setIterableExpression(convertExpression(statement.getExpression()))
         .setBody(convertStatement(statement.getStatement()))
@@ -443,36 +465,40 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private IfStatement convertIf(JCIf statement) {
-    return IfStatement.newBuilder()
+    return IfStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
-        .setConditionExpression(convertConditionRemovingOuterParentheses(statement.getCondition()))
+        .setConditionExpression(convertExpression(statement.getCondition()))
         .setThenStatement(convertStatement(statement.getThenStatement()))
         .setElseStatement(convertStatementOrNull(statement.getElseStatement()))
         .build();
   }
 
   private WhileStatement convertWhileLoop(JCWhileLoop statement) {
-    return WhileStatement.newBuilder()
+    return WhileStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
-        .setConditionExpression(convertConditionRemovingOuterParentheses(statement.getCondition()))
+        .setConditionExpression(convertExpression(statement.getCondition()))
         .setBody(convertStatement(statement.getStatement()))
         .build();
   }
 
   private SwitchStatement convertSwitch(JCSwitch switchStatement) {
-    return SwitchStatement.newBuilder()
+    return SwitchStatement.builder()
         .setSourcePosition(getSourcePosition(switchStatement))
         .setExpression(convertExpressionOrNull(switchStatement.getExpression()))
         .setCases(
             switchStatement.getCases().stream()
                 .map(c -> convertSwitchCase(c, PrimitiveTypes.VOID))
                 .collect(toImmutableList()))
+        .setAllowsNulls(allowsNulls(switchStatement.getCases()))
         .build();
   }
 
   private Expression convertSwitchExpression(JCSwitchExpression expression) {
-    TypeDescriptor typeDescriptor = environment.createTypeDescriptor(expression.type);
-    return SwitchExpression.newBuilder()
+    // Create the result type descriptor for the switch expression with the right nullability scope
+    // but make it nullable to since a branch might return null or other nullable value.
+    TypeDescriptor typeDescriptor =
+        environment.createTypeDescriptor(expression.type, inNullMarkedScope()).toNullable();
+    return SwitchExpression.builder()
         .setSourcePosition(getSourcePosition(expression))
         .setExpression(convertExpressionOrNull(expression.getExpression()))
         .setTypeDescriptor(typeDescriptor)
@@ -480,15 +506,49 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
             expression.getCases().stream()
                 .map(c -> convertSwitchCase(c, typeDescriptor))
                 .collect(toImmutableList()))
+        .setAllowsNulls(allowsNulls(expression.getCases()))
         .build();
   }
 
+  private static boolean allowsNulls(List<JCCase> cases) {
+    return cases.stream()
+        .flatMap(c -> c.getExpressions().stream().map(JCExpression::getKind))
+        .anyMatch(Kind.NULL_LITERAL::equals);
+  }
+
   private SwitchCase convertSwitchCase(JCCase caseClause, TypeDescriptor resultType) {
-    return SwitchCase.newBuilder()
-        .setCaseExpressions(convertCaseExpressions(caseClause))
+    boolean canFallthrough = caseClause.getCaseKind() == CaseKind.STATEMENT;
+
+    boolean isDefault =
+        caseClause.getLabels().stream().anyMatch(DefaultCaseLabelTree.class::isInstance);
+    if (isDefault) {
+      return SwitchCaseDefault.builder()
+          .setStatements(getCaseStatements(caseClause, resultType))
+          .setCanFallthrough(canFallthrough)
+          .setSourcePosition(getSourcePosition(caseClause))
+          .build();
+    }
+
+    // If a case has expressions, all the labels are of JCConstantCaseLabel type.
+    if (caseClause.getLabels().stream().allMatch(JCConstantCaseLabel.class::isInstance)) {
+      return SwitchCaseExpressions.builder()
+          .setCaseExpressions(convertCaseExpressions(caseClause))
+          .setStatements(getCaseStatements(caseClause, resultType))
+          .setCanFallthrough(canFallthrough)
+          .setSourcePosition(getSourcePosition(caseClause))
+          .build();
+    }
+
+    // If a case has patterns, it has exactly one label of JCPatternCaseLabel type.
+    JCPattern pattern =
+        ((JCPatternCaseLabel) Iterables.getOnlyElement(caseClause.getLabels())).getPattern();
+
+    return SwitchCasePattern.builder()
+        .setPattern(convertPattern(pattern))
+        .setGuard(convertExpressionOrNull(caseClause.getGuard()))
         .setStatements(getCaseStatements(caseClause, resultType))
-        .setCanFallthrough(
-            caseClause.getCaseKind() == com.sun.source.tree.CaseTree.CaseKind.STATEMENT)
+        .setCanFallthrough(canFallthrough)
+        .setSourcePosition(getSourcePosition(caseClause))
         .build();
   }
 
@@ -506,30 +566,27 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       // The body is just an expression, convert it to a yield statement.
       checkState(!isPrimitiveVoid(resultTypeDescriptor));
       return ImmutableList.of(
-          YieldStatement.newBuilder()
+          YieldStatement.builder()
               .setExpression(convertExpression((JCExpression) body))
               .setSourcePosition(getSourcePosition(body))
               .build());
     }
 
-    ImmutableList.Builder<Statement> statementsBuilder = ImmutableList.builder();
-    if (body == null) {
-    } else if (body instanceof JCBlock block) {
-      statementsBuilder.addAll(convertBlock(block).getStatements());
-    } else if (body instanceof JCStatement statement) {
-      statementsBuilder.add(convertStatement(statement));
-    } else {
-      throw new AssertionError("Unexpected node type in switch case rule: " + body.getKind());
+    checkState(body == null || body instanceof JCStatement);
+    var caseBody = body == null ? null : convertStatement((JCStatement) body);
+
+    // If the result of the switch construct is void, it means that it is a switch statement;
+    // otherwise the result should have been the type of the resulting expression and no case
+    // falls through.
+    var isSwitchStatement = isPrimitiveVoid(resultTypeDescriptor);
+    if (isSwitchStatement && !(caseBody != null && caseBody.terminatesAbruptly())) {
+      // Add a break statement to prevent fallthrough since this is a case rule and the body
+      // can complete normally.
+      return ImmutableList.of(
+          caseBody, BreakStatement.builder().setSourcePosition(SourcePosition.NONE).build());
     }
 
-    if (isPrimitiveVoid(resultTypeDescriptor)) {
-      // Switch case rules don't fallthrough and this one is in a switch statement,
-      // add an explicit break.
-      statementsBuilder.add(
-          BreakStatement.newBuilder().setSourcePosition(getSourcePosition(body)).build());
-    }
-
-    return statementsBuilder.build();
+    return ImmutableList.of(caseBody);
   }
 
   private List<Expression> convertCaseExpressions(JCCase caseClause) {
@@ -537,7 +594,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private ThrowStatement convertThrow(JCThrow statement) {
-    return ThrowStatement.newBuilder()
+    return ThrowStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
         .setExpression(convertExpression(statement.getExpression()))
         .build();
@@ -546,7 +603,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   private TryStatement convertTry(JCTry statement) {
     List<JCCatch> catchClauses = statement.getCatches();
 
-    return TryStatement.newBuilder()
+    return TryStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
         .setResourceDeclarations(
             statement.getResources().stream().map(this::toResource).collect(toImmutableList()))
@@ -568,9 +625,9 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   private VariableDeclarationExpression toResource(JCIdent ident) {
     // Create temporary variables for resources declared outside of the try statement.
     Expression expression = convertIdent(ident);
-    return VariableDeclarationExpression.newBuilder()
+    return VariableDeclarationExpression.builder()
         .addVariableDeclaration(
-            Variable.newBuilder()
+            Variable.builder()
                 .setName("$resource")
                 .setTypeDescriptor(expression.getTypeDescriptor())
                 .setFinal(true)
@@ -581,28 +638,28 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
 
   private CatchClause convertCatchClause(JCCatch catchClause) {
     // Order is important here, exception declaration must be converted before body.
-    return CatchClause.newBuilder()
-        .setExceptionVariable(createVariable(catchClause.getParameter(), false))
+    return CatchClause.builder()
+        .setExceptionVariable(createVariable(catchClause.getParameter(), /* isParameter= */ false))
         .setBody(convertBlock(catchClause.getBlock()))
         .build();
   }
 
   private ReturnStatement convertReturn(JCReturn statement) {
-    return ReturnStatement.newBuilder()
+    return ReturnStatement.builder()
         .setExpression(convertExpressionOrNull(statement.getExpression()))
         .setSourcePosition(getSourcePosition(statement))
         .build();
   }
 
   private Statement convertYield(JCYield statement) {
-    return YieldStatement.newBuilder()
+    return YieldStatement.builder()
         .setExpression(convertExpressionOrNull(statement.value))
         .setSourcePosition(getSourcePosition(statement))
         .build();
   }
 
   private SynchronizedStatement convertSynchronized(JCSynchronized statement) {
-    return SynchronizedStatement.newBuilder()
+    return SynchronizedStatement.builder()
         .setSourcePosition(getSourcePosition(statement))
         .setExpression(convertExpression(statement.getExpression()))
         .setBody(convertBlock(statement.getBlock()))
@@ -616,7 +673,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
 
   private VariableDeclarationExpression createVariableDeclarationExpression(
       JCVariableDecl variableDeclaration) {
-    return VariableDeclarationExpression.newBuilder()
+    return VariableDeclarationExpression.builder()
         .addVariableDeclarationFragments(createVariableDeclarationFragment(variableDeclaration))
         .build();
   }
@@ -624,7 +681,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   private VariableDeclarationFragment createVariableDeclarationFragment(
       JCVariableDecl variableDeclaration) {
     Variable variable = createVariable(variableDeclaration, false);
-    return VariableDeclarationFragment.newBuilder()
+    return VariableDeclarationFragment.builder()
         .setVariable(variable)
         .setInitializer(convertExpressionOrNull(variableDeclaration.getInitializer()))
         .build();
@@ -636,7 +693,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       case ASSERT -> convertAssert((JCAssert) jcStatement);
       case BLOCK -> convertBlock((JCBlock) jcStatement);
       case BREAK -> convertBreak((JCBreak) jcStatement);
-      case CLASS ->
+      case CLASS, RECORD ->
           new LocalClassDeclarationStatement(
               convertClassDeclaration((JCClassDecl) jcStatement), getSourcePosition(jcStatement));
       case CONTINUE -> convertContinue((JCContinue) jcStatement);
@@ -686,24 +743,34 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       String name, int startCharacterPosition, int endCharacterPosition) {
     int startLine = javacUnit.getLineMap().getLineNumber(startCharacterPosition) - 1;
     int startColumn = javacUnit.getLineMap().getColumnNumber(startCharacterPosition) - 1;
+    // TODO(b/505900609): remove this and just store character positions.
+    int startByteOffset =
+        byteOffsetConverter != null
+            ? byteOffsetConverter.getByteOffset(startCharacterPosition)
+            : startCharacterPosition;
     int endLine = javacUnit.getLineMap().getLineNumber(endCharacterPosition) - 1;
     int endColumn = javacUnit.getLineMap().getColumnNumber(endCharacterPosition) - 1;
-    return SourcePosition.newBuilder()
-        .setFilePath(javacUnit.getSourceFile().getName())
+    // TODO(b/505900609): remove this and just store character positions.
+    int endByteOffset =
+        byteOffsetConverter != null
+            ? byteOffsetConverter.getByteOffset(endCharacterPosition)
+            : endCharacterPosition;
+    return SourcePosition.builder()
+        .setFilePath(getCurrentCompilationUnit().getFilePath())
         .setPackageRelativePath(getCurrentCompilationUnit().getPackageRelativePath())
         .setName(name)
         .setStartFilePosition(
-            FilePosition.newBuilder()
+            FilePosition.builder()
                 .setLine(startLine)
                 .setColumn(startColumn)
-                .setByteOffset(startCharacterPosition)
+                .setByteOffset(startByteOffset)
                 .build())
         .setEndFilePosition(
-            FilePosition.newBuilder()
+            FilePosition.builder()
                 .setLine(endLine)
                 // TODO(b/92372836): Document which character this should point to
                 .setColumn(endColumn)
-                .setByteOffset(endCharacterPosition + 1)
+                .setByteOffset(endByteOffset)
                 .build())
         .build();
   }
@@ -711,8 +778,8 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   /** Javac does not always report the end position of a construct. */
   private int guessEndPosition(JCTree node) {
     int startCharacterPosition = node.getStartPosition();
-    int endCharacterPosition = node.getEndPosition(javacUnit.endPositions);
-    if (endCharacterPosition == -1) {
+    int endCharacterPosition = getEndPosition(node, javacUnit);
+    if (endCharacterPosition == -1 || endCharacterPosition == startCharacterPosition) {
       try {
         // Scan the source file for the end of an identifier.
         String src = javacUnit.sourcefile.getCharContent(true).toString();
@@ -724,6 +791,47 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       }
     }
     return endCharacterPosition;
+  }
+
+  private static int getEndPosition(JCTree tree, JCCompilationUnit unit) {
+    // TODO: remove method handles once the minimum supported JDK is JDK 27+
+    try {
+      return (int) GET_END_POS_HANDLE.invokeExact(tree, unit);
+    } catch (Throwable e) {
+      Throwables.throwIfUnchecked(e);
+      throw new AssertionError(e);
+    }
+  }
+
+  private static final MethodHandle GET_END_POS_HANDLE = getEndPosMethodHandle();
+
+  private static MethodHandle getEndPosMethodHandle() {
+    MethodHandles.Lookup lookup = MethodHandles.lookup();
+    try {
+      // JDK versions after https://bugs.openjdk.org/browse/JDK-8372948
+      return MethodHandles.dropArguments(
+          lookup.findVirtual(
+              JCTree.class, "getEndPosition", java.lang.invoke.MethodType.methodType(int.class)),
+          1,
+          JCCompilationUnit.class);
+    } catch (ReflectiveOperationException e1) {
+      // JDK versions before https://bugs.openjdk.org/browse/JDK-8372948
+      try {
+        Class<?> endPosTableClass = Class.forName("com.sun.tools.javac.tree.EndPosTable");
+        return MethodHandles.filterArguments(
+            lookup.findVirtual(
+                JCTree.class,
+                "getEndPosition",
+                java.lang.invoke.MethodType.methodType(int.class, endPosTableClass)),
+            1,
+            lookup
+                .findVarHandle(JCCompilationUnit.class, "endPositions", endPosTableClass)
+                .toMethodHandle(VarHandle.AccessMode.GET));
+      } catch (ReflectiveOperationException e2) {
+        e2.addSuppressed(e1);
+        throw new LinkageError(e2.getMessage(), e2);
+      }
+    }
   }
 
   private SourcePosition getNamePosition(JCTree node) {
@@ -744,7 +852,8 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       if (kind == Kind.ANNOTATION_TYPE
           || kind == Kind.CLASS
           || kind == Kind.ENUM
-          || kind == Kind.INTERFACE) {
+          || kind == Kind.INTERFACE
+          || kind == Kind.RECORD) {
         // Skip the class/enum/interface token.
         while (src.charAt(start++) != ' ') {}
       } else if (kind != Kind.METHOD && kind != Kind.VARIABLE) {
@@ -765,14 +874,14 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
 
   // Expressions
   private ArrayAccess convertArrayAccess(JCArrayAccess expression) {
-    return ArrayAccess.newBuilder()
+    return ArrayAccess.builder()
         .setArrayExpression(convertExpression(expression.getExpression()))
         .setIndexExpression(convertExpression(expression.getIndex()))
         .build();
   }
 
   private BinaryExpression convertAssignment(JCAssign expression) {
-    return BinaryExpression.newBuilder()
+    return BinaryExpression.builder()
         .setLeftOperand(convertExpression(expression.getVariable()))
         .setOperator(JavaEnvironment.getBinaryOperator(expression.getKind()))
         .setRightOperand(convertExpression(expression.getExpression()))
@@ -781,7 +890,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
 
   /** Convert compound assigment. */
   private BinaryExpression convertAssignment(JCAssignOp expression) {
-    return BinaryExpression.newBuilder()
+    return BinaryExpression.builder()
         .setLeftOperand(convertExpression(expression.getVariable()))
         .setOperator(JavaEnvironment.getBinaryOperator(expression.getKind()))
         .setRightOperand(convertExpression(expression.getExpression()))
@@ -789,7 +898,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private BinaryExpression convertBinary(JCBinary expression) {
-    return BinaryExpression.newBuilder()
+    return BinaryExpression.builder()
         .setLeftOperand(convertExpression(expression.getLeftOperand()))
         .setOperator(JavaEnvironment.getBinaryOperator(expression.getKind()))
         .setRightOperand(convertExpression(expression.getRightOperand()))
@@ -797,14 +906,14 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
   }
 
   private UnaryExpression convertPostfixUnary(JCUnary expression) {
-    return PostfixExpression.newBuilder()
+    return PostfixExpression.builder()
         .setOperand(convertExpression(expression.getExpression()))
         .setOperator(JavaEnvironment.getPostfixOperator(expression.getKind()))
         .build();
   }
 
   private UnaryExpression convertPrefixUnary(JCUnary expression) {
-    return PrefixExpression.newBuilder()
+    return PrefixExpression.builder()
         .setOperand(convertExpression(expression.getExpression()))
         .setOperator(JavaEnvironment.getPrefixOperator(expression.getKind()))
         .build();
@@ -822,7 +931,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       castTypeDescriptor = castTypeDescriptor.toNullable();
     }
 
-    return CastExpression.newBuilder()
+    return CastExpression.builder()
         .setExpression(castExpression)
         .setCastTypeDescriptor(castTypeDescriptor)
         .build();
@@ -835,7 +944,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
     Expression condition = convertExpression(conditionalExpression.getCondition());
     Expression trueExpression = convertExpression(conditionalExpression.getTrueExpression());
     Expression falseExpression = convertExpression(conditionalExpression.getFalseExpression());
-    return ConditionalExpression.newBuilder()
+    return ConditionalExpression.builder()
         .setTypeDescriptor(
             trueExpression.getTypeDescriptor().canBeNull()
                     || falseExpression.getTypeDescriptor().canBeNull()
@@ -847,18 +956,42 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
         .build();
   }
 
-  private InstanceOfExpression convertInstanceOf(JCInstanceOf expression) {
-    Variable patternVariable = null;
-    if (expression.getPattern() instanceof JCBindingPattern pattern) {
-      patternVariable = createVariable(pattern.var, false);
-    }
+  private Expression convertInstanceOf(JCInstanceOf instanceofExpression) {
+    SourcePosition sourcePosition = getSourcePosition(instanceofExpression);
+    Expression expression = convertExpression(instanceofExpression.getExpression());
+    return instanceofExpression.getPattern() == null
+        ? InstanceOfExpression.builder()
+            .setSourcePosition(sourcePosition)
+            .setExpression(expression)
+            .setTestTypeDescriptor(
+                environment.createTypeDescriptor(
+                    instanceofExpression.getType().type, /* inNullMarkedScope= */ false))
+            .build()
+        : PatternMatchExpression.builder()
+            .setSourcePosition(sourcePosition)
+            .setExpression(expression)
+            .setPattern(convertPattern(instanceofExpression.getPattern()))
+            .build();
+  }
 
-    return InstanceOfExpression.newBuilder()
-        .setSourcePosition(getSourcePosition(expression))
-        .setExpression(convertExpression(expression.getExpression()))
-        .setPatternVariable(patternVariable)
-        .setTestTypeDescriptor(environment.createTypeDescriptor(expression.getType().type))
-        .build();
+  private Pattern convertPattern(JCPattern pattern) {
+    return switch (pattern) {
+      case JCBindingPattern bindingPattern ->
+          new BindingPattern(createVariable(bindingPattern.var, false));
+      case JCRecordPattern recordPattern ->
+          new RecordPattern(
+              environment.createDeclaredTypeDescriptor(getRecordType(recordPattern)),
+              recordPattern.getNestedPatterns().stream()
+                  .map(this::convertPattern)
+                  .collect(toCollection(ArrayList::new)));
+      case JCAnyPattern anyPattern -> new AnyPattern();
+      case null -> null;
+      default -> throw new IllegalArgumentException("Unexpected pattern: " + pattern);
+    };
+  }
+
+  private static com.sun.tools.javac.code.Type getRecordType(JCRecordPattern recordPattern) {
+    return ((JCExpression) recordPattern.getDeconstructor()).type;
   }
 
   private Expression convertLambda(JCLambda expression) {
@@ -867,7 +1000,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
     MethodDescriptor functionalMethodDescriptor =
         expressionTypeDescriptor.getFunctionalInterface().getSingleAbstractMethodDescriptor();
 
-    return FunctionExpression.newBuilder()
+    return FunctionExpression.builder()
         .setTypeDescriptor(expressionTypeDescriptor)
         .setJsAsync(functionalMethodDescriptor.isJsAsync())
         .setParameters(
@@ -891,7 +1024,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       Statement statement =
           isPrimitiveVoid(returnTypeDescriptor)
               ? lambdaExpression.makeStatement(sourcePosition)
-              : ReturnStatement.newBuilder()
+              : ReturnStatement.builder()
                   .setExpression(lambdaExpression)
                   .setSourcePosition(sourcePosition)
                   .build();
@@ -908,7 +1041,6 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
     throw new AssertionError("Unexpected node type in lambda body: " + body.getKind());
   }
 
-
   /**
    * Converts method reference expressions of the form:
    *
@@ -917,65 +1049,43 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
    * <pre> {@code A::m}    into    {@code  (par1, ..., parN) -> A.m(par1, ..., parN) } </pre>
    */
   private Expression convertMemberReference(JCMemberReference memberReference) {
-    MethodSymbol methodSymbol = (MethodSymbol) memberReference.sym;
+    var methodSymbol = (MethodSymbol) memberReference.sym.baseSymbol();
 
-    TypeDescriptor expressionTypeDescriptor =
-        environment.createTypeDescriptor(memberReference.type);
-    MethodDescriptor functionalMethodDescriptor =
+    var expressionTypeDescriptor =
+        environment.createTypeDescriptor(memberReference.type, inNullMarkedScope());
+    var functionalMethodDescriptor =
         expressionTypeDescriptor.getFunctionalInterface().getSingleAbstractMethodDescriptor();
 
-    if (methodSymbol.getEnclosingElement().getQualifiedName().contentEquals("Array")) {
-      // Arrays member references are seen as references to members on a class Array.
-      // Obtain @NullMarked scope from the enclosing type declaration so that both the enclosing
-      // type descriptor and the MethodDescriptor are created in the right context.
-      TypeElement typeElement =
-          (TypeElement) memberReference.getQualifierExpression().type.asElement();
-      boolean inNullMarkedScope = environment.createTypeDeclaration(typeElement).isNullMarked();
-      return ArrayCreationReference.newBuilder()
+    if (memberReference.kind == ReferenceKind.ARRAY_CTOR) {
+      return ArrayCreationReference.builder()
           .setTargetTypeDescriptor(
-              environment.createTypeDescriptor(
-                  memberReference.getQualifierExpression().type,
-                  inNullMarkedScope,
-                  ArrayTypeDescriptor.class))
+              environment
+                  .createTypeDescriptor(
+                      memberReference.getQualifierExpression().type,
+                      inNullMarkedScope(),
+                      ArrayTypeDescriptor.class)
+                  .toNonNullable())
           .setInterfaceMethodDescriptor(functionalMethodDescriptor)
           .setSourcePosition(getSourcePosition(memberReference))
           .build();
     }
 
-    Expression qualifier = convertExpressionOrNull(memberReference.getQualifierExpression());
-    if (qualifier instanceof JsConstructorReference) {
-      // The qualifier was just the class name, remove it.
-      qualifier = null;
-    }
+    var qualifier = convertExpressionOrNull(memberReference.getQualifierExpression());
+    var methodType = memberReference.referentType.asMethodType();
 
-    // Obtain @NullMarked scope from the enclosing type declaration so that both the enclosing type
-    // descriptor and the MethodDescriptor are created in the right context.
-    TypeElement typeElement = (TypeElement) methodSymbol.getEnclosingElement();
-    boolean inNullMarkedScope = environment.createTypeDeclaration(typeElement).isNullMarked();
-    DeclaredTypeDescriptor declarationEnclosingTypeDescriptor =
-        getParameterizedEnclosingType(
-            environment.createDeclaredTypeDescriptor(
-                methodSymbol.getEnclosingElement().asType(), inNullMarkedScope),
-            qualifier);
+    // Retrieve the potentially parameterized type for the qualifier that will be used to infer
+    // type arguments for the enclosing type. We can not use qualifier.getTypeDescriptor() because
+    // for the case in which is just the parameterized outer class name, it would be a
+    // JsConstructorReference which looses the parameterization.
+    var qualifierTypeDescriptor =
+        memberReference.getQualifierExpression() == null
+                || memberReference.getQualifierExpression().type.isRaw()
+            ? null
+            : environment.createTypeDescriptor(
+                memberReference.getQualifierExpression().type, inNullMarkedScope());
 
-    var methodType = memberReference.referentType;
-
-    Map<TypeVariable, TypeDescriptor> enclosingTypeArguments = new HashMap<>();
-    var mapping =
-        methodSymbol.isConstructor()
-            ? JavaEnvironment.getTypeSubstitution(
-                methodType.getReturnType(), methodType.getReturnType().tsym)
-            : JavaEnvironment.getTypeSubstitution(methodType, methodSymbol);
-    for (var tv : mapping.keySet()) {
-      enclosingTypeArguments.put(
-          (TypeVariable) environment.createTypeDescriptor(tv.asType()),
-          environment.createTypeDescriptor(
-              mapping.get(tv).getFirst(),
-              declarationEnclosingTypeDescriptor.getTypeDeclaration().isNullMarked()));
-    }
-    DeclaredTypeDescriptor enclosingTypeDescriptor =
-        (DeclaredTypeDescriptor)
-            declarationEnclosingTypeDescriptor.specializeTypeVariables(enclosingTypeArguments);
+    var enclosingTypeDescriptor =
+        getEnclosingTypeDescriptor(methodSymbol, methodType, qualifierTypeDescriptor);
 
     var typeArguments =
         convertTypeArguments(
@@ -984,18 +1094,16 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
             methodType,
             enclosingTypeDescriptor.getTypeDeclaration().isNullMarked());
 
-    MethodDescriptor targetMethodDescriptor =
+    var targetMethodDescriptor =
         environment.createMethodDescriptor(
-            enclosingTypeDescriptor,
-            /* methodType= */ methodType.asMethodType(),
-            /* declarationMethodElement= */ methodSymbol,
-            typeArguments);
+            enclosingTypeDescriptor, methodType.asMethodType(), methodSymbol, typeArguments);
 
-    return MethodReference.newBuilder()
+    return MethodReference.builder()
         .setTypeDescriptor(expressionTypeDescriptor)
         .setReferencedMethodDescriptor(targetMethodDescriptor)
         .setInterfaceMethodDescriptor(functionalMethodDescriptor)
         .setQualifier(qualifier)
+        .setTypeArguments(convertTypes(memberReference.getTypeArguments(), inNullMarkedScope()))
         .setSourcePosition(getSourcePosition(memberReference))
         .build();
   }
@@ -1012,12 +1120,12 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
     ArrayLiteral arrayLiteral =
         expression.getInitializers() == null
             ? null
-            : ArrayLiteral.newBuilder()
+            : ArrayLiteral.builder()
                 .setTypeDescriptor(typeDescriptor)
                 .setValueExpressions(convertExpressions(expression.getInitializers()))
                 .build();
 
-    return NewArray.newBuilder()
+    return NewArray.builder()
         .setTypeDescriptor(typeDescriptor)
         .setDimensionExpressions(dimensionExpressions)
         .setInitializer(arrayLiteral)
@@ -1038,86 +1146,108 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
 
   private NumberLiteral convertNumberLiteral(JCLiteral literal) {
     return new NumberLiteral(
-        (PrimitiveTypeDescriptor) environment.createTypeDescriptor(literal.type),
+        (PrimitiveTypeDescriptor)
+            environment.createTypeDescriptor(literal.type, inNullMarkedScope()),
         (Number) literal.getValue());
   }
 
   @Nullable
   private Expression convertFieldAccess(JCFieldAccess fieldAccess) {
     JCExpression expression = fieldAccess.getExpression();
-    if (fieldAccess.name.contentEquals("class")) {
-      return new TypeLiteral(
-          getSourcePosition(fieldAccess), environment.createTypeDescriptor(expression.type));
+
+    // Handle special cases that are modeled as field accesses with a special field names.
+    switch (fieldAccess.name.toString()) {
+      // Qualified `this` expressions are seen as a qualified field accesses to a field named "this"
+      // with its qualifier being the type accessible through `expression.type`.
+      case "this" -> {
+        return new ThisReference(
+            environment.createDeclaredTypeDescriptor(expression.type), /* isQualified= */ true);
+      }
+
+      // Qualified `super` expressions are seen as a qualified field accesses to a field named
+      // "super" with its qualifier being the type accessible through `expression.type`.
+      case "super" -> {
+        DeclaredTypeDescriptor typeDescriptor =
+            environment.createDeclaredTypeDescriptor(expression.type);
+
+        if (typeDescriptor.isInterface()) {
+          // Don't consider calls that select a default method in the super hierarchy as qualified.
+          // This qualified super expression can only be a qualifier of a method call. The actual
+          // class where the method resides will be present in the target of the method call that
+          // has this expression as its qualifier (this is the same modeling we do for the Kotlin
+          // frontend).
+          return new SuperReference(getCurrentType().getTypeDescriptor());
+        }
+
+        // This is a qualified super expression referring to an enclosing class.
+        return new SuperReference(typeDescriptor, /* isQualified= */ true);
+      }
+
+      // Type literals (Type.class) are seen as a qualified field accesses to a field named "class"
+      // with its qualifier being the type accessible through `expression.type`.
+      case "class" -> {
+        return new TypeLiteral(
+            getSourcePosition(fieldAccess),
+            environment.createTypeDescriptor(expression.type, inNullMarkedScope()));
+      }
+
+      // The `length` field is special, but only in array types.
+      case "length" -> {
+        if (expression.type.getKind() == TypeKind.ARRAY) {
+          return ArrayLength.builder().setArrayExpression(convertExpression(expression)).build();
+        }
+      }
     }
 
-    if (fieldAccess.name.contentEquals("this")) {
-      return new ThisReference(
-          environment.createTypeDeclaration((ClassSymbol) expression.type.tsym).toDescriptor(),
-          /* isQualified= */ true);
-    }
-    if (fieldAccess.name.contentEquals("super")) {
-      DeclaredTypeDescriptor typeDescriptor =
-          environment.createTypeDeclaration((ClassSymbol) expression.type.tsym).toDescriptor();
+    if (fieldAccess.sym.baseSymbol() instanceof VariableElement variableElement) {
+      Expression qualifier = convertExpression(expression);
+      DeclaredTypeDescriptor parameterizedEnclosingType =
+          getParameterizedEnclosingType(
+              environment.createDeclaredTypeDescriptor(
+                  JavaEnvironment.getEnclosingTypeElement(variableElement).asType()),
+              qualifier);
 
-      boolean isQualified = !typeDescriptor.isInterface();
-      if (isQualified) {
-        return new SuperReference(typeDescriptor, isQualified);
-      }
-      return new SuperReference(getCurrentType().getTypeDescriptor());
-    }
-    Expression qualifier;
-    if (fieldAccess.sym instanceof VariableElement variableElement) {
-      qualifier = convertExpression(expression);
-      if (qualifier instanceof JsConstructorReference) {
-        // Remove qualifier if it a type. A type can only be a qualifier for a static field and
-        // in such cases the actual target type is part of the field descriptor.
-        checkState(fieldAccess.sym.isStatic());
-        qualifier = null;
-      }
-      if (fieldAccess.name.contentEquals("length") && qualifier.getTypeDescriptor().isArray()) {
-        return ArrayLength.newBuilder().setArrayExpression(qualifier).build();
-      }
       FieldDescriptor fieldDescriptor =
-          environment.createFieldDescriptor(variableElement, fieldAccess.type);
-      return FieldAccess.newBuilder().setQualifier(qualifier).setTarget(fieldDescriptor).build();
+          environment.createFieldDescriptor(
+              parameterizedEnclosingType, variableElement, fieldAccess.type);
+      return FieldAccess.builder().setQualifier(qualifier).setTarget(fieldDescriptor).build();
     }
+
+    // Ignore qualified class names. These only appear as qualifiers for static members, class
+    // literals, etc. and are handled when processing the parent node.
+    checkState(fieldAccess.sym instanceof ClassSymbol);
     return null;
   }
 
   private Expression convertNewClass(JCNewClass expression) {
-    Type anonymousInnerClass =
+    var anonymousInnerClass =
         expression.getClassBody() != null
             ? convertClassDeclaration(expression.getClassBody(), expression)
             : null;
 
-    MethodSymbol constructorElement = (MethodSymbol) expression.constructor;
+    var constructorSymbol = (MethodSymbol) expression.constructor.baseSymbol();
     // Obtain @NullMarked scope from the enclosing type declaration so that both the enclosing type
     // descriptor and the MethodDescriptor are created in the right context.
-    TypeElement typeElement = (TypeElement) expression.type.asElement();
-    boolean inNullMarkedScope = environment.createTypeDeclaration(typeElement).isNullMarked();
-    DeclaredTypeDescriptor enclosingTypeDescriptor =
+    var typeElement = (TypeElement) expression.type.asElement();
+    var inNullMarkedScope = environment.createTypeDeclaration(typeElement).isNullMarked();
+    var enclosingTypeDescriptor =
         environment.createDeclaredTypeDescriptor(expression.type, inNullMarkedScope);
 
-    MethodType methodType = expression.constructor.type.asMethodType();
+    var methodType = expression.constructorType.baseType().asMethodType();
     var typeArguments =
         convertTypeArguments(
             expression.getTypeArguments(),
-            constructorElement,
+            constructorSymbol,
             methodType,
             enclosingTypeDescriptor.getTypeDeclaration().isNullMarked());
 
-    MethodDescriptor constructorMethodDescriptor =
+    var constructorMethodDescriptor =
         environment.createMethodDescriptor(
-            /* enclosingTypeDescriptor= */ enclosingTypeDescriptor,
-            /* methodType= */ (ExecutableType)
-                constructorElement.asMemberOf(expression.type, environment.internalTypes).asType(),
-            /* declarationMethodElement= */ constructorElement,
-            typeArguments);
-    Expression qualifier = convertExpressionOrNull(expression.getEnclosingExpression());
-    List<Expression> arguments =
-        convertArguments(constructorMethodDescriptor, expression.getArguments());
-    DeclaredTypeDescriptor targetClassDescriptor =
-        constructorMethodDescriptor.getEnclosingTypeDescriptor();
+            enclosingTypeDescriptor, methodType, constructorSymbol, typeArguments);
+
+    var qualifier = convertExpressionOrNull(expression.getEnclosingExpression());
+    var arguments = convertArguments(constructorMethodDescriptor, expression.getArguments());
+    var targetClassDescriptor = constructorMethodDescriptor.getEnclosingTypeDescriptor();
 
     if (targetClassDescriptor.getTypeDeclaration().isAnonymous() && qualifier != null) {
       // This is the qualifier to for the super invocation, pass as first parameter, since the
@@ -1125,7 +1255,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       arguments.add(0, qualifier);
       qualifier = null;
     }
-    boolean needsQualifier =
+    var needsQualifier =
         constructorMethodDescriptor
             .getEnclosingTypeDescriptor()
             .getTypeDeclaration()
@@ -1134,43 +1264,84 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
         qualifier == null || needsQualifier,
         "NewInstance of non nested class should have no qualifier.");
 
-    return NewInstance.Builder.from(constructorMethodDescriptor)
+    return NewInstance.builderFrom(constructorMethodDescriptor)
         .setAnonymousInnerClass(anonymousInnerClass)
         .setQualifier(qualifier)
         .setArguments(arguments)
+        .setTypeArguments(convertTypes(getTypeArguments(expression), inNullMarkedScope()))
         .build();
   }
 
-  private Expression convertMethodInvocation(JCMethodInvocation methodInvocation) {
-    JCExpression jcQualifier = getExplicitQualifier(methodInvocation);
-    Expression qualifier = convertExpressionOrNull(jcQualifier);
-    MethodSymbol methodSymbol = getMemberSymbol(methodInvocation.getMethodSelect());
-    if (qualifier instanceof JsConstructorReference) {
-      // Remove qualifier if it is a type name. Only allowed for static methods.
-      checkState(methodSymbol.isStatic());
-      qualifier = null;
+  /**
+   * Returns the type arguments of the class in the new instance expression.
+   *
+   * <p>These are the type arguments of the class (e.g. {@code new A<X>()}), not the type arguments
+   * to the constructor declared type parameters.
+   */
+  private List<? extends JCExpression> getTypeArguments(JCNewClass newClass) {
+    var classBody = newClass.getClassBody();
+    if (classBody == null) {
+      return getClassTypeArguments(newClass.clazz);
     }
 
-    MethodType methodType = methodInvocation.meth.type.asMethodType();
-    // The type arguments for the method itself. For example `String` in `C.<String>m()`.
+    if (classBody.getExtendsClause() != null) {
+      return getClassTypeArguments(classBody.getExtendsClause());
+    }
+    return getClassTypeArguments(Iterables.getOnlyElement(classBody.getImplementsClause()));
+  }
 
-    // Obtain @NullMarked scope from the enclosing type declaration so that both the enclosing type
-    // descriptor and the MethodDescriptor are created in the right context.
-    TypeElement typeElement = (TypeElement) methodSymbol.getEnclosingElement();
-    boolean inNullMarkedScope = environment.createTypeDeclaration(typeElement).isNullMarked();
-    DeclaredTypeDescriptor enclosingTypeDescriptor =
-        environment.createDeclaredTypeDescriptor(
-            methodSymbol.getEnclosingElement().asType(), inNullMarkedScope);
+  /**
+   * Returns the type arguments of a class in the AST.
+   *
+   * <p>In the javac AST class are represented syntactically, i.e. a class name might be an JCIndent
+   * (unqualified name), a JCFieldAccess for a qualified name (A.B) or a JCTypeApply for a
+   * parameterized type {@code A<A>}.
+   */
+  private List<? extends JCExpression> getClassTypeArguments(JCExpression expression) {
+    return switch (expression) {
+      // In the AST, a parametrized type is presented as a type application (the analogue of a
+      // method call where there is a target and arguments).
+      case JCTree.JCTypeApply typeApply -> typeApply.getTypeArguments();
 
-    var typeArguments =
-        convertTypeArguments(
-            methodInvocation.getTypeArguments(),
+      // The type is either not generic or has an implicit (diamond) parameterization.
+      default -> ImmutableList.of();
+    };
+  }
+
+  private Expression convertMethodInvocation(JCMethodInvocation methodInvocation) {
+    MethodSymbol methodSymbol;
+    Expression qualifier = null;
+    JCExpression methodSelectorExpression = methodInvocation.getMethodSelect();
+
+    // The target and qualifier of method calls are in the method selector which is either
+    // an identifier (JCIdent) for unqualified calls or member select expression (JCFieldAccess)
+    // for qualified calls.
+    switch (methodSelectorExpression) {
+      case JCIdent ident -> {
+        // This is an unqualified method call, where `ident.sym` is the method symbol.
+        methodSymbol = (MethodSymbol) ident.sym.baseSymbol();
+      }
+      case JCFieldAccess fieldAccess -> {
+        // This is a qualified method call, where `fieldAccess.sym` is the method symbol and
+        // `fieldAccess.getExpression()` is the qualifier.
+        methodSymbol = (MethodSymbol) fieldAccess.sym.baseSymbol();
+        qualifier = convertExpression(fieldAccess.getExpression());
+      }
+      default ->
+          throw new IllegalArgumentException(
+              "Unexpected method selector " + methodSelectorExpression);
+    }
+
+    var methodType = methodInvocation.getMethodSelect().type.asMethodType();
+    var enclosingTypeDescriptor =
+        getEnclosingTypeDescriptor(
             methodSymbol,
             methodType,
-            enclosingTypeDescriptor.getTypeDeclaration().isNullMarked());
-    if (!methodSymbol.isConstructor()) {
-      enclosingTypeDescriptor = getParameterizedEnclosingType(enclosingTypeDescriptor, qualifier);
-    } else {
+            qualifier == null || methodSymbol.isConstructor()
+                ? null
+                : qualifier.getTypeDescriptor());
+
+    if (methodSymbol.isConstructor()) {
       // For constructor calls, make the enclosing type of the method either the current enclosing
       // type or the super type as declared. Javac does not always provide enough information here
       // to determine the correct type parameterization.
@@ -1182,53 +1353,69 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
               : getCurrentType().getSuperTypeDescriptor();
     }
 
-    MethodDescriptor methodDescriptor =
-        environment.createMethodDescriptor(
-            /* enclosingTypeDescriptor= */ enclosingTypeDescriptor,
-            /* methodType= */ methodType,
-            /* declarationMethodElement= */ methodSymbol,
-            typeArguments);
-
-    if (methodDescriptor.isConstructor()
-        && methodDescriptor.isMemberOf(TypeDescriptors.get().javaLangEnum)) {
-      // Fix inconsistencies in calls to JRE's Enum constructor calls. Enum constructor has 2
-      // implicit parameters (name and ordinal) that are added by a normalization pass. This removes
-      // the parameter definition from the descriptor so that they are consistent.
-      checkArgument(
-          methodDescriptor.getParameterDescriptors().size()
-              == methodInvocation.getArguments().size() + 2);
-      methodDescriptor =
-          MethodDescriptor.Builder.from(methodDescriptor)
-              .setParameterDescriptors(ImmutableList.of())
-              .makeDeclaration()
-              .build();
-    }
+    // The type arguments for the method itself. For example `String` in `C.<String>m()`.
+    var typeArguments =
+        convertTypeArguments(
+            methodInvocation.getTypeArguments(),
+            methodSymbol,
+            methodType,
+            enclosingTypeDescriptor.getTypeDeclaration().isNullMarked());
+    var methodDescriptor =
+        fixSpecialMethodDescriptors(
+            qualifier,
+            environment.createMethodDescriptor(
+                enclosingTypeDescriptor, methodType, methodSymbol, typeArguments));
 
     List<Expression> arguments =
         convertArguments(methodDescriptor, methodInvocation.getArguments());
 
-    if (isSuperConstructorCall(methodInvocation)) {
-      return MethodCall.Builder.from(methodDescriptor)
-          .setQualifier(qualifier)
-          .setArguments(arguments)
-          .setSourcePosition(getSourcePosition(methodInvocation))
-          .build();
-    }
+    boolean isStaticDispatch =
+        qualifier instanceof SuperReference superReference
+            && (superReference.isQualified()
+                || methodDescriptor.getEnclosingTypeDescriptor().isInterface());
 
-    boolean hasSuperQualifier = isSuperExpression(jcQualifier);
-    boolean isStaticDispatch = isQualifiedSuperExpression(jcQualifier);
-    if (hasSuperQualifier
-        && (qualifier.getTypeDescriptor().isInterface() || methodDescriptor.isDefaultMethod())) {
-      // This is a default method call through super.
-      isStaticDispatch = true;
-    }
-
-    return MethodCall.Builder.from(methodDescriptor)
+    return MethodCall.builderFrom(methodDescriptor)
         .setQualifier(qualifier)
         .setArguments(arguments)
+        .setTypeArguments(convertTypes(methodInvocation.getTypeArguments(), inNullMarkedScope()))
         .setStaticDispatch(isStaticDispatch)
         .setSourcePosition(getSourcePosition(methodInvocation))
         .build();
+  }
+
+  /**
+   * Fixes up method descriptors that are modeled inconsistently with respect to the {@code
+   * JCMethodInvocation} node.
+   */
+  private MethodDescriptor fixSpecialMethodDescriptors(
+      Expression qualifier, MethodDescriptor methodDescriptor) {
+    if (qualifier != null
+        && qualifier.getTypeDescriptor().isArray()
+        && methodDescriptor.getSignature().equals("clone()")) {
+      // A call to `q.clone()` on an array `q` returns the same array type as the array `q`. That
+      // is reflected in the type of the JCMethodInvocation node but not in the return type
+      // of the method descriptor.
+      // This is a bit hacky since there is not a declared type that represents an array to be the
+      // enclosing type of the `clone()` method.
+      return methodDescriptor.toBuilder()
+          .setReturnTypeDescriptor(qualifier.getTypeDescriptor().toNonNullable())
+          .build();
+    }
+
+    // TODO(b/491913371): Cleanup after JDT is gone.
+    if (methodDescriptor.isConstructor()
+        && methodDescriptor.isMemberOf(TypeDescriptors.get().javaLangEnum)) {
+      // The constructor for `java.lang.Enum` has two parameters (ordinal and name) but those are
+      // implicit in the method calls. Here the JCMethodInvocation lacks those parameters but the
+      // method descriptor contains them.
+      // In our AST we require that the parameters declared  method descriptor in an `Invocation`
+      // are consistent with the arguments passed.
+      return methodDescriptor.toBuilder()
+          .setParameterDescriptors(ImmutableList.of())
+          .makeDeclaration()
+          .build();
+    }
+    return methodDescriptor;
   }
 
   private ImmutableList<TypeDescriptor> convertTypeArguments(
@@ -1236,12 +1423,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       MethodSymbol methodSymbol,
       com.sun.tools.javac.code.Type methodType,
       boolean inNullMarkedScope) {
-    var typeArgumentsDescriptors =
-        typeArguments == null
-            ? ImmutableList.<TypeDescriptor>of()
-            : environment.createTypeDescriptors(
-                typeArguments.stream().map(e -> e.type).collect(toImmutableList()),
-                inNullMarkedScope);
+    var typeArgumentsDescriptors = convertTypes(typeArguments, inNullMarkedScope);
 
     if (typeArgumentsDescriptors.isEmpty() && !methodSymbol.getTypeParameters().isEmpty()) {
       // Retrieve the inferred type arguments
@@ -1253,6 +1435,16 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
               .collect(toImmutableList());
     }
     return typeArgumentsDescriptors;
+  }
+
+  private ImmutableList<TypeDescriptor> convertTypes(
+      List<? extends JCExpression> types, boolean inNullMarkedScope) {
+    if (types == null) {
+      return ImmutableList.of();
+    }
+    return types.stream()
+        .map(t -> environment.createTypeDescriptor(t.type, inNullMarkedScope))
+        .collect(toImmutableList());
   }
 
   private static com.sun.tools.javac.code.Type getDeclaredUpperBound(TypeVariableSymbol t) {
@@ -1273,34 +1465,60 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
     return AstUtils.maybePackageVarargs(methodDescriptor, arguments);
   }
 
-  /**
-   * Returns a qualifier for a method invocation that doesn't have one, specifically,
-   * instanceMethod() will return a resolved qualifier that may refer to "this" or to the enclosing
-   * instances. A staticMethod() will return null.
-   */
-  @Nullable
-  private static JCExpression getExplicitQualifier(JCMethodInvocation methodInvocation) {
+  private DeclaredTypeDescriptor getEnclosingTypeDescriptor(
+      MethodSymbol methodSymbol, MethodType methodType, TypeDescriptor qualifierTypeDescriptor) {
+    // Obtain @NullMarked scope from the enclosing type declaration so that both the enclosing type
+    // descriptor and the MethodDescriptor are created in the right context.
+    TypeElement typeElement = (TypeElement) methodSymbol.getEnclosingElement();
+    boolean inNullMarkedScope = environment.createTypeDeclaration(typeElement).isNullMarked();
+    DeclaredTypeDescriptor unparameterizedEnclosingTypeDescriptor =
+        environment.createDeclaredTypeDescriptor(
+            methodSymbol.getEnclosingElement().asType(), inNullMarkedScope);
 
-    if (methodInvocation.getMethodSelect().getKind() != Kind.IDENTIFIER) {
-      return getQualifier(methodInvocation.getMethodSelect());
+    if (qualifierTypeDescriptor != null) {
+      return getParameterizedEnclosingType(
+          unparameterizedEnclosingTypeDescriptor, qualifierTypeDescriptor);
     }
 
-    // No qualifier specified.
-    MethodSymbol memberSymbol = getMemberSymbol(methodInvocation.getMethodSelect());
-    if (memberSymbol.isStatic()) {
-      return null;
+    Map<TypeVariable, TypeDescriptor> enclosingTypeArguments = new HashMap<>();
+    var mapping =
+        methodSymbol.isConstructor()
+            ? JavaEnvironment.getTypeSubstitution(
+                methodType.getReturnType(), methodType.getReturnType().tsym)
+            : JavaEnvironment.getTypeSubstitution(methodType, methodSymbol);
+
+    // Use the raw upperbound for unparameterized type variables.
+    for (var tv :
+        unparameterizedEnclosingTypeDescriptor.getTypeDeclaration().getTypeParameterDescriptors()) {
+      enclosingTypeArguments.put(tv, tv.toRawTypeDescriptor());
     }
 
-    return getQualifier(methodInvocation.getMethodSelect());
+    // ... and use the actual type arguments if they were found.
+    for (var tv : mapping.keySet()) {
+      enclosingTypeArguments.put(
+          (TypeVariable) environment.createTypeDescriptor(tv.asType(), inNullMarkedScope),
+          environment.createTypeDescriptor(
+              mapping.get(tv).getFirst(),
+              unparameterizedEnclosingTypeDescriptor.getTypeDeclaration().isNullMarked()));
+    }
+    return (DeclaredTypeDescriptor)
+        unparameterizedEnclosingTypeDescriptor.specializeTypeVariables(enclosingTypeArguments);
   }
 
   private DeclaredTypeDescriptor getParameterizedEnclosingType(
       DeclaredTypeDescriptor enclosingTypeDescriptor, Expression qualifier) {
-    if (qualifier == null) {
+    return getParameterizedEnclosingType(
+        enclosingTypeDescriptor, qualifier == null ? null : qualifier.getTypeDescriptor());
+  }
+
+  private DeclaredTypeDescriptor getParameterizedEnclosingType(
+      DeclaredTypeDescriptor enclosingTypeDescriptor, TypeDescriptor qualifierTypeDescriptor) {
+
+    if (qualifierTypeDescriptor == null) {
       return enclosingTypeDescriptor;
     }
 
-    if (qualifier.getTypeDescriptor().isRaw()) {
+    if (qualifierTypeDescriptor.isRaw()) {
       return enclosingTypeDescriptor.toRawTypeDescriptor();
     }
 
@@ -1308,76 +1526,66 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
     // if available. The methodSymbol's enclosing element will not have the necessary type
     // information from javac.
     return checkNotNull(
-        qualifier.getTypeDescriptor().findSupertype(enclosingTypeDescriptor.getTypeDeclaration()));
+        qualifierTypeDescriptor.findSupertype(enclosingTypeDescriptor.getTypeDeclaration()));
   }
 
+  /**
+   * Converts a syntactic element which is just a plain identifier in the source code.
+   *
+   * <p>A `JCIdent` can represent a variety of different source code elements:
+   *
+   * <ul>
+   *   <li>`this`.
+   *   <li>`super`.
+   *   <li>a variable name.
+   *   <li>an unqualified field name.
+   *   <li>an unqualified type name.
+   * </ul>
+   */
   private Expression convertIdent(JCIdent identifier) {
-    if (isThisExpression(identifier)) {
-      return new ThisReference(getCurrentType().getTypeDescriptor());
+    switch (identifier.name.toString()) {
+      case "this" -> {
+        // Unqualified `this`.
+        return new ThisReference(getCurrentType().getTypeDescriptor());
+      }
+      case "super" -> {
+        // Unqualified `super`.
+        return new SuperReference(getCurrentType().getTypeDescriptor());
+      }
     }
-    if (isSuperExpression(identifier)) {
-      return new SuperReference(getCurrentType().getTypeDescriptor());
-    }
-    Symbol symbol = identifier.sym;
-    if (symbol instanceof ClassSymbol classSymbol) {
-      return new JsConstructorReference(environment.createTypeDeclaration(classSymbol));
-    }
+
+    // In some cases `identifier.sym` will point to a synthetic symbol for the field and not the
+    // actual declaration `Symbol`. For those cases we need to get declaration `Symbol` by calling
+    // `baseSymbol()`.
+    Symbol symbol = identifier.sym.baseSymbol();
     if (symbol instanceof VarSymbol varSymbol) {
+      if (symbol.getKind().isField()) {
+        // An unqualified field access in a subclass might have a different type than its
+        // declaration:
+        //
+        // class A<T> {
+        //   T field;
+        // }
+        // class B extends A<String> {
+        //   // Unqualifed access to `field` here is of type `String`.
+        //   private String zoo() { return field; }
+        // }
+        //
+        // For unqualified field access, the actual type of the field access is provided by
+        // `identifier.type` (vs. `identifier.sym` which might not be reflect the parameterization).
+        FieldDescriptor fieldDescriptor =
+            environment.createFieldDescriptor(varSymbol, identifier.type);
+        return FieldAccess.builder().setTarget(fieldDescriptor).build();
+      }
 
-    if (symbol.getKind() == ElementKind.FIELD || symbol.getKind() == ElementKind.ENUM_CONSTANT) {
-      FieldDescriptor fieldDescriptor =
-          environment.createFieldDescriptor(varSymbol, identifier.type);
-      return FieldAccess.newBuilder().setTarget(fieldDescriptor).build();
+      Variable variable = variableByVariableElement.get(symbol);
+      return variable.createReference();
     }
 
-    Variable variable = variableByVariableElement.get(symbol);
-    return variable.createReference();
-    }
-    throw new AssertionError("Unexpected symbol class: " + symbol.getClass());
-  }
-
-  private static boolean isSuperConstructorCall(JCMethodInvocation methodInvocation) {
-    return isSuperExpression(methodInvocation.getMethodSelect());
-  }
-
-  private static boolean isSuperExpression(JCExpression expression) {
-    if (expression instanceof JCIdent identifier) {
-      return identifier.getName().contentEquals("super");
-    }
-    return false;
-  }
-
-  private static boolean isQualifiedSuperExpression(JCExpression expression) {
-    return expression instanceof JCFieldAccess fieldAccess
-        && fieldAccess.getIdentifier().contentEquals("super");
-  }
-
-  private static boolean isThisExpression(JCExpression expression) {
-    if (expression instanceof JCIdent identifier) {
-      return identifier.getName().contentEquals("this");
-    }
-    return false;
-  }
-
-  private static MethodSymbol getMemberSymbol(JCTree.JCExpression node) {
-    return switch (node.getKind()) {
-      case IDENTIFIER -> (MethodSymbol) ((JCTree.JCIdent) node).sym.baseSymbol();
-      case MEMBER_SELECT -> (MethodSymbol) ((JCTree.JCFieldAccess) node).sym;
-      default -> throw new AssertionError("Unexpected tree kind: " + node.getKind());
-    };
-  }
-
-  @Nullable
-  private static JCExpression getQualifier(JCTree.JCExpression node) {
-    return switch (node.getKind()) {
-      case IDENTIFIER -> null;
-      case MEMBER_SELECT -> ((JCTree.JCFieldAccess) node).getExpression();
-      default -> throw new AssertionError("Unexpected tree kind: " + node.getKind());
-    };
-  }
-
-  private Expression convertConditionRemovingOuterParentheses(JCExpression expression) {
-    return convertExpression(((JCParens) expression).getExpression());
+    // Ignore unqualified class names. These only appear as qualifiers for static members, class
+    // literals, etc. and are handled when processing the parent node.
+    checkState(identifier.sym instanceof ClassSymbol);
+    return null;
   }
 
   private Expression convertParens(JCParens expression) {
@@ -1430,7 +1638,9 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
       case STRING_LITERAL:
         return convertStringLiteral((JCLiteral) jcExpression);
       case NULL_LITERAL:
-        return environment.createTypeDescriptor(jcExpression.type).getNullValue();
+        return environment
+            .createTypeDescriptor(jcExpression.type, inNullMarkedScope())
+            .getNullValue();
       case AND:
       case CONDITIONAL_AND:
       case CONDITIONAL_OR:
@@ -1483,7 +1693,7 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
           return RuntimeMethods.createCheckNotNullCall(
               convertExpression(((JCUnary) jcExpression).arg));
         }
-        // fall through
+      // fall through
       default:
         throw new AssertionError(
             "Unknown expression " + jcExpression + " (node type: " + jcExpression.getKind() + ")");
@@ -1499,12 +1709,27 @@ public class CompilationUnitBuilder extends AbstractCompilationUnitBuilder {
     return expressions.stream().map(this::convertExpression).collect(toCollection(ArrayList::new));
   }
 
-  public CompilationUnit buildCompilationUnit(CompilationUnitTree javacUnit) {
+  public CompilationUnit buildCompilationUnit(
+      String sourcePath, CompilationUnitTree javacUnit, boolean generateKytheIndexingMetadata) {
     this.javacUnit = (JCCompilationUnit) javacUnit;
     setCurrentCompilationUnit(
         CompilationUnit.createForFile(
-            javacUnit.getSourceFile().getName(),
+            sourcePath,
             javacUnit.getPackageName() == null ? "" : javacUnit.getPackageName().toString()));
+
+    // We only use byte offsets for Kythe indexing metadata, so we can skip this work if it's not
+    // enabled.
+    if (generateKytheIndexingMetadata) {
+      try {
+        byteOffsetConverter =
+            Utf8ByteOffsetConverter.create(this.javacUnit.sourcefile.getCharContent(true));
+      } catch (IOException e) {
+        throw internalCompilerError(e, "Error reading source file.");
+      }
+    } else {
+      byteOffsetConverter = null;
+    }
+
     for (Tree tree : javacUnit.getTypeDecls()) {
       if (tree instanceof JCClassDecl classDeclaration) {
         getCurrentCompilationUnit().addType(convertClassDeclaration(classDeclaration));

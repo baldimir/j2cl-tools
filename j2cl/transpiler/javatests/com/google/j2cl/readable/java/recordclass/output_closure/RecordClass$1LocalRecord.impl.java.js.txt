@@ -1,0 +1,51 @@
+goog.module('recordclass.RecordClass.$1LocalRecord$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class $1LocalRecord extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {number} @nodts*/
+  this.f_value__recordclass_RecordClass_1LocalRecord_ = 0;
+ }
+ /** @nodts @return {!$1LocalRecord} */
+ static $create__int(/** number */ value) {
+  $1LocalRecord.$clinit();
+  let $instance = new $1LocalRecord();
+  $instance.$ctor__recordclass_RecordClass_1LocalRecord__int__void(value);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_1LocalRecord__int__void(/** number */ value) {
+  this.$ctor__java_lang_Record__void();
+  this.f_value__recordclass_RecordClass_1LocalRecord_ = value;
+  $J2CL_PRESERVE$(this.f_value__recordclass_RecordClass_1LocalRecord_);
+ }
+ /** @nodts @return {number} */
+ m_value__int() {
+  return this.f_value__recordclass_RecordClass_1LocalRecord_;
+ }
+ /** @nodts */
+ static $clinit() {
+  $1LocalRecord.$clinit = () =>{};
+  $1LocalRecord.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof $1LocalRecord;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata($1LocalRecord, 'recordclass.RecordClass$1LocalRecord');
+
+exports = $1LocalRecord;
+
+//# sourceMappingURL=RecordClass$1LocalRecord.js.map

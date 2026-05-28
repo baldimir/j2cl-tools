@@ -15,17 +15,17 @@
  */
 package com.google.j2cl.common;
 
+import static com.google.common.collect.Streams.stream;
+import static java.util.Arrays.stream;
+
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.MoreFiles;
-import com.google.common.io.RecursiveDeleteOption;
 import com.google.j2cl.common.Problems.FatalError;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import java.util.zip.ZipException;
@@ -71,28 +71,29 @@ public class SourceUtils {
 
   private static final String J2CL_TEMP_ROOT = "_j2cl";
 
-  public static Path deriveDirectory(Path output, String suffix) {
-    String name = MoreFiles.getNameWithoutExtension(output);
-    return output.resolveSibling(J2CL_TEMP_ROOT).resolve(name + suffix);
+  public static Path deriveTempRootForBazel(Path output) {
+    return output.resolveSibling(J2CL_TEMP_ROOT).resolve(MoreFiles.getNameWithoutExtension(output));
   }
 
   private static final String ARCHIVE_ROOT = "j2cl_sources";
 
-  /** Returns all individual sources where source jars extracted and flattened. */
-  @Nullable
-  public static Stream<FileInfo> getAllSourcesFromPaths(
-      Stream<Path> sources, Path sourceJarDir, Problems problems) {
-    return getAllSources(sources.map(Path::toString), sourceJarDir, problems);
+  /** Returns all source files under the given directory. */
+  public static Stream<FileInfo> getAllSources(Path directory) {
+    return stream(MoreFiles.fileTraverser().depthFirstPreOrder(directory))
+        .map(p -> FileInfo.create(p.toString(), directory.relativize(p).toString()));
   }
 
   /** Returns all individual sources where source jars extracted and flattened. */
   @Nullable
   public static Stream<FileInfo> getAllSources(
+      Stream<Path> sources, Path sourceJarDir, Problems problems) {
+    return getAllSourcesImpl(sources.map(Path::toString), sourceJarDir, problems);
+  }
+
+  /** Returns all individual sources where source jars extracted and flattened. */
+  @Nullable
+  private static Stream<FileInfo> getAllSourcesImpl(
       Stream<String> sources, Path sourceJarDir, Problems problems) {
-    // Make sure the directory is empty. For Bazel workers, we reuse the directory between runs for
-    // same targets (predictable directory helps with debugging). However, requires cleaning up
-    // before each run.
-    cleanupDirectory(sourceJarDir, problems);
     // Make sure to extract all of the Jars into a single temp dir so that when later sorting
     // sourceFilePaths there is no instability introduced by differences in randomly generated
     // temp dir prefixes.
@@ -117,17 +118,6 @@ public class SourceUtils {
                     : Stream.of(FileInfo.create(f, f, getJavaPath(f))))
         .sorted()
         .distinct();
-  }
-
-  private static void cleanupDirectory(Path directory, Problems problems) {
-    try {
-      if (Files.exists(directory)) {
-        MoreFiles.deleteRecursively(directory, RecursiveDeleteOption.ALLOW_INSECURE);
-      }
-      Files.createDirectories(directory);
-    } catch (IOException e) {
-      problems.fatal(FatalError.CANNOT_CREATE_TEMP_DIR, e.getMessage());
-    }
   }
 
   @Nullable
@@ -188,12 +178,12 @@ public class SourceUtils {
   }
 
   public static void checkSourceFiles(
-      Problems problems, List<String> sourceFiles, String... validExtensions) {
-    for (String sourceFile : sourceFiles) {
-      if (Arrays.stream(validExtensions).noneMatch(sourceFile::endsWith)) {
+      Problems problems, List<Path> sourceFiles, String... validExtensions) {
+    for (Path sourceFile : sourceFiles) {
+      if (stream(validExtensions).noneMatch(x -> sourceFile.toString().endsWith(x))) {
         problems.fatal(FatalError.UNKNOWN_INPUT_TYPE, sourceFile);
       }
-      if (!Files.isRegularFile(Paths.get(sourceFile))) {
+      if (!Files.isRegularFile(sourceFile)) {
         problems.fatal(FatalError.FILE_NOT_FOUND, sourceFile);
       }
     }

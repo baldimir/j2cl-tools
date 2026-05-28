@@ -69,20 +69,11 @@ public class J2clTestingProcessingStep implements ProcessingStep {
   @Override
   public Set<Element> process(
       SetMultimap<Class<? extends Annotation>, Element> elementsByAnnotation) {
-
-    java.util.Collection<Element> elements = elementsByAnnotation.get(J2clTestInput.class);
-    for(Element elm: elements) {
+    for (Element value : elementsByAnnotation.get(J2clTestInput.class)) {
       String className =
-              MoreApt.getClassNameFromAnnotation(elm, J2clTestInput.class, "value").get();
-      System.out.println("process " + elm + " " + className);
+          MoreApt.getClassNameFromAnnotation(value, J2clTestInput.class, "value").get();
       handleClass(className);
-
     }
-
-/*    Element value = Iterables.getOnlyElement(elementsByAnnotation.get(J2clTestInput.class));
-    String className =
-        MoreApt.getClassNameFromAnnotation(value, J2clTestInput.class, "value").get();
-    handleClass(className);*/
     return ImmutableSet.of();
   }
 

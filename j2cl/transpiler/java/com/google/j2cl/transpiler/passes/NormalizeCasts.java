@@ -121,18 +121,13 @@ public class NormalizeCasts extends NormalizationPass {
   }
 
   private static Expression skipPassThroughExpressions(Expression expression) {
-    if (expression instanceof MultiExpression) {
-      return skipPassThroughExpressions(
-          Iterables.getLast(((MultiExpression) expression).getExpressions()));
-    }
-    if (expression instanceof JsDocCastExpression) {
-      return skipPassThroughExpressions(((JsDocCastExpression) expression).getExpression());
-    }
-    if (expression instanceof PostfixExpression
-        && ((PostfixExpression) expression).getOperator() == PostfixOperator.NOT_NULL_ASSERTION) {
-      return skipPassThroughExpressions(((PostfixExpression) expression).getOperand());
-    }
-    return expression;
+    return switch (expression) {
+      case MultiExpression e -> skipPassThroughExpressions(Iterables.getLast(e.getExpressions()));
+      case JsDocCastExpression e -> skipPassThroughExpressions(e.getExpression());
+      case PostfixExpression e when e.getOperator() == PostfixOperator.NOT_NULL_ASSERTION ->
+          skipPassThroughExpressions(e.getOperand());
+      default -> expression;
+    };
   }
 
   /**
@@ -173,7 +168,7 @@ public class NormalizeCasts extends NormalizationPass {
       // TODO(b/118615488): Surface enum boxed types so that this hack is not needed.
       castTypeDescriptor = TypeDescriptors.getEnumBoxType(castTypeDescriptor);
     }
-    return JsDocCastExpression.newBuilder()
+    return JsDocCastExpression.builder()
         .setCastTypeDescriptor(castTypeDescriptor)
         .setExpression(expression)
         .build();
@@ -244,7 +239,7 @@ public class NormalizeCasts extends NormalizationPass {
     expression = AstUtils.removeJsDocCastIfPresent(expression);
 
     MethodDescriptor castToMethodDescriptor =
-        MethodDescriptor.newBuilder()
+        MethodDescriptor.builder()
             .setOriginalJsInfo(JsInfo.RAW)
             .setStatic(true)
             .setEnclosingTypeDescriptor(BootstrapType.CASTS.getDescriptor())
@@ -255,7 +250,7 @@ public class NormalizeCasts extends NormalizationPass {
             .build();
 
     // Casts.$to(expr, TypeName);
-    return MethodCall.Builder.from(castToMethodDescriptor)
+    return MethodCall.builderFrom(castToMethodDescriptor)
         .setArguments(expression, toTypeDescriptor.getMetadataConstructorReference())
         .build();
   }

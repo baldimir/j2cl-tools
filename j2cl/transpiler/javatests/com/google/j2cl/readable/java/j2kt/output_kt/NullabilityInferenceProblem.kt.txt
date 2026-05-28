@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -29,18 +30,18 @@ import kotlin.Suppress
 import kotlin.collections.MutableIterable
 import kotlin.jvm.JvmStatic
 
-open class NullabilityInferenceProblem internal constructor() {
+internal open class NullabilityInferenceProblem internal constructor() {
  companion object {
   @JvmStatic
   private fun <E: Any> sortedCopyOf(comparator: Comparator<in E>, elements: MutableIterable<E>): ImmutableList<E> {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun <T: Any> checkNotNull(reference: T?): T {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun testImplicitTypeArguments(users: MutableIterable<User>): ImmutableList<User> {
    return NullabilityInferenceProblem.sortedCopyOf<User>(
@@ -52,7 +53,7 @@ open class NullabilityInferenceProblem internal constructor() {
     users,
    )
   }
-
+  
   @JvmStatic
   private fun testExplicitTypeArguments(users: MutableIterable<User>): ImmutableList<User> {
    return NullabilityInferenceProblem.sortedCopyOf<User>(
@@ -64,7 +65,7 @@ open class NullabilityInferenceProblem internal constructor() {
     users,
    )
   }
-
+  
   @JvmStatic
   private fun testCheckNotNull(users: MutableIterable<User>): ImmutableList<User> {
    return NullabilityInferenceProblem.sortedCopyOf<User>(
@@ -73,16 +74,16 @@ open class NullabilityInferenceProblem internal constructor() {
       return@Function NullabilityInferenceProblem.checkNotNull<String>(
        user.getName().orElse("")!!,
       )
-     } as Function<in User, out String>,
+     },
     ),
     users,
    )
   }
  }
-
- interface ImmutableList<T: Any>: MutableListJvm<T>
-
- fun interface User {
+ 
+ internal interface ImmutableList<T: Any>: MutableListJvm<T>
+ 
+ internal fun interface User {
   fun getName(): Optional<String>
  }
 }

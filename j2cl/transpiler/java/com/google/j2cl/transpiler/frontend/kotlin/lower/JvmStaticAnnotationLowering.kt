@@ -5,16 +5,13 @@
 
 package com.google.j2cl.transpiler.frontend.kotlin.lower
 
-import com.google.j2cl.transpiler.frontend.kotlin.ir.isStaticJsMember
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.jvm.CachedFieldsForObjectInstances
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.backend.jvm.ir.isEffectivelyInlineOnly
-import org.jetbrains.kotlin.backend.jvm.ir.isInlineFunctionCall
 import org.jetbrains.kotlin.backend.jvm.ir.replaceThisByStaticReference
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
-import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.*
@@ -32,7 +29,8 @@ import org.jetbrains.kotlin.resolve.annotations.JVM_STATIC_ANNOTATION_FQ_NAME
  * Makes `@JvmStatic` functions in non-companion objects static and replaces all call sites in the
  * module.
  *
- * Copied and modified from org.jetbrains.kotlin.backend.common.lower.JvmStaticAnnotationLowering.
+ * Copied and modified from
+ * compiler/ir/backend.jvm/lower/src/org/jetbrains/kotlin/backend/jvm/lower/JvmStaticAnnotationLowering.kt
  */
 internal class JvmStaticInObjectLowering(val context: JvmBackendContext) : FileLoweringPass {
   override fun lower(irFile: IrFile) =
@@ -79,12 +77,11 @@ private fun IrMemberAccessExpression<*>.makeStatic(
   irBuiltIns: IrBuiltIns,
   replaceCallee: IrSimpleFunction?,
 ): IrExpression {
-  val receiver = dispatchReceiver ?: return this
-  removeDispatchReceiver()
+  val receiver = arguments.removeAt(0)
   if (replaceCallee != null) {
     (this as IrCall).symbol = replaceCallee.symbol
   }
-  if (receiver.isTrivial()) {
+  if (receiver == null || receiver.isTrivial()) {
     // Receiver has no side effects (aside from maybe class initialization) so discard it.
     return this
   }
@@ -107,7 +104,7 @@ class SingletonObjectJvmStaticTransformer(
     if (function.isJvmStaticInObject()) {
       // dispatch receiver parameter is already null for synthetic property annotation methods
       function.dispatchReceiverParameter?.let { oldDispatchReceiverParameter ->
-        function.dispatchReceiverParameter = null
+        function.parameters -= oldDispatchReceiverParameter
 
         if (function !is IrLazyFunctionBase) {
           function.replaceThisByStaticReference(
@@ -199,9 +196,9 @@ private class CompanionObjectJvmStaticTransformer(val context: JvmBackendContext
         // END OF MODIFICATIONS.
         expression.makeStatic(context.irBuiltIns, staticProxy)
       }
-      callee.symbol == context.ir.symbols.indyLambdaMetafactoryIntrinsic -> {
+      callee.symbol == context.symbols.indyLambdaMetafactoryIntrinsic -> {
         val implFunRef =
-          expression.getValueArgument(1) as? IrFunctionReference
+          expression.arguments[1] as? IrFunctionReference
             ?: throw AssertionError(
               "'implMethodReference' is expected to be 'IrFunctionReference': ${expression.dump()}"
             )
@@ -218,8 +215,7 @@ private class CompanionObjectJvmStaticTransformer(val context: JvmBackendContext
           //     context.cachedDeclarations.getStaticAndCompanionDeclaration(implFun)
           val (staticProxy, _) = getStaticAndCompanionDeclaration(implFun)
           // END OF MODIFICATIONS.
-          expression.putValueArgument(
-            1,
+          expression.arguments[1] =
             IrFunctionReferenceImpl(
               implFunRef.startOffset,
               implFunRef.endOffset,
@@ -228,8 +224,7 @@ private class CompanionObjectJvmStaticTransformer(val context: JvmBackendContext
               staticProxy.typeParameters.size,
               implFunRef.reflectionTarget,
               implFunRef.origin,
-            ),
-          )
+            )
         }
         expression
       }
@@ -255,20 +250,18 @@ private class CompanionObjectJvmStaticTransformer(val context: JvmBackendContext
   private fun getStaticAndCompanionDeclaration(
     callee: IrSimpleFunction
   ): Pair<IrSimpleFunction, IrSimpleFunction> {
+    val originalVisibility = callee.visibility
+    // Convert the visibility to public to avoid mangling the name of the proxy.
+    callee.visibility = DescriptorVisibilities.PUBLIC
     val (static, companionFun) = context.cachedDeclarations.getStaticAndCompanionDeclaration(callee)
     // When the original function is external, it is moved as static function in the enclosed type
     // and the proxy is created on the companion. In all the other cases, the proxy is created
     // as a static function in the enclosing type.
     val proxy = if (callee.isExternal) companionFun else static
 
-    if (callee.visibility.delegate == Visibilities.Internal) {
-      // Restore name from the original method.
-      proxy.name = callee.name
-      // Because the name has been mangled, they changed the visibility of the function to public
-      // in order to avoid mangling at code generation time. We restore the visibility from the
-      // original method.
-      proxy.visibility = callee.visibility
-    }
+    // Restore the correct visibilities.
+    callee.visibility = originalVisibility
+    proxy.visibility = originalVisibility
 
     // The return type on the proxy was blindy copied from the original without remapping the
     // possible type parameters.
@@ -284,13 +277,14 @@ private class CompanionObjectJvmStaticTransformer(val context: JvmBackendContext
   // END OF MODIFICATIONS.
 
   private fun shouldReplaceWithStaticCall(callee: IrSimpleFunction) =
-    (callee.isJvmStaticInCompanion() &&
-      callee.visibility == DescriptorVisibilities.PROTECTED &&
-      !callee.isInlineFunctionCall(context)) ||
-      // MODIFIED BY GOOGLE.
-      // The static function on the enclosing type is the function that is transpiled as a JsMethod.
-      // Redirecting the call to this method avoid issue around spread operator and JS vararg.
-      (callee.isJvmStaticInCompanion() &&
-        getStaticAndCompanionDeclaration(callee).first.isStaticJsMember())
+    // MODIFIED BY GOOGLE.
+    // Redirect all companion @JvmStatic calls to the static proxy function created on the
+    // enclosing type. This simplifies dispatch and avoids JS-interop issues (such as with
+    // spread operators and JS vararg).
+    // Original code:
+    // (callee.isJvmStaticInCompanion() &&
+    //   callee.visibility == DescriptorVisibilities.PROTECTED &&
+    //   !callee.isInlineFunctionCall(context))
+    callee.isJvmStaticInCompanion()
   // END OF MODIFICATIONS
 }

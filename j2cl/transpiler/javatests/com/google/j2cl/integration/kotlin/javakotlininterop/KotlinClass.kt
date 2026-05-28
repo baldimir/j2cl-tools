@@ -19,6 +19,7 @@ import com.google.j2cl.integration.testing.Asserts.assertEquals
 import com.google.j2cl.integration.testing.TestUtils.isJvm
 import javakotlininterop.FromJava.AbstractConsumer
 import javakotlininterop.FromJava.TConsumer
+import jsinterop.annotations.JsType
 
 var topLevelProperty = 0
 
@@ -144,3 +145,13 @@ object KotlinOptionalVarargs {
     vararg args: Int = intArrayOf(1, 2, 3),
   ) = intArrayOf(optional, *args)
 }
+
+@JsType class JsTypeClass(val x: Int, val y: String)
+
+data class DataClass(val x: Int, val y: String)
+
+@JsType data class JsTypeDataClass(val x: Int, val y: String)
+
+@JvmRecord data class MyRecord(val x: Int, val y: String)
+
+@JsType @JvmRecord data class MyJsTypeRecord(val x: Int, val y: String)

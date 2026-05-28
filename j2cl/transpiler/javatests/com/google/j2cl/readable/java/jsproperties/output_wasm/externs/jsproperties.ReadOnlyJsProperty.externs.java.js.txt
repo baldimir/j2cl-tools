@@ -1,0 +1,12 @@
+/** @externs */
+
+/**
+ * @constructor
+ */
+var jsproperties_ReadOnlyJsProperty = function() {};
+
+/** @const {number} */
+jsproperties_ReadOnlyJsProperty.prototype.c;
+
+/** @const {number} */
+jsproperties_ReadOnlyJsProperty.d;

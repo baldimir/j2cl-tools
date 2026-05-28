@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import jsinterop.annotations.JsConstructor;
+import jsinterop.annotations.JsEnum;
 
 abstract class SourceMap<T extends Number> implements Comparator<T> {
 
@@ -137,5 +138,52 @@ abstract class SourceMap<T extends Number> implements Comparator<T> {
           case 1, 2 -> 10;
           default -> 20;
         };
+  }
+
+  private boolean testInstanceOf(Object o) {
+    return o instanceof String;
+  }
+
+  private Function<Object, Object> testFunctionExpression() {
+    return (Object o) -> o;
+  }
+
+  private Class<?> testTypeLiteral() {
+    return String.class;
+  }
+
+  public abstract static class SuperCalls extends SourceMap<Integer> {
+    @JsConstructor
+    public SuperCalls(Integer i) {
+      super(i);
+    }
+  }
+
+  public final class InnerClass {
+    public final int field;
+
+    public InnerClass(int i) {
+      this.field = i;
+    }
+  }
+
+  @JsEnum
+  public enum FooJsEnum {
+    A,
+    B,
+    C;
+  }
+
+  @JsEnum(hasCustomValue = true)
+  public enum StringJsEnum {
+    A("FOO"),
+    B("BAR"),
+    C("BUZZ");
+
+    public final String value;
+
+    StringJsEnum(String value) {
+      this.value = value;
+    }
   }
 }

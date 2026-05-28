@@ -15,6 +15,8 @@
  */
 package voidtypes
 
+import jsinterop.annotations.JsFunction
+
 fun f(): Unit {}
 
 val w = f()
@@ -65,6 +67,81 @@ fun returnUnitBlock(a: Int): Unit =
     else -> g()
   }
 
+fun unitLambdas() {
+  val a: () -> Unit = { f() }
+  val b: () -> Unit = ::f
+  val c: () -> Unit = ::w
+
+  consumeGenericJsFunction { f() }
+  consumeGenericJsFunction(::f)
+  consumeGenericJsFunction(::w)
+  consumeGenericJsFunction {
+    when {
+      a == b -> return@consumeGenericJsFunction
+    }
+    return@consumeGenericJsFunction
+  }
+  consumeGenericJsFunction {
+    return@consumeGenericJsFunction a()
+  }
+
+  consumeUnitJsFunction { f() }
+  consumeUnitJsFunction(::f)
+  consumeUnitJsFunction(::w)
+  consumeUnitJsFunction {
+    when {
+      a == b -> return@consumeUnitJsFunction
+    }
+    return@consumeUnitJsFunction
+  }
+  consumeUnitJsFunction {
+    return@consumeUnitJsFunction a()
+  }
+}
+
+fun unitSpecialization() {
+  val unitProducer: Producer<Unit> = UnitProducer()
+  val unitConsumer: Consumer<Unit> = UnitConsumer()
+
+  unitConsumer.consume(unitProducer.provide())
+}
+
+@JsFunction
+fun interface GenericJsFunction<T> {
+  fun execute(): T
+}
+
+fun <T> consumeGenericJsFunction(f: GenericJsFunction<T>) {}
+
+@JsFunction
+fun interface UnitJsFunction {
+  fun execute()
+}
+
+fun consumeUnitJsFunction(f: UnitJsFunction) = f()
+
+class UnitProducer : Producer<Unit> {
+  override fun provide() {}
+}
+
+open class UnitProvider {
+  fun provide() {}
+}
+
+class AccidentalUnitProducer : UnitProvider(), Producer<Unit>
+
+class UnitConsumer : Consumer<Unit> {
+  override fun consume(value: Unit) {}
+}
+
+class UnitProducerWithMultipleExits(private val i: Int) : Producer<Unit> {
+  override fun provide() {
+    when {
+      i == 10 -> return
+    }
+  }
+}
+
 fun nothingTests() {
   val a = 2
   if (a is Nothing) {
@@ -78,10 +155,15 @@ fun nothingTests() {
 
 object NothingIterator : ListIterator<Nothing> {
   override fun hasNext(): Boolean = throw RuntimeException()
+
   override fun next(): Nothing = throw RuntimeException()
+
   override fun hasPrevious(): Boolean = false
+
   override fun nextIndex() = -1
+
   override fun previous(): Nothing = throw RuntimeException()
+
   override fun previousIndex(): Int = -1
 }
 
@@ -89,6 +171,7 @@ fun emptyStringIterator(): Iterator<String> = NothingIterator
 
 object NullableNothingIterator : Iterator<Nothing?> {
   override fun hasNext(): Boolean = throw RuntimeException()
+
   override fun next(): Nothing? = null
 }
 
@@ -112,16 +195,26 @@ class NothingProducer : Producer<Nothing> {
 
 object EmptyList : List<Nothing> {
   override val size: Int = 0
+
   override fun contains(element: Nothing): Boolean = false
+
   override fun containsAll(elements: Collection<Nothing>): Boolean = elements.isEmpty()
+
   override fun get(index: Int): Nothing = throw RuntimeException()
+
   override fun indexOf(element: Nothing): Int = -1
+
   override fun isEmpty(): Boolean = true
+
   override fun lastIndexOf(element: Nothing): Int = -1
+
   override fun iterator(): Iterator<Nothing> = NothingIterator
+
   override fun listIterator(): ListIterator<Nothing> = NothingIterator
+
   override fun listIterator(index: Int): ListIterator<Nothing> =
     if (index == 0) NothingIterator else throw RuntimeException()
+
   override fun subList(fromIndex: Int, toIndex: Int): List<Nothing> =
     if (fromIndex == 0 && toIndex == 0) this else throw RuntimeException()
 }
@@ -129,10 +222,13 @@ object EmptyList : List<Nothing> {
 object NothingByStringMap : Map<String, Nothing> {
   override val entries: Set<Map.Entry<String, Nothing>>
     get() = throw RuntimeException()
+
   override val keys: Set<String>
     get() = throw RuntimeException()
+
   override val size: Int
     get() = throw RuntimeException()
+
   override val values: Collection<Nothing>
     get() = throw RuntimeException()
 

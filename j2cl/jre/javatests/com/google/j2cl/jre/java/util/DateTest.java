@@ -15,6 +15,8 @@
  */
 package com.google.j2cl.jre.java.util;
 
+import static org.junit.Assert.assertThrows;
+
 import com.google.j2cl.jre.testing.J2ktIncompatible;
 import com.google.j2cl.jre.testing.TestUtils;
 import java.util.ArrayList;
@@ -33,7 +35,6 @@ public class DateTest extends TestCase {
   public static final long SECOND_MILLISECONDS_SHIFT = 10;
 
   Date theDate = new Date();
-
 
   /** Testing for public boolean java.util.Date.after(java.util.Date). */
   public void testAfter() {
@@ -89,10 +90,7 @@ public class DateTest extends TestCase {
     assertFalse(a2);
   }
 
-  /**
-   * Tests that if daylight savings time occurs tomorrow, the current date isn't
-   * affected.
-   */
+  /** Tests that if daylight savings time occurs tomorrow, the current date isn't affected. */
   public void testClockForwardNextDay() {
     int[] monthDayHour = new int[3];
     if (!findClockForwardTime(2009, monthDayHour)) {
@@ -345,9 +343,8 @@ public class DateTest extends TestCase {
   }
 
   /**
-   * Testing to that if we set the day number to 31 for a month that only has 30
-   * days in it, that the date rolls over to the first day of the next month in
-   * sequence.
+   * Testing to that if we set the day number to 31 for a month that only has 30 days in it, that
+   * the date rolls over to the first day of the next month in sequence.
    */
   public void testInvalidDateForMonth() {
     int monthNum = 3; // April
@@ -361,12 +358,7 @@ public class DateTest extends TestCase {
 
   @J2ktIncompatible // Not nullable according to Jspecify
   public void testParseNull() {
-    try {
-      Date.parse(null);
-      fail("Should have thrown exception");
-    } catch (IllegalArgumentException e) {
-      // Expected
-    }
+    assertThrows(IllegalArgumentException.class, () -> Date.parse(null));
   }
 
   /** Testing for public static long java.util.Date.parse(java.lang.String). */
@@ -434,10 +426,9 @@ public class DateTest extends TestCase {
   }
 
   /**
-   * We want to test to see that if we are currently in a month with 31 days and
-   * we set the month to one which has less than 31 days, that the month
-   * returned by the date class will be one higher than the month that we
-   * originally set (according to the spec of java.util.date).
+   * We want to test to see that if we are currently in a month with 31 days and we set the month to
+   * one which has less than 31 days, that the month returned by the date class will be one higher
+   * than the month that we originally set (according to the spec of java.util.date).
    */
   public void testSetInvalidMonthForDate() {
     int dayNum = 31;
@@ -450,9 +441,8 @@ public class DateTest extends TestCase {
   }
 
   /**
-   * We want to test to see that if the date is Feb 29th (in a leap year) and we
-   * set the year to a non-leap year, that the month and day will roll over to
-   * March 1st.
+   * We want to test to see that if the date is Feb 29th (in a leap year) and we set the year to a
+   * non-leap year, that the month and day will roll over to March 1st.
    */
   public void testSetInvalidYearForDate() {
     int dayNum = 29;
@@ -509,8 +499,8 @@ public class DateTest extends TestCase {
   }
 
   /**
-   * We want to test to see that if the date is Feb 29th (in a leap year) and we
-   * set the year to another leap year, that the month and day will be retained.
+   * We want to test to see that if the date is Feb 29th (in a leap year) and we set the year to
+   * another leap year, that the month and day will be retained.
    */
   public void testSetValidLeapYearForDate() {
     int dayNum = 29;
@@ -589,8 +579,7 @@ public class DateTest extends TestCase {
       String s = d.toString();
 
       assertTrue("Bad format " + s, s.matches(TO_STRING_PATTERN));
-      assertEquals("Parsing returned unequal dates from " + s, d, new Date(
-          Date.parse(s)));
+      assertEquals("Parsing returned unequal dates from " + s, d, new Date(Date.parse(s)));
 
       // /////////////////////////////
       // Future
@@ -599,8 +588,7 @@ public class DateTest extends TestCase {
       s = d.toString();
 
       assertTrue("Bad format " + s, s.matches(TO_STRING_PATTERN));
-      assertEquals("Parsing returned unequal dates from " + s, d, new Date(
-          Date.parse(s)));
+      assertEquals("Parsing returned unequal dates from " + s, d, new Date(Date.parse(s)));
     }
   }
 
@@ -686,8 +674,7 @@ public class DateTest extends TestCase {
     timeShiftDate.clear();
     Date start = new Date(year - 1900, 0, 1, 12, 0, 0);
     Date end = new Date(year + 1 - 1900, 0, 1, 12, 0, 0);
-    int days = (int) ((end.getTime() - start.getTime()) /
-        (24 * 60 * 60 * 1000));
+    int days = (int) ((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
     findTimeShift(start, days);
   }
 
@@ -753,8 +740,7 @@ public class DateTest extends TestCase {
     if (!findClockForwardTime(date.getYear() + 1900, monthDayHour)) {
       return false;
     }
-    return monthDayHour[0] == date.getMonth()
-        && monthDayHour[1] == date.getDate();
+    return monthDayHour[0] == date.getMonth() && monthDayHour[1] == date.getDate();
   }
 
   public void testClockBackwardTime() {

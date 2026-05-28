@@ -14,6 +14,7 @@
  * the License.
  */
 @file:Suppress("JAVA_MODULE_DOES_NOT_DEPEND_ON_MODULE")
+@file:OptIn(org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class)
 
 package com.google.j2cl.transpiler.frontend.kotlin.ir
 
@@ -25,12 +26,15 @@ import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.backend.jvm.getRequiresMangling
 import org.jetbrains.kotlin.backend.jvm.ir.getSingleAbstractMethod
+import org.jetbrains.kotlin.builtins.StandardNames.DATA_CLASS_COMPONENT_PREFIX
+import org.jetbrains.kotlin.builtins.StandardNames.DATA_CLASS_COPY
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.SourceFile
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.java.JavaVisibilities
+import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrAnnotationContainer
 import org.jetbrains.kotlin.ir.declarations.IrClass
@@ -45,11 +49,11 @@ import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
 import org.jetbrains.kotlin.ir.declarations.IrField
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrOverridableMember
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.declarations.IrTypeParametersContainer
-import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.expressions.IrBreakContinue
 import org.jetbrains.kotlin.ir.expressions.IrCall
@@ -61,6 +65,7 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
 import org.jetbrains.kotlin.ir.expressions.IrGetField
+import org.jetbrains.kotlin.ir.expressions.IrLocalDelegatedPropertyReference
 import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
 import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
@@ -74,14 +79,20 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.IrTypeArgument
 import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.classOrNull
+import org.jetbrains.kotlin.ir.types.classifierOrFail
 import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.extractTypeParameters
+import org.jetbrains.kotlin.ir.types.getClass
+import org.jetbrains.kotlin.ir.types.impl.buildSimpleType
 import org.jetbrains.kotlin.ir.types.impl.makeTypeProjection
+import org.jetbrains.kotlin.ir.types.impl.toBuilder
 import org.jetbrains.kotlin.ir.types.isArray
 import org.jetbrains.kotlin.ir.types.isClassType
 import org.jetbrains.kotlin.ir.types.isNullableArray
 import org.jetbrains.kotlin.ir.types.isUnit
+import org.jetbrains.kotlin.ir.types.typeOrFail
+import org.jetbrains.kotlin.ir.types.typeOrNull
 import org.jetbrains.kotlin.ir.util.allOverridden
 import org.jetbrains.kotlin.ir.util.allTypeParameters
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
@@ -103,21 +114,24 @@ import org.jetbrains.kotlin.ir.util.isLocal
 import org.jetbrains.kotlin.ir.util.isObject
 import org.jetbrains.kotlin.ir.util.isOverridableOrOverrides
 import org.jetbrains.kotlin.ir.util.isPrimitiveArray
-import org.jetbrains.kotlin.ir.util.isReal
 import org.jetbrains.kotlin.ir.util.isStatic
 import org.jetbrains.kotlin.ir.util.isSuspendFunction
 import org.jetbrains.kotlin.ir.util.isTopLevel
+import org.jetbrains.kotlin.ir.util.isTypeParameter
+import org.jetbrains.kotlin.ir.util.nonDispatchArguments
 import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.parentClassOrNull
 import org.jetbrains.kotlin.ir.util.properties
+import org.jetbrains.kotlin.ir.util.superTypes
+import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
+import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.NameUtils
 import org.jetbrains.kotlin.types.Variance
-import org.jetbrains.kotlin.utils.addIfNotNull
 import org.jetbrains.org.objectweb.asm.commons.Method
 
 /** Returns the actual function expression from inside a nested type operator. */
@@ -151,8 +165,8 @@ val IrDeclarationWithVisibility.j2clVisibility: Visibility
     when (visibility.delegate) {
       // Internal means that the owner is visible inside the kotlin module. When you call
       // kotlin members from java, they are considered as public.
-      Visibilities.Public,
-      Visibilities.Internal -> Visibility.PUBLIC
+      Visibilities.Public -> Visibility.PUBLIC
+      Visibilities.Internal,
       Visibilities.Protected,
       JavaVisibilities.ProtectedAndPackage,
       JavaVisibilities.ProtectedStaticVisibility -> Visibility.PROTECTED
@@ -163,7 +177,7 @@ val IrDeclarationWithVisibility.j2clVisibility: Visibility
 val IrDeclarationContainer.methods: List<IrFunction>
   get() {
     val allMethods =
-      declarations.filterIsInstance<IrFunction>().filter { it.isReal } + gettersAndSetters
+      declarations.filterIsInstance<IrFunction>().filter { !it.isKotlinStub } + gettersAndSetters
     return if (this is IrClass && isAnnotationClass) {
       // Annotations are transpiled to interfaces (like Kotlin/JVM does), we do not include the
       // ctors in the result set.
@@ -178,7 +192,7 @@ private val IrDeclarationContainer.gettersAndSetters: List<IrFunction>
     properties
       // We only care about getter/setters for real properties, and only if it's not a @JvmField,
       // as they won't have these functions generated for them.
-      .filter { it.isReal && !it.backingField.isJvmField }
+      .filter { !it.isKotlinStub && !it.backingField.isJvmField }
       .flatMap { sequenceOf(it.getter, it.setter) }
       .filterNotNull()
       .toList()
@@ -189,37 +203,48 @@ val IrField?.isJvmField: Boolean
 val IrClass.enumEntries: List<IrEnumEntry>
   get() = declarations.filterIsInstance<IrEnumEntry>()
 
-fun IrFunctionAccessExpression.getArguments(): List<IrExpression> = buildList {
-  addIfNotNull(extensionReceiver)
+// TODO(dramaix): This function provides a workaround for accessing arguments of an enum constructor
+// call. Callers should eventually be migrated to directly use `call.arguments` or
+// `call.nonDispatchArguments`. Any remaining necessary logic should be moved to
+// CompilationUnitBuilder.
+fun IrFunctionAccessExpression.getArguments(): List<IrExpression> {
   // Enums that take no explicit params don't include the name/ordinal params in the constructor
   // calls. If all the value parameters are null we can simply return.
-  if (
-    this@getArguments is IrEnumConstructorCall &&
-      (0 until valueArgumentsCount).all { getValueArgument(it) == null }
-  ) {
-    return@buildList
+  if (this is IrEnumConstructorCall && arguments.all { it == null }) {
+    return emptyList()
   }
-  for (i in 0 until valueArgumentsCount) {
-    val valueArgument = getValueArgument(i)
-    // Value arguments should never be null at this point as default arguments and varargs have
-    // already been lowered.
-    checkNotNull(valueArgument) { "Unexpected null value argument" }
-    add(valueArgument)
+
+  // Value arguments should never be null at this point as default arguments and varargs have
+  // already been lowered.
+  return nonDispatchArguments.map { argument ->
+    checkNotNull(argument) { "Unexpected null value argument" }
   }
 }
 
+val IrMemberAccessExpression<*>.extensionReceiverOrNull: IrExpression?
+  get() {
+    val ownerAsFunction: IrFunction =
+      when (symbol.owner) {
+        is IrFunction -> symbol.owner as IrFunction
+        is IrProperty ->
+          when {
+            this is IrPropertyReference -> (getter ?: setter)?.owner
+            this is IrLocalDelegatedPropertyReference -> getter.owner
+            else -> throw IllegalStateException("Unexpected property reference")
+          }
+        else -> throw IllegalStateException("Unexpected owner type: ${symbol.owner}")
+      } ?: return null
+
+    val extensionReceiverIndex =
+      ownerAsFunction.parameters.indexOfFirst { it.kind == IrParameterKind.ExtensionReceiver }
+    return if (extensionReceiverIndex >= 0) arguments[extensionReceiverIndex] else null
+  }
+
+val IrMemberAccessExpression<*>.extensionReceiverOrFail: IrExpression
+  get() = checkNotNull(extensionReceiverOrNull)
+
 val IrFunctionAccessExpression.isSuperCall
   get() = (this as? IrCall)?.superQualifierSymbol != null
-
-fun IrFunction.getParameters(): List<IrValueParameter> =
-  when (this) {
-    is IrSimpleFunction ->
-      buildList {
-        addIfNotNull(extensionReceiverParameter)
-        addAll(valueParameters)
-      }
-    else -> valueParameters
-  }
 
 // Based on org.jetbrains.kotlin.ir.types.typeConstructorParameters, but we collect type parameters
 // defined on parents of anonymous object.
@@ -276,9 +301,85 @@ fun IrMemberAccessExpression<*>.getTypeSubstitutionMap(
 
   return typeParameters.withIndex().associateTo(result) {
     // Modified to build a IrTypeArgument for member parameters.
-    it.value.symbol to makeTypeProjection(getTypeArgument(it.index)!!, it.value.variance)
+    it.value.symbol to makeTypeProjection(typeArguments[it.index]!!, it.value.variance)
     // End of modification
   }
+}
+
+/**
+ * Collects all type parameters and their substitutions needed for inlining an `irFunction`.
+ *
+ * Collects all type parameters and their substitutions for a function call, including those from
+ * the receiver's type hierarchy.
+ */
+fun IrFunctionAccessExpression.getCompleteTypeSubstitutionMap(
+  irFunction: IrFunction,
+  irBuiltins: IrBuiltIns,
+): Map<IrTypeParameterSymbol, IrType> {
+  val typeSubstitutionMap = mutableMapOf<IrTypeParameterSymbol, IrType>()
+  val receiverType =
+    (this as? IrCall)?.superQualifierSymbol?.defaultType
+      ?: getRealDispatcherReceiverForTypeSubstitution(irFunction)
+
+  if (receiverType != null) {
+    for (superType in receiverType.allSuperTypesAndSelf().filterIsInstance<IrSimpleType>()) {
+      superType.classOrNull?.owner?.typeParameters?.zip(superType.arguments)?.associateTo(
+        typeSubstitutionMap
+      ) { (typeParam, typeArg) ->
+        val type =
+          when (typeArg) {
+            is IrStarProjection ->
+              if (typeParam.variance == Variance.IN_VARIANCE) {
+                irBuiltins.nothingType
+              } else {
+                typeParam.defaultType
+              }
+            else -> typeArg.typeOrFail
+          }
+        typeParam.symbol to type
+      }
+    }
+    // The mapping extracted from the supertypes of the receiver can refer to intermediate type
+    // parameters that also appear in the mapping. We'll "flatten" the mapping by resolving these
+    // intermediate type parameters to their final resolved value.
+    typeSubstitutionMap.replaceAll { typeParameter, type ->
+      type.resolveWithTypeParameterMapping(typeSubstitutionMap)
+    }
+  }
+
+  return irFunction.allTypeParameters.withIndex().associateTo(typeSubstitutionMap) {
+    it.value.symbol to typeArguments[it.index]!!
+  }
+}
+
+private fun IrType.resolveWithTypeParameterMapping(
+  parameterTypeMapping: Map<IrTypeParameterSymbol, IrType>
+): IrType {
+  if (isTypeParameter()) {
+    val resolvedType = parameterTypeMapping.getOrDefault(classifierOrFail, this)
+    if (resolvedType == this) {
+      return this
+    }
+    return resolvedType.resolveWithTypeParameterMapping(parameterTypeMapping)
+  } else if (this is IrSimpleType) {
+    if (arguments.isEmpty()) {
+      return this
+    }
+    val resolvedArguments = arguments.map {
+      it.typeOrNull?.resolveWithTypeParameterMapping(parameterTypeMapping)?.let { type ->
+        makeTypeProjection(type, type.variance)
+      } ?: it
+    }
+    return toBuilder().apply { arguments = resolvedArguments }.buildSimpleType()
+  }
+  return this
+}
+
+fun IrType.allSuperTypesAndSelf(): Set<IrType> {
+  val allSupertypesIncludingSelf = linkedSetOf<IrType>()
+  allSupertypesIncludingSelf.add(this)
+  type.superTypes().forEach { allSupertypesIncludingSelf.addAll(it.allSuperTypesAndSelf()) }
+  return allSupertypesIncludingSelf
 }
 
 // TODO(b/377502016): remove this method when bug on JetBrain side is fixed.
@@ -385,7 +486,7 @@ fun IrType.isArrayType(): Boolean = isArray() || isNullableArray() || isPrimitiv
 fun IrType.isClassType(fqName: FqNameUnsafe): Boolean =
   isClassType(fqName, false) || isClassType(fqName, true)
 
-fun IrType.isKFunctionOrKSuspendFunction() = isKFunction() || isKSuspendFunction()
+fun IrClassifierSymbol.isKFunctionOrKSuspendFunction() = isKFunction() || isKSuspendFunction()
 
 fun IrType.isFunctionOrSuspendFunction() = isFunction() || isSuspendFunction()
 
@@ -439,6 +540,9 @@ val IrClass.isAbstract: Boolean
 
 val IrClass.isFinal: Boolean
   get() = modality == Modality.FINAL
+
+val IrClass.isSealed: Boolean
+  get() = modality == Modality.SEALED
 
 val IrClass.isFromSource: Boolean
   get() = source.containingFile != SourceFile.NO_SOURCE_FILE
@@ -494,9 +598,29 @@ inline fun <reified T> IrConstructorCall.getValueArgumentAsConst(name: Name): T?
 
 val IrDeclaration.isSynthetic
   get() =
+    origin == IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER ||
+      isCompanionInstanceField ||
+      isDataClassSyntheticHelper
+
+private val IrDeclaration.isCompanionInstanceField: Boolean
+  get() =
+    this is IrField &&
+      type.getClass()?.isCompanion == true &&
+      origin == IrDeclarationOrigin.FIELD_FOR_OBJECT_INSTANCE
+
+private val IrDeclaration.isDataClassSyntheticHelper: Boolean
+  get() =
+    this is IrFunction &&
+      origin == IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER &&
+      (name == DATA_CLASS_COPY || name.asString().startsWith(DATA_CLASS_COMPONENT_PREFIX))
+
+/**
+ * Returns `true` for stub artifacts of the Kotlin frontend that shouldn't reach to J2CL AST or type
+ * model.
+ */
+val IrDeclaration.isKotlinStub
+  get() =
     isFakeOverride ||
-      // Enum synthetic functions values and valueOf will be generated by later passes.
-      origin == IrDeclarationOrigin.ENUM_CLASS_SPECIAL_MEMBER ||
       // Lowered properties/typealiases with annotations get a synthetic stub function added to hold
       // onto the original annotations. We have no use for these stubs.
       origin == JvmLoweredDeclarationOrigin.SYNTHETIC_METHOD_FOR_PROPERTY_OR_TYPEALIAS_ANNOTATIONS
@@ -512,13 +636,51 @@ private val IrFunction.isPropertyGetter: Boolean
 val IrFunction.hasVoidReturn: Boolean
   get() = returnType.isUnit() && !isPropertyGetter
 
+val IrFunction.isLambda: Boolean
+  get() = origin == IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
+
 fun IrFunction.resolveName(jvmBackendContext: JvmBackendContext): String? =
   when (this) {
     is IrConstructor -> null
-    is IrSimpleFunction -> this.resolveName(jvmBackendContext)
+    is IrSimpleFunction -> this.resolveName(jvmBackendContext) + getLocalSuffix()
   }
 
-fun IrSimpleFunction.resolveName(jvmBackendContext: JvmBackendContext): String {
+private fun IrFunction.getLocalSuffix(): String {
+  // Whether the IrFunction is a local function itself.
+  val isLocal = visibility.delegate == Visibilities.Local
+  if (!isLocal) {
+    return ""
+  }
+  var index = 0
+  val function = this
+  var found = false
+  parent.acceptChildrenVoid(
+    object : IrVisitorVoid() {
+      override fun visitElement(element: IrElement) {
+        if (!found && element !is IrDeclarationParent) {
+          element.acceptChildrenVoid(this)
+        }
+      }
+
+      override fun visitFunction(declaration: IrFunction) {
+        if (declaration.symbol == function.symbol) {
+          found = true
+        }
+        if (!found && declaration.name == function.name) {
+          // There is a another local function with the same name that appears before the
+          // local function we are looking for. Keep track of the count to add as a suffix.
+          index++
+        }
+      }
+    }
+  )
+  if (index == 0) {
+    return ""
+  }
+  return "_$$index"
+}
+
+private fun IrSimpleFunction.resolveName(jvmBackendContext: JvmBackendContext): String {
   // Pretend the function is public when mapping the signature. We want to avoid internal name
   // mangling for now.
   // TODO(b/236236685): Revisit this if we decide to mangle internal names.
@@ -545,7 +707,7 @@ fun IrSimpleFunction.resolveName(jvmBackendContext: JvmBackendContext): String {
     } else {
       name
     }
-  return sanitizeName(resolvedName)
+  return resolvedName.sanitizeName()
 }
 
 private fun <R> IrSimpleFunction.runAsIfNonInternalFunction(block: IrSimpleFunction.() -> R): R {
@@ -565,19 +727,10 @@ val IrDeclarationWithName.sanitizedName: String
     if (this is IrFunction) {
       throw IllegalStateException("Use IrFunction.resolveName(jvmBackendContext) instead")
     }
-    return sanitizeName()
+    return name.sanitizeName()
   }
 
-private fun IrDeclarationWithName.sanitizeName(name: Name = this.name) =
-  if (isJsMember()) {
-    // We don't sanitize name for JsMember. Instead, we pass the original name through to the
-    // backend, and let the JsInteropRestriction checker validate if it's a valid JS identifier.
-    name.asString()
-  } else {
-    name.sanitizeName()
-  }
-
-private fun Name.sanitizeName() = JsUtils.sanitizeJsIdentifier(this.asStringStripSpecialMarkers())
+fun Name.sanitizeName() = JsUtils.sanitizeJsIdentifier(this.asStringStripSpecialMarkers())
 
 /**
  * Returns `true` if the function reference is a reference to a synthetic adapter function created

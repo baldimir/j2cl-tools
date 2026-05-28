@@ -5,7 +5,7 @@ This is an experimental tool and should not be used.
 """
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load(":j2cl_common.bzl", "get_bootclasspath", "get_bootclasspath_deps")
+load(":j2cl_common.bzl", "get_bootclasspath", "get_java_toolchain", "get_jdk_system")
 load(":j2cl_js_common.bzl", "J2CL_JS_TOOLCHAIN_ATTRS", "j2cl_js_provider")
 load(":j2wasm_common.bzl", "J2WASM_FEATURE_SET", "J2WASM_TOOLCHAIN_ATTRS")
 load(":provider.bzl", "J2wasmInfo")
@@ -17,7 +17,8 @@ goog.module("%MODULE_NAME%.j2wasm");
 
 %IMPORTS%
 
-const options = { "builtins": ["js-string"] , "importedStringConstants": "'"'"'" }
+const jsConstructors = {};
+const options = { "builtins": ["js-string", "js-prototypes"] , "importedStringConstants": "'"'"'" }
 
 /**
  * Instantiates the web assembly module. This is the recommended way to load & instantate
@@ -33,6 +34,7 @@ async function instantiateStreaming(urlOrResponse) {
     // Shortcut for magic import case.
     const response = typeof urlOrResponse == "string" ? fetch(urlOrResponse) : urlOrResponse;
     const {instance} = await WebAssembly.instantiateStreaming(response, getImports(), options);
+    globalThis.j2wasmJsConstructors = jsConstructors;
     return instance;
   }
   const module = await compileStreaming(urlOrResponse);
@@ -51,12 +53,23 @@ async function compileStreaming(urlOrResponse) {
 }
 
 /**
+ * @param {!BufferSource} moduleBuffer
+ * @return {!Promise<!WebAssembly.Module>}
+ * @suppress {checkTypes} Externs are missing options parameter (phase 2)
+ */
+async function compile(moduleBuffer) {
+  return WebAssembly.compile(moduleBuffer, options);
+}
+
+/**
  * @param {!WebAssembly.Module} module
  * @return {!Promise<!WebAssembly.Instance>}
  * @suppress {checkTypes} Externs are missing overloads for WebAssembly.instantiate.
  */
 async function instantiate(module) {
-  return WebAssembly.instantiate(module, prepareImports(module));
+  const instance = await WebAssembly.instantiate(module, prepareImports(module));
+  globalThis.j2wasmJsConstructors = jsConstructors;
+  return instance;
 }
 
 /**
@@ -68,13 +81,15 @@ async function instantiate(module) {
  * small threshold, mandating the async functions for all non-trivial apps. This
  * function can be used in other contexts, such as the D8 command line.
  *
- * @param {!BufferSource} moduleObject
+ * @param {!BufferSource} moduleBuffer
  * @return {!WebAssembly.Instance}
  * @suppress {checkTypes} Externs are missing options parameter (phase 2)
  */
-function instantiateBlocking(moduleObject) {
-  const module = new WebAssembly.Module(moduleObject, options);
-  return new WebAssembly.Instance(module, prepareImports(module));
+function instantiateBlocking(moduleBuffer) {
+  const module = new WebAssembly.Module(moduleBuffer, options);
+  const instance = new WebAssembly.Instance(module, prepareImports(module));
+  globalThis.j2wasmJsConstructors = jsConstructors;
+  return instance;
 }
 
 /**
@@ -91,27 +106,30 @@ function prepareImports(module) {
   return imports;
 }
 
-exports = {compileStreaming, instantiate, instantiateStreaming, instantiateBlocking};
+exports = {compile, compileStreaming, instantiate, instantiateStreaming, instantiateBlocking};
 """
 
 def _impl_j2wasm_application(ctx):
-    feature_set = ctx.attr._feature_set[BuildSettingInfo].value
-    deps = [ctx.attr._jre] + ctx.attr.deps
-    srcs = _get_transitive_srcs(deps)
-    classpath = _get_transitive_classpath(deps)
-    module_outputs = _get_transitive_modules(deps)
+    feature_set = ctx.attr.feature_set
+    if feature_set == J2WASM_FEATURE_SET.DEFAULT:
+        feature_set = ctx.attr._feature_set[BuildSettingInfo].value
+
+    deps = _get_j2cl_infos_for_feature_set(ctx.attr.deps, feature_set)
+    classpath = _get_all_classjars(deps).to_list()
+    jdk_system = get_jdk_system(get_java_toolchain(ctx), [])
 
     # Create a module for exports.
     exports_module_output = ctx.actions.declare_directory(ctx.label.name + ".exports")
     exporter_args = ctx.actions.args()
     exporter_args.use_param_file("@%s", use_always = True)
     exporter_args.set_param_file_format("multiline")
-    exporter_args.add_joined("-classpath", _get_all_classjars(deps).to_list(), join_with = ctx.configuration.host_path_separator)
+    exporter_args.add_joined("-classpath", classpath, join_with = ctx.configuration.host_path_separator)
+    exporter_args.add_all("-system", jdk_system, expand_directories = False)
     exporter_args.add("-output", exports_module_output.path)
     exporter_args.add_all(ctx.attr.entry_points, before_each = "-entryPointPattern")
     ctx.actions.run(
         progress_message = "Generating Wasm Exports %s" % ctx.label,
-        inputs = _get_all_classjars(deps),
+        inputs = classpath + jdk_system,
         outputs = [exports_module_output],
         executable = ctx.executable._export_generator,
         arguments = [exporter_args],
@@ -120,24 +138,28 @@ def _impl_j2wasm_application(ctx):
         mnemonic = "J2wasmApp",
     )
 
-    all_modules = module_outputs.to_list() + [exports_module_output]
-    jre_jars = get_bootclasspath(ctx).to_list() + get_bootclasspath_deps(ctx).to_list()
+    module_outputs = _get_transitive_modules(deps).to_list()
+    all_modules = module_outputs + [exports_module_output]
+    bundler_classpath = get_bootclasspath(ctx).to_list()
 
     # Bundle the module outputs.
     bundler_args = ctx.actions.args()
     bundler_args.use_param_file("@%s", use_always = True)
     bundler_args.set_param_file_format("multiline")
     bundler_args.add_all(all_modules, expand_directories = False)
-    bundler_args.add_joined("-classpath", jre_jars, join_with = ctx.configuration.host_path_separator)
+    bundler_args.add_joined("-classpath", bundler_classpath, join_with = ctx.configuration.host_path_separator)
+    bundler_args.add_all("-system", jdk_system, expand_directories = False)
     bundler_args.add_all(ctx.attr.defines, before_each = "-define")
     bundler_args.add("-output", ctx.outputs.wat)
     bundler_args.add("-jsimports", ctx.outputs.jsimports)
+    if feature_set == J2WASM_FEATURE_SET.CUSTOM_DESCRIPTORS_JSINTEROP:
+        bundler_args.add("-experimentalEnableWasmCustomDescriptorsJsInterop")
     ctx.actions.run(
         progress_message = "Bundling modules for Wasm %s" % ctx.label,
         # Note that all_modules also contains some files that are not
         # actually needed by the bundler, e.g. namemaps; that increases
         # the total size of the inputs to the bundler.
-        inputs = all_modules + jre_jars,
+        inputs = all_modules + bundler_classpath + jdk_system,
         outputs = [ctx.outputs.wat, ctx.outputs.jsimports],
         executable = ctx.executable._bundler,
         arguments = [bundler_args],
@@ -150,9 +172,9 @@ def _impl_j2wasm_application(ctx):
     ctx.actions.run_shell(
         inputs = all_modules,
         outputs = [transpile_out],
-        command = "mkdir -p %s && cat %s > %s/namemap" % (
+        command = "mkdir -p %s && cat %s > %s/name.map" % (
             transpile_out.path,
-            " ".join([m.path + "/namemap" for m in all_modules]),
+            " ".join([m.path + "/name.map" for m in all_modules]),
             transpile_out.path,
         ),
         mnemonic = "J2wasmApp",
@@ -182,7 +204,10 @@ def _impl_j2wasm_application(ctx):
         args.add("--enable-bulk-memory")
         args.add("--closed-world")
         args.add("--traps-never-happen")
-        if feature_set == J2WASM_FEATURE_SET.CUSTOM_DESCRIPTORS:
+        if feature_set in [
+            J2WASM_FEATURE_SET.CUSTOM_DESCRIPTORS,
+            J2WASM_FEATURE_SET.CUSTOM_DESCRIPTORS_JSINTEROP,
+        ]:
             args.add("--enable-custom-descriptors")
         args.add_all(stage_args)
 
@@ -246,7 +271,7 @@ def _impl_j2wasm_application(ctx):
 
     # Compute the directory where the source map file will reside (relative to `runtime_root`).
     source_map_short_path_dir = ctx.outputs.srcmap.short_path.removesuffix(ctx.outputs.srcmap.basename)
-    for module_output in module_outputs.to_list():
+    for module_output in module_outputs:
         # Add the module output to the runfiles.
         runfiles.append(module_output)
 
@@ -273,7 +298,7 @@ def _impl_j2wasm_application(ctx):
     js_info = j2cl_js_provider(
         ctx,
         srcs = [js_module],
-        deps = [d[J2wasmInfo]._private_.js_info for d in deps],
+        deps = [d._private_.js_info for d in deps],
     )
 
     return [
@@ -288,20 +313,16 @@ def _impl_j2wasm_application(ctx):
             ]),
             data_runfiles = ctx.runfiles(files = runfiles, symlinks = symlinks),
         ),
-        OutputGroupInfo(_validation = _trigger_javac_build(ctx.attr.deps)),
     ]
 
-def _get_transitive_srcs(deps):
-    return depset(transitive = [d[J2wasmInfo]._private_.transitive_srcs for d in deps])
+def _get_j2cl_infos_for_feature_set(deps, feature_set):
+    return [d[J2wasmInfo]._private_.feature_set_map[feature_set] for d in deps]
 
-def _get_transitive_classpath(deps):
-    return depset(transitive = [d[J2wasmInfo]._private_.transitive_classpath for d in deps])
+def _get_transitive_modules(j2cl_infos):
+    return depset(transitive = [d._private_.transitive_modules for d in j2cl_infos], order = "postorder")
 
-def _get_transitive_modules(deps):
-    return depset(transitive = [d[J2wasmInfo]._private_.wasm_modular_info.transitive_modules for d in deps], order = "postorder")
-
-def _get_all_classjars(deps):
-    return depset(transitive = [d[J2wasmInfo]._private_.java_info.transitive_compile_time_jars for d in deps])
+def _get_all_classjars(j2cl_infos):
+    return depset(transitive = [d._private_.java_info.transitive_compile_time_jars for d in j2cl_infos])
 
 _STAGE_SEPARATOR = "--NEW_STAGE--"
 
@@ -315,10 +336,6 @@ def _extract_stages(args):
         else:
             current_stage_args.append(arg)
     return stages
-
-# Trigger a parallel Javac build to provide better error messages than JDT.
-def _trigger_javac_build(deps):
-    return depset(transitive = [d[J2wasmInfo]._private_.java_info.transitive_runtime_jars for d in deps])
 
 def _remap_symbol_map(ctx, transpile_out, binaryen_symbolmap):
     ctx.actions.run_shell(
@@ -335,19 +352,9 @@ def _remap_symbol_map(ctx, transpile_out, binaryen_symbolmap):
                 }
             } END {
                 for (i in symbols) print i":"symbols[i]
-            }' %s/namemap %s > %s""" % (transpile_out.path, binaryen_symbolmap.path, ctx.outputs.symbolmap.path),
+            }' %s/name.map %s > %s""" % (transpile_out.path, binaryen_symbolmap.path, ctx.outputs.symbolmap.path),
         mnemonic = "J2wasmApp",
     )
-
-_j2wasm_app_feature_set_transition = transition(
-    implementation = lambda settings, attr: (
-        {} if attr.feature_set == J2WASM_FEATURE_SET.DEFAULT else {
-            "//build_defs/internal_do_not_use:j2wasm_feature_set": attr.feature_set,
-        }
-    ),
-    inputs = [],
-    outputs = ["//build_defs/internal_do_not_use:j2wasm_feature_set"],
-)
 
 _J2WASM_APP_ATTRS = {
     "deps": attr.label_list(providers = [J2wasmInfo]),
@@ -360,7 +367,6 @@ _J2WASM_APP_ATTRS = {
     "enable_debug_info": attr.bool(default = False),
     "use_magic_string_imports": attr.bool(default = False),
     "feature_set": attr.string(default = J2WASM_FEATURE_SET.DEFAULT),
-    "_jre": attr.label(default = Label("//build_defs/internal_do_not_use:j2wasm_jre")),
     "_binaryen": attr.label(
         cfg = "exec",
         executable = True,
@@ -389,7 +395,6 @@ _J2WASM_APP_ATTRS.update(J2WASM_TOOLCHAIN_ATTRS)
 _j2wasm_application = rule(
     implementation = _impl_j2wasm_application,
     attrs = _J2WASM_APP_ATTRS,
-    cfg = _j2wasm_app_feature_set_transition,
     fragments = ["js"],
     outputs = {
         "wat": "%{name}.wat",

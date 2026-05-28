@@ -72,7 +72,9 @@ package_sources(
         "javaemul/internal/Casts.java",  # J2WASM doesn't need it.
         "javaemul/internal/ArrayStamper.java",  # Unused in Wasm
         "javaemul/internal/Comparables.java",  # Unused in Wasm
+        "javaemul/internal/JsIterableHelper.java",  # Unused in Wasm
         "javaemul/internal/Objects.java",  # Unused in Wasm
+        "javaemul/internal/Ref.java",  # Unused in Wasm
     ],
     super_srcs = glob(["super-wasm/**/*.java"]) + [
         "//jre/java/super-wasm/javaemul/internal/wasmarray",
@@ -88,7 +90,7 @@ filegroup(
             "**/externs.js",
         ],
     ) + [
-        "//jre/java/javaemul/internal/vmbootstrap/primitives",
+        "//jre/java/javaemul/internal/primitives",
     ],
     visibility = ["//transpiler/javatests/com/google/j2cl/transpiler:__pkg__"],
 )
@@ -106,7 +108,7 @@ j2wasm_library(
         ":jre_java_files-j2wasm",
     ] + glob(["super-wasm/*.js"]),
     javacopts = JRE_JAVAC_OPTS,
-    visibility = ["//build_defs/internal_do_not_use:__pkg__"],
+    visibility = ["//:__pkg__"],
     deps = [
         ":javaemul_internal_annotations-j2wasm",
         "//third_party:jsinterop-annotations-j2wasm",

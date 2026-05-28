@@ -20,6 +20,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 
 INTEGRATION_ROOT = "transpiler/javatests/com/google/j2cl/integration/"
 OPT_TEST_PATTERN = INTEGRATION_ROOT + "%s:opt%s"
@@ -138,14 +139,9 @@ def get_rule_kind(target, cwd=None):
   """Returns the rule kind of the target if it exists, otherwise return None."""
   command = [BLAZE_CMD, "query", '"%s"' % target, "--output=label_kind"]
 
-  try:
-    result = run_cmd(command, cwd=cwd).split()
-    # the output of the cmd is "{rule_kind} rule {target_label}"
-    return result[0]
-  except Exception:
-    # invalid target, just return None to the caller so we know the target does
-    # not exist.
-    return None
+  result = run_cmd(command, cwd=cwd).split()
+  # the output of the cmd is "{rule_kind} rule {target_label}"
+  return result[0]
 
 
 def get_all_size_tests(cwd=None):
@@ -214,12 +210,24 @@ def get_file_from_target(target):
   return target.replace(":", "/")
 
 
+def get_current_cl():
+  return int(run_cmd(["srcfs", "get_readonly"]))
+
+
 def sync_j2size_repo():
-  g4_sync_cmds = [
-      "synced_to_cl=@$(srcfs get_readonly) && "
-      "cd $(p4 g4d -f j2cl-size) && g4 sync $synced_to_cl"
-  ]
-  run_cmd(g4_sync_cmds, shell=True)
+  sync_jsize_repo_to_cl(get_current_cl())
+
+
+def sync_jsize_repo_to_cl(cl):
+  run_cmd([f"cd $(p4 g4d -f j2cl-size) && p4 sync @{cl}"], shell=True)
+
+
+def get_last_cl_for_size_report():
+  path = SIZE_REPORT
+  output = run_cmd(
+      ["p4 changes -m 1 -s submitted %s | awk '{print $2}'" % path], shell=True
+  )
+  return int(output)
 
 
 def get_j2size_repo_path():
@@ -230,7 +238,7 @@ def get_repo_path(workspace):
   return f"/google/src/cloud/{getpass.getuser()}/{workspace}/google3"
 
 
-def run_cmd(cmd_args, cwd=None, include_stderr=False, shell=False):
+def run_cmd(cmd_args, cwd=None, shell=False):
   """Runs a command and returns output as a string."""
 
   process = subprocess.Popen(
@@ -242,16 +250,21 @@ def run_cmd(cmd_args, cwd=None, include_stderr=False, shell=False):
       cwd=cwd)
   output = process.communicate()
   if process.wait() != 0:
-    print("Error while running the command!")
+    cmd_str = " ".join(cmd_args)
+    max_length = 1000
+    truncated_cmd_str = (
+        (cmd_str[:max_length] + "...[truncated]")
+        if len(cmd_str) > max_length
+        else cmd_str
+    )
+    print("Error while running command:\n" + truncated_cmd_str)
     print("\nOUTPUT:\n============")
     print(output[1].decode("utf-8"))
     print("============\n")
-    raise Exception(
-        "cmd invocation FAILED: "
-        + (cmd_args if isinstance(cmd_args, str) else " ".join(cmd_args))
-    )
+    sys.exit(1)
 
-  rv = output[0].decode("utf-8")
-  if include_stderr:
-    rv = (rv + "\n" if rv else "") + output[1].decode("utf-8")
-  return rv
+  return output[0].decode("utf-8")
+
+
+def refresh_source_control(path):
+  """Refreshes source control tracking for the given path."""

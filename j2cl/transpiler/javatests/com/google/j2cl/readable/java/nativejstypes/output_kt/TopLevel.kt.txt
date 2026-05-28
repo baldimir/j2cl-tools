@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package nativejstypes
 
@@ -26,12 +27,12 @@ import kotlin.jvm.JvmField
 @JsType(name = "toplevel", namespace = "", isNative = true)
 open class TopLevel {
  private constructor()
-
+ 
  companion object {
   @JvmField
   var x: Int = 0
  }
-
+ 
  @JsType(isNative = true)
  open class Nested internal constructor() {
   @JvmField

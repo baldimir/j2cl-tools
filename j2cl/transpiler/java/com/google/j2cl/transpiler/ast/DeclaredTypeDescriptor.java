@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.collect.MoreCollectors.toOptional;
@@ -30,6 +31,7 @@ import com.google.auto.value.AutoValue;
 import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
@@ -48,6 +50,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -56,7 +59,7 @@ import javax.annotation.Nullable;
 /** A usage-site reference to a declared type, i.e. a class, an interface or an enum. */
 @Visitable
 @AutoValue
-public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
+public abstract non-sealed class DeclaredTypeDescriptor extends TypeDescriptor {
 
   /** The actual type declaration this descriptor is referencing. */
   public abstract TypeDeclaration getTypeDeclaration();
@@ -123,10 +126,6 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
 
   public boolean isStarOrUnknown() {
     return getTypeDeclaration().isStarOrUnknown();
-  }
-
-  public boolean isJavaScriptClass() {
-    return !isStarOrUnknown() && !isJsFunctionInterface();
   }
 
   @Override
@@ -393,11 +392,11 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   /** Returns the class initializer method descriptor for a particular type. */
   @Memoized
   public MethodDescriptor getClinitMethodDescriptor() {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setName(MethodDescriptor.CLINIT_METHOD_NAME)
         .setEnclosingTypeDescriptor(this)
         .setOrigin(MethodOrigin.SYNTHETIC_CLASS_INITIALIZER)
-        .setOriginalJsInfo(isNative() || isJsFunctionInterface() ? JsInfo.RAW_OVERLAY : JsInfo.RAW)
+        .setOriginalJsInfo(isNative() || isJsFunctionInterface() ? JsInfo.OVERLAY : JsInfo.RAW)
         .setStatic(true)
         .build();
   }
@@ -405,11 +404,11 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   /** Returns the class initializer property as a field for a particular type. */
   @Memoized
   public FieldDescriptor getClinitFieldDescriptor() {
-    return FieldDescriptor.newBuilder()
+    return FieldDescriptor.builder()
         .setEnclosingTypeDescriptor(this)
         .setTypeDescriptor(TypeDescriptors.get().nativeFunction)
         .setName(MethodDescriptor.CLINIT_METHOD_NAME)
-        .setOriginalJsInfo(isNative() || isJsFunctionInterface() ? JsInfo.RAW_OVERLAY : JsInfo.RAW)
+        .setOriginalJsInfo(isNative() || isJsFunctionInterface() ? JsInfo.OVERLAY : JsInfo.RAW)
         .setStatic(true)
         .build();
   }
@@ -417,7 +416,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   /** Returns the instance initializer method descriptor for a particular type. */
   @Memoized
   public MethodDescriptor getInitMethodDescriptor() {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setName(MethodDescriptor.INIT_METHOD_NAME)
         .setEnclosingTypeDescriptor(this)
         .setOrigin(MethodOrigin.SYNTHETIC_INSTANCE_INITIALIZER)
@@ -428,7 +427,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   /** Returns the method descriptor for $isInstance. */
   @Memoized
   public MethodDescriptor getIsInstanceMethodDescriptor() {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setName(MethodDescriptor.IS_INSTANCE_METHOD_NAME)
         .setEnclosingTypeDescriptor(getMetadataTypeDeclaration().toDescriptor())
         .setParameterTypeDescriptors(TypeDescriptors.getUnknownType())
@@ -441,7 +440,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   /** Returns the method descriptor for $markImplementor. */
   @Memoized
   public MethodDescriptor getMarkImplementorMethodDescriptor() {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setName(MethodDescriptor.MARK_IMPLEMENTOR_METHOD_NAME)
         .setEnclosingTypeDescriptor(getMetadataTypeDeclaration().toDescriptor())
         .setParameterTypeDescriptors(TypeDescriptors.get().nativeFunction)
@@ -454,7 +453,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   /** Returns the field descriptor for the instanceof checking marker field. */
   public FieldDescriptor getIsInstanceMarkerField() {
     checkState(isInterface() || isJsFunctionImplementation());
-    return FieldDescriptor.newBuilder()
+    return FieldDescriptor.builder()
         .setName(isJsFunctionImplementation() ? "$is" : "$implements")
         .setEnclosingTypeDescriptor(this)
         .setTypeDescriptor(PrimitiveTypes.BOOLEAN)
@@ -465,7 +464,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   /** Returns the method descriptor for $copy. */
   @Memoized
   public MethodDescriptor getCopyMethodDescriptor() {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setName(MethodDescriptor.COPY_METHOD_NAME)
         .setEnclosingTypeDescriptor(
             getMetadataConstructorReference().getReferencedTypeDeclaration().toDescriptor())
@@ -479,7 +478,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
 
   /** Returns the FieldDescriptor corresponding to the enclosing class instance. */
   public FieldDescriptor getFieldDescriptorForEnclosingInstance() {
-    return FieldDescriptor.newBuilder()
+    return FieldDescriptor.builder()
         .setEnclosingTypeDescriptor(getDeclarationDescriptor())
         .setName("$outer_this")
         .setTypeDescriptor(getEnclosingTypeDescriptor().toNonNullable())
@@ -513,13 +512,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
    */
   @Memoized
   public Collection<MethodDescriptor> getDeclaredMethodDescriptors() {
-    if (isRaw()) {
-      return getTypeDeclaration().getDeclaredMethodDescriptors().stream()
-          .map(MethodDescriptor::toRawMemberDescriptor)
-          .collect(toImmutableList());
-    }
-    return specializeMethods(
-        getTypeDeclaration().getDeclaredMethodDescriptors(), getTypeArgumentsByTypeTypeParameter());
+    return specializeMembers(getTypeDeclaration().getDeclaredMethodDescriptors());
   }
 
   /**
@@ -528,14 +521,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
    */
   @Memoized
   public Collection<FieldDescriptor> getDeclaredFieldDescriptors() {
-    if (isRaw()) {
-      return getTypeDeclaration().getDeclaredFieldDescriptors().stream()
-          .map(FieldDescriptor::toRawMemberDescriptor)
-          .collect(toImmutableList());
-    }
-    return getTypeDeclaration().getDeclaredFieldDescriptors().stream()
-        .map(f -> f.specializeTypeVariables(getTypeArgumentsByTypeTypeParameter()))
-        .collect(toImmutableList());
+    return specializeMembers(getTypeDeclaration().getDeclaredFieldDescriptors());
   }
 
   @Memoized
@@ -544,6 +530,40 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
         .addAll(getDeclaredMethodDescriptors())
         .addAll(getDeclaredFieldDescriptors())
         .build();
+  }
+
+  /**
+   * The list of component accessors declared in the record type returned in the order the
+   * components are declared.
+   */
+  @Memoized
+  public List<MethodDescriptor> getRecordComponentAccessors() {
+    return specializeMembers(getTypeDeclaration().getRecordComponentAccessorDescriptors());
+  }
+
+  /**
+   * The list of component field descriptors declared in the record type returned in the order the
+   * components are declared.
+   */
+  @Memoized
+  public ImmutableList<FieldDescriptor> getRecordComponentFieldDescriptors() {
+    // Per JLS 8.10.1 (all components have a private instance field) and JLS 8.10.2 (a record class
+    // cannot declare an instance field) all instance fields in a record class are component backing
+    // fields.
+    //
+    // There is no guarantee that a compiler will not insert synthetic instance fields (although it
+    // is pretty safe to assume that) nor whether the tooling will preserve private fields in the
+    // header jars.
+    //
+    // We assume here that all instance fields are backing fields of record components, that they
+    // are preserved in the class files and that the order in the type model corresponds to the
+    // component ordering.
+    // TODO(b/516726204): Reconsider alternative ways to implement this.
+    return !getTypeDeclaration().isJavaRecord()
+        ? ImmutableList.of()
+        : getDeclaredFieldDescriptors().stream()
+            .filter(FieldDescriptor::isInstanceMember)
+            .collect(toImmutableList());
   }
 
   /** Retrieves the field descriptor named {@code name} if it exists, {@code null} otherwise. */
@@ -640,7 +660,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
   public Collection<MethodDescriptor> getPolymorphicMethods() {
     DeclaredTypeDescriptor declaration = getDeclarationDescriptor();
     if (!declaration.equals(this)) {
-      return specializeMethods(declaration.getPolymorphicMethods(), getParameterization());
+      return specializeMembers(declaration.getPolymorphicMethods(), getParameterization());
     }
 
     // The bridges need to be computed at the type declaration in order to create them as
@@ -753,10 +773,94 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
     return methodsByMangledName.values();
   }
 
-  private static ImmutableList<MethodDescriptor> specializeMethods(
-      Collection<MethodDescriptor> methods, Map<TypeVariable, TypeDescriptor> parameterization) {
-    return methods.stream()
-        .map(m -> m.getDeclarationDescriptor().specializeTypeVariables(parameterization))
+  /**
+   * Returns accidental overrides of interface methods in the form of synthetic methods whose target
+   * is the superclass implementation. To get the interface methods overridden by each method, use
+   * {@link MethodDescriptor#getJavaOverriddenMethodDescriptors}.
+   *
+   * <p>An accidental override occurs when a class implements an interface and inherits an
+   * implementation from a superclass that matches the interface method's signature, without
+   * providing an explicit override itself.
+   *
+   * <p>Example:
+   *
+   * <pre>{@code
+   * interface I { void m(); }
+   * class A { public void m() {} }
+   * class B extends A implements I {}
+   * }</pre>
+   *
+   * <p>In class {@code B}, {@code A.m} is an "accidental override" of {@code I.m}.
+   */
+  @Memoized
+  public Collection<MethodDescriptor> getAccidentalOverrides() {
+    if (isInterface() || getSuperTypeDescriptor() == null) {
+      return ImmutableList.of();
+    }
+
+    SourceLanguage sourceLanguage = getTypeDeclaration().getSourceLanguage();
+
+    // Methods declared explicitly in this type.
+    ImmutableSet<String> declaredOverrideKeys =
+        getDeclaredMethodDescriptors().stream()
+            .filter(MethodDescriptor::isPolymorphic)
+            .map(m -> m.getOverrideKey(sourceLanguage))
+            .collect(toImmutableSet());
+
+    // Interface methods that are not declared in this type. These are all interface methods that
+    // are accidentally overridden. We just need to find the corresponding implementation in a
+    // superclass.
+    ImmutableMap<String, MethodDescriptor> undeclaredInterfaceMethodsByOverrideKey =
+        getInterfaceTypeDescriptors().stream()
+            .flatMap(i -> i.getPolymorphicMethods().stream())
+            .filter(
+                m ->
+                    !TypeDescriptors.isJavaLangObject(m.getEnclosingTypeDescriptor())
+                        // Exclude interface methods that are implemented by the supertype.
+                        && !getSuperTypeDescriptor().isSubtypeOf(m.getEnclosingTypeDescriptor())
+                        && !declaredOverrideKeys.contains(m.getOverrideKey(sourceLanguage)))
+            .collect(
+                toImmutableMap(
+                    m -> m.getOverrideKey(sourceLanguage),
+                    Function.identity(),
+                    (existing, replacement) -> replacement));
+
+    return getSuperTypeDescriptor().getPolymorphicMethods().stream()
+        .map(
+            m -> {
+              var interfaceMethod =
+                  undeclaredInterfaceMethodsByOverrideKey.get(m.getOverrideKey(sourceLanguage));
+              if (interfaceMethod == null) {
+                // No corresponding interface method found, so no accidental override.
+                return null;
+              }
+
+              // Note: Create the accidental override bridge as a SPECIALIZING_BRIDGE for now which
+              // has the required behavior for `getJsInfo` and does not delegate it to the bridge
+              // origin.
+              // TODO(b/507538365): Consider its own method origin.
+              return createBridgeMethodDescriptor(
+                  MethodOrigin.SPECIALIZING_BRIDGE, interfaceMethod, m);
+            })
+        .filter(Objects::nonNull)
+        .collect(toImmutableList());
+  }
+
+  // Safe cast because a specialized a member will be the same type of member.
+  @SuppressWarnings("unchecked")
+  private <T extends MemberDescriptor> ImmutableList<T> specializeMembers(Collection<T> members) {
+    if (isRaw()) {
+      return members.stream().map(m -> (T) m.toRawMemberDescriptor()).collect(toImmutableList());
+    }
+    return specializeMembers(members, getTypeArgumentsByTypeTypeParameter());
+  }
+
+  // Safe cast because a specialized a member will be the same type of member.
+  @SuppressWarnings("unchecked")
+  private static <T extends MemberDescriptor> ImmutableList<T> specializeMembers(
+      Collection<T> members, Map<TypeVariable, TypeDescriptor> parameterization) {
+    return members.stream()
+        .map(m -> (T) m.getDeclarationDescriptor().specializeTypeVariables(parameterization))
         .collect(toImmutableList());
   }
 
@@ -984,7 +1088,7 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
     // TODO(b/271144313): Cleanup when a category EXPOSING_JSNAME_BRIDGE is added.
     boolean isFinal = origin == MethodOrigin.GENERALIZING_BRIDGE && !exposesJsMethod;
 
-    return MethodDescriptor.Builder.from(bridgeMethodDescriptor)
+    return bridgeMethodDescriptor.toBuilder()
         .setParameterDescriptors(
             computeParameterDescriptors(bridgeMethodDescriptor, targetMethodDescriptor))
         .setReturnTypeDescriptor(
@@ -1332,11 +1436,11 @@ public abstract class DeclaredTypeDescriptor extends TypeDescriptor {
 
   abstract Builder toBuilder();
 
-  public static Builder newBuilder() {
+  static Builder builder() {
     return new AutoValue_DeclaredTypeDescriptor.Builder();
   }
 
-  /** Builder for a TypeDescriptor. */
+  /** Builder for a DeclaredTypeDescriptor. */
   @AutoValue.Builder
   public abstract static class Builder {
 

@@ -34,6 +34,7 @@ import com.google.j2cl.transpiler.ast.MethodDescriptor;
 import com.google.j2cl.transpiler.ast.MethodDescriptor.ParameterDescriptor;
 import com.google.j2cl.transpiler.ast.MethodLike;
 import com.google.j2cl.transpiler.ast.PrimitiveTypeDescriptor;
+import com.google.j2cl.transpiler.ast.PrimitiveTypes;
 import com.google.j2cl.transpiler.ast.TypeDeclaration;
 import com.google.j2cl.transpiler.ast.TypeDescriptor;
 import com.google.j2cl.transpiler.ast.TypeDescriptors;
@@ -116,7 +117,6 @@ class ClosureTypesGenerator {
                     getClosureTypes(descriptor.getTypeArgumentDescriptors())),
                 typeDescriptor.isNullable());
       }
-      default -> throw new IllegalArgumentException();
     };
   }
 
@@ -325,7 +325,8 @@ class ClosureTypesGenerator {
           new ClosureNamedType(environment.aliasForType(typeDeclaration), typeParameters),
           BOOLEAN,
           NUMBER,
-          STRING);
+          STRING,
+          getClosureTypeForPrimitive(PrimitiveTypes.LONG));
     }
 
     if (TypeDescriptors.isJavaLangCharSequence(typeDescriptor)) {
@@ -335,7 +336,13 @@ class ClosureTypesGenerator {
 
     if (TypeDescriptors.isJavaLangNumber(typeDescriptor)) {
       return new ClosureUnionType(
-          new ClosureNamedType(environment.aliasForType(typeDeclaration), typeParameters), NUMBER);
+          new ClosureNamedType(environment.aliasForType(typeDeclaration), typeParameters),
+          NUMBER,
+          getClosureTypeForPrimitive(PrimitiveTypes.LONG));
+    }
+
+    if (TypeDescriptors.isJavaLangLong(typeDescriptor)) {
+      return getClosureTypeForPrimitive(PrimitiveTypes.LONG);
     }
 
     if (TypeDescriptors.isJavaLangCloneable(typeDescriptor)

@@ -150,7 +150,6 @@ public interface Map<K, V> {
         k1, v1, k2, v2, k3, v3, k4, v4, k5, v5, k6, v6, k7, v7, k8, v8, k9, v9, k10, v10);
   }
 
-  @JsIgnore
   static <K, V> Entry<K, V> entry(K key, V value) {
     // This isn't quite consistent with the javadoc, since this is serializable, while entry()
     // need not be serializable.
@@ -159,6 +158,14 @@ public interface Map<K, V> {
 
   @JsIgnore
   static <K, V> Map<K, V> ofEntries(Entry<? extends K, ? extends V>... entries) {
+    // This is not marked as JS method for symmetry with List.of and avoid extra cloning at
+    // call sites when an array is passed. A different method provided as Map.ofEntries to JS below.
+    return Collections.internalMapFromEntries(Arrays.asList(entries));
+  }
+
+  /** Map.ofEntries API that is friendly to use from JavaScript. */
+  @JsMethod(name = "ofEntries")
+  static <K, V> Map<K, V> jsOfEntries(Entry<? extends K, ? extends V>... entries) {
     return Collections.internalMapFromEntries(Arrays.asList(entries));
   }
 
@@ -167,9 +174,7 @@ public interface Map<K, V> {
     return Collections.internalMapFromEntries(map.entrySet());
   }
 
-  /**
-   * Represents an individual map entry.
-   */
+  /** Represents an individual map entry. */
   interface Entry<K, V> {
     @Override
     boolean equals(Object o);
@@ -186,7 +191,7 @@ public interface Map<K, V> {
     @JsMethod
     V setValue(V value);
 
-    static <K extends Comparable<? super K>, V> Comparator<Map.Entry<K,V>> comparingByKey() {
+    static <K extends Comparable<? super K>, V> Comparator<Map.Entry<K, V>> comparingByKey() {
       return comparingByKey(Comparator.naturalOrder());
     }
 
@@ -196,7 +201,7 @@ public interface Map<K, V> {
           (a, b) -> cmp.compare(a.getKey(), b.getKey());
     }
 
-    static <K, V extends Comparable<? super V>> Comparator<Map.Entry<K,V>> comparingByValue() {
+    static <K, V extends Comparable<? super V>> Comparator<Map.Entry<K, V>> comparingByValue() {
       return comparingByValue(Comparator.naturalOrder());
     }
 
@@ -270,7 +275,7 @@ public interface Map<K, V> {
   @JsNullable
   V get(Object key);
 
-  default V getOrDefault(Object key, V defaultValue) {
+  default @JsNullable V getOrDefault(Object key, @JsNullable V defaultValue) {
     V currentValue = get(key);
     return (currentValue == null && !containsKey(key)) ? defaultValue : currentValue;
   }
@@ -343,7 +348,8 @@ public interface Map<K, V> {
 
   int size();
 
-  @JsNonNull Collection<V> values();
+  @JsNonNull
+  Collection<V> values();
 
   // Note: Explicit equals override helps an experimental JSpecify nullness checker.
   boolean equals(Object o);

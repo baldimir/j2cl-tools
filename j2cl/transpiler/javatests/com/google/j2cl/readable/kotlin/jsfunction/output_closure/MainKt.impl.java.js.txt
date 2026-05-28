@@ -9,17 +9,18 @@ let Integer = goog.forwardDeclare('java.lang.Integer$impl');
 let Number = goog.forwardDeclare('java.lang.Number$impl');
 let j_l_String = goog.forwardDeclare('java.lang.String$impl');
 let InternalPreconditions = goog.forwardDeclare('javaemul.internal.InternalPreconditions$impl');
+let Primitives = goog.forwardDeclare('javaemul.internal.Primitives$impl');
+let $int = goog.forwardDeclare('javaemul.internal.primitives.$int$impl');
 let ClassWithJsFunctionProperty = goog.forwardDeclare('jsfunction.ClassWithJsFunctionProperty$impl');
 let ContainerImpl = goog.forwardDeclare('jsfunction.ContainerImpl$impl');
 let DoubleDoubleJsBiFunction = goog.forwardDeclare('jsfunction.DoubleDoubleJsBiFunction$impl');
 let JsFunctionImplementation = goog.forwardDeclare('jsfunction.JsFunctionImplementation$impl');
 let TIntegerJsBiFunction = goog.forwardDeclare('jsfunction.TIntegerJsBiFunction$impl');
 let $Equality = goog.forwardDeclare('nativebootstrap.Equality$impl');
+let $Long = goog.forwardDeclare('nativebootstrap.Long$impl');
 let $Arrays = goog.forwardDeclare('vmbootstrap.Arrays$impl');
 let $Casts = goog.forwardDeclare('vmbootstrap.Casts$impl');
 let $JavaScriptFunction = goog.forwardDeclare('vmbootstrap.JavaScriptFunction$impl');
-let $Primitives = goog.forwardDeclare('vmbootstrap.Primitives$impl');
-let $$int = goog.forwardDeclare('vmbootstrap.primitives.$int$impl');
 
 /**
  * @final
@@ -98,7 +99,7 @@ class MainKt extends j_l_Object {
  static m_testJsFunctionVarargs__jsfunction_JsFunctionVarargs() {
   MainKt.$clinit();
   return /**  @return {number}*/ ((/** number */ i, .../** ...number */ numbers) =>{
-   $Arrays.$stampType(numbers, $$int);
+   $Arrays.$stampType(numbers, $int);
    let sum = i;
    let indexedObject = numbers;
    let inductionVariable = 0;
@@ -115,7 +116,7 @@ class MainKt extends j_l_Object {
  static m_testJsFunctionVarargsInnerClass__jsfunction_JsFunctionVarargs() {
   MainKt.$clinit();
   return /**  @return {number}*/ ((/** number */ i, .../** ...number */ numbers) =>{
-   $Arrays.$stampType(numbers, $$int);
+   $Arrays.$stampType(numbers, $int);
    let sum = i;
    for (let indexedObject = numbers, inductionVariable = 0, last = indexedObject.length; inductionVariable < last; inductionVariable = inductionVariable + 1 | 0) {
     let number_1 = indexedObject[inductionVariable];
@@ -162,7 +163,7 @@ class MainKt extends j_l_Object {
  static m_testJsFunctionOptional__void() {
   MainKt.$clinit();
   let f = /**  @return {number}*/ ((/** number */ i, /** ?number= */ n) =>{
-   return $Primitives.narrowDoubleToInt(i + Double.m_doubleValue__java_lang_Double__double(InternalPreconditions.m_checkNotNull__java_lang_Object__java_lang_Object(n)));
+   return Primitives.m_narrowDoubleToInt__int__int(i + Double.m_doubleValue__java_lang_Double__double(InternalPreconditions.m_checkNotNull__java_lang_Object__java_lang_Object(n)));
   });
  }
  /** @nodts @return {function(?):void} */
@@ -201,6 +202,7 @@ class MainKt extends j_l_Object {
    let unused_1 = /**@type {?string}*/ ($Casts.$to(unused, j_l_String));
    let l = /**@type {!Array<Array<*>>}*/ ($Arrays.$create([1, null], j_l_Object));
    $Arrays.$set(l, 0, /**@type {!Array<string>}*/ ($Arrays.$stampType([''], j_l_String)));
+   return;
   };
  }
  /** @nodts */
@@ -208,14 +210,20 @@ class MainKt extends j_l_Object {
   MainKt.$clinit();
   let c = ClassWithJsFunctionProperty.$create__();
   c.m_getFn__jsfunction_ParametricJsFunction()('');
-  c.function('');
+  {
+   let $function = c.function;
+   $function('');
+  }
   c.m_getFn__jsfunction_ParametricJsFunction()('');
-  (!$Equality.$same(c, null) ? c.m_getFn__jsfunction_ParametricJsFunction() : null)('');
+  {
+   let $function_1 = !$Equality.$same(c, null) ? c.m_getFn__jsfunction_ParametricJsFunction() : null;
+   $function_1('');
+  }
  }
  /** @nodts @return {*} */
- static m_callInterfaceProjected__jsfunction_JsBiFunction__java_lang_Object__java_lang_Number__java_lang_Object(/** function(?, ?):? */ f, /** * */ o, /** (Number|number) */ n) {
+ static m_callInterfaceProjected__jsfunction_JsBiFunction__java_lang_Object__java_lang_Number__java_lang_Object(/** function(?, ?):? */ f, /** * */ o, /** (Number|number|!$Long) */ n) {
   MainKt.$clinit();
-  return (/**@type {function(*, (Number|number)):*}*/ (InternalPreconditions.m_checkNotNull__java_lang_Object__java_lang_Object(f)))(o, n);
+  return (/**@type {function(*, (Number|number|!$Long)):*}*/ (InternalPreconditions.m_checkNotNull__java_lang_Object__java_lang_Object(f)))(o, n);
  }
  /** @nodts @return {?string} */
  static m_callInterfaceParameterized__jsfunction_JsBiFunction__java_lang_String__java_lang_String(/** function(?string, Integer):?string */ f, /** ?string */ s) {
@@ -266,7 +274,7 @@ class MainKt extends j_l_Object {
   let o = /**@type {!TIntegerJsBiFunction<string>}*/ (TIntegerJsBiFunction.$create__());
   let rawTIntegerJsBiFunction = /**@type {!TIntegerJsBiFunction<*>}*/ ($Casts.$to(o, TIntegerJsBiFunction));
   let parameterizedTIntegerJsBiFunction = /**@type {!TIntegerJsBiFunction<string>}*/ ($Casts.$to(o, TIntegerJsBiFunction));
-  let anotherRawJsBiFunction = /**@type {function(*, (Number|number)):*}*/ ($Casts.$to(o, $JavaScriptFunction));
+  let anotherRawJsBiFunction = /**@type {function(*, (Number|number|!$Long)):*}*/ ($Casts.$to(o, $JavaScriptFunction));
   let anotherParameterizedJsBiFunction = /**@type {function(string, !Integer):string}*/ ($Casts.$to(o, $JavaScriptFunction));
   let doubleDoubleJsBiFunction = /**@type {!DoubleDoubleJsBiFunction}*/ ($Casts.$to(o, DoubleDoubleJsBiFunction));
  }
@@ -276,6 +284,14 @@ class MainKt extends j_l_Object {
   let rawTIntegerJsBiFunction = /**@type {!TIntegerJsBiFunction<*>}*/ (TIntegerJsBiFunction.$create__());
   let parameterizedTIntegerJsBiFunction = /**@type {!TIntegerJsBiFunction<string>}*/ (TIntegerJsBiFunction.$create__());
   let rawJsBiFunction = DoubleDoubleJsBiFunction.$create__();
+ }
+ /** @nodts */
+ static m_testInvokableFunction__void() {
+  MainKt.$clinit();
+  let f = /**  @return {number}*/ ((/** number */ a) =>{
+   return a + 1 | 0;
+  });
+  f(1);
  }
  /** @nodts */
  static $clinit() {
@@ -302,6 +318,8 @@ class MainKt extends j_l_Object {
   Integer = goog.module.get('java.lang.Integer$impl');
   j_l_String = goog.module.get('java.lang.String$impl');
   InternalPreconditions = goog.module.get('javaemul.internal.InternalPreconditions$impl');
+  Primitives = goog.module.get('javaemul.internal.Primitives$impl');
+  $int = goog.module.get('javaemul.internal.primitives.$int$impl');
   ClassWithJsFunctionProperty = goog.module.get('jsfunction.ClassWithJsFunctionProperty$impl');
   ContainerImpl = goog.module.get('jsfunction.ContainerImpl$impl');
   DoubleDoubleJsBiFunction = goog.module.get('jsfunction.DoubleDoubleJsBiFunction$impl');
@@ -311,8 +329,6 @@ class MainKt extends j_l_Object {
   $Arrays = goog.module.get('vmbootstrap.Arrays$impl');
   $Casts = goog.module.get('vmbootstrap.Casts$impl');
   $JavaScriptFunction = goog.module.get('vmbootstrap.JavaScriptFunction$impl');
-  $Primitives = goog.module.get('vmbootstrap.Primitives$impl');
-  $$int = goog.module.get('vmbootstrap.primitives.$int$impl');
  }
 }
 /**@type {function(?):void} @nodts*/

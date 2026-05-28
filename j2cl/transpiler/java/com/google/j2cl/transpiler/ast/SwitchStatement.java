@@ -32,11 +32,17 @@ public class SwitchStatement extends Statement implements SwitchConstruct<Switch
   @Visitable Expression expression;
   @Visitable List<SwitchCase> cases = new ArrayList<>();
 
+  private final boolean allowsNulls;
+
   private SwitchStatement(
-      SourcePosition sourcePosition, Expression expression, List<SwitchCase> cases) {
+      SourcePosition sourcePosition,
+      Expression expression,
+      List<SwitchCase> cases,
+      boolean allowsNulls) {
     super(sourcePosition);
     this.expression = checkNotNull(expression);
     this.cases.addAll(checkNotNull(cases));
+    this.allowsNulls = allowsNulls;
   }
 
   @Override
@@ -49,6 +55,11 @@ public class SwitchStatement extends Statement implements SwitchConstruct<Switch
     return cases;
   }
 
+  @Override
+  public boolean allowsNulls() {
+    return allowsNulls;
+  }
+
   /** Returns the position of the default case, -1 if there is no default case. */
   public int getDefaultCasePosition() {
     return Iterables.indexOf(getCases(), SwitchCase::isDefault);
@@ -56,10 +67,11 @@ public class SwitchStatement extends Statement implements SwitchConstruct<Switch
 
   @Override
   public SwitchStatement clone() {
-    return SwitchStatement.newBuilder()
+    return SwitchStatement.builder()
         .setSourcePosition(getSourcePosition())
         .setExpression(expression.clone())
         .setCases(AstUtils.clone(cases))
+        .setAllowsNulls(allowsNulls)
         .build();
   }
 
@@ -68,12 +80,20 @@ public class SwitchStatement extends Statement implements SwitchConstruct<Switch
     return Visitor_SwitchStatement.visit(processor, this);
   }
 
-  @Override
-  public Builder toBuilder() {
-    return Builder.from(this);
+  public static Builder builderFrom(SwitchConstruct<?> switchConstruct) {
+    return builder()
+        .setSourcePosition(switchConstruct.getSourcePosition())
+        .setExpression(switchConstruct.getExpression())
+        .setCases(switchConstruct.getCases())
+        .setAllowsNulls(switchConstruct.allowsNulls());
   }
 
-  public static Builder newBuilder() {
+  @Override
+  public Builder toBuilder() {
+    return builderFrom(this);
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
@@ -81,14 +101,8 @@ public class SwitchStatement extends Statement implements SwitchConstruct<Switch
   public static class Builder implements SwitchConstruct.Builder<SwitchStatement> {
     private Expression expression;
     private List<SwitchCase> switchCases = new ArrayList<>();
+    private boolean allowsNulls;
     private SourcePosition sourcePosition;
-
-    public static <T extends SwitchConstruct<T>> Builder from(SwitchConstruct<T> switchConstruct) {
-      return newBuilder()
-          .setSourcePosition(switchConstruct.getSourcePosition())
-          .setExpression(switchConstruct.getExpression())
-          .setCases(switchConstruct.getCases());
-    }
 
     @Override
     @CanIgnoreReturnValue
@@ -118,8 +132,15 @@ public class SwitchStatement extends Statement implements SwitchConstruct<Switch
     }
 
     @Override
+    @CanIgnoreReturnValue
+    public Builder setAllowsNulls(boolean allowsNulls) {
+      this.allowsNulls = allowsNulls;
+      return this;
+    }
+
+    @Override
     public SwitchStatement build() {
-      return new SwitchStatement(sourcePosition, expression, switchCases);
+      return new SwitchStatement(sourcePosition, expression, switchCases, allowsNulls);
     }
 
     private Builder() {}

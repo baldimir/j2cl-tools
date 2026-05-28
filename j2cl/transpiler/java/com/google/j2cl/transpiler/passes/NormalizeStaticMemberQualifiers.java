@@ -33,7 +33,7 @@ public class NormalizeStaticMemberQualifiers extends NormalizationPass {
         new AbstractRewriter() {
           @Override
           public Expression rewriteMemberReference(MemberReference memberReference) {
-            // If this is a static member referece, split the evaluation of the qualifier to
+            // If this is a static member reference, split the evaluation of the qualifier to
             // preserve
             // potential side effects.
             if (isStaticMemberReferenceWithInstanceQualifier(memberReference)) {
@@ -42,7 +42,7 @@ public class NormalizeStaticMemberQualifiers extends NormalizationPass {
                 multiExpressionBuilder.addExpressions(memberReference.getQualifier());
               }
               multiExpressionBuilder.addExpressions(
-                  MemberReference.Builder.from(memberReference).setQualifier(null).build());
+                  memberReference.toBuilder().setQualifier(null).build());
               return multiExpressionBuilder.build();
             }
             return memberReference;
@@ -52,9 +52,8 @@ public class NormalizeStaticMemberQualifiers extends NormalizationPass {
 
   /*** Returns true if a member reference to a static member is qualified by an expression.  */
   private static boolean isStaticMemberReferenceWithInstanceQualifier(Expression expression) {
-    if (!(expression instanceof MemberReference memberReference)) {
-      return false;
-    }
-    return memberReference.getTarget().isStatic() && memberReference.getQualifier() != null;
+    return expression instanceof MemberReference memberReference
+        && memberReference.getTarget().isStatic()
+        && memberReference.getQualifier() != null;
   }
 }

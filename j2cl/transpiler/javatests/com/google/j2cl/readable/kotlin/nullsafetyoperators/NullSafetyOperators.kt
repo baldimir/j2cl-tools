@@ -31,3 +31,9 @@ fun main() {
   val j = 1 ?: 2
   val k = 1?.hashCode()
 }
+
+fun foo(a: String?): String {
+  // Right side if guaranteed to fail.
+  val b: String = if (a != null) a!! else a!!
+  return b
+}

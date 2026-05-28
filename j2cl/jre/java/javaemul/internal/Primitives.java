@@ -15,13 +15,10 @@
  */
 package javaemul.internal;
 
-import jsinterop.annotations.JsType;
-
 /**
  * Static Primitive helper. This class should only use int, long and double and avoid casts and
  * coercions.
  */
-@JsType(namespace = "vmbootstrap")
 public class Primitives {
 
   /** Narrows a number to a 8-bit signed number. */
@@ -203,9 +200,7 @@ public class Primitives {
     return toInt(value);
   }
 
-  /**
-   * Rounds to an integral value.
-   */
+  /** Rounds to an integral value. */
   private static int roundToInt(int value) {
     return toInt(Math.max(Math.min(value, Integer.MAX_VALUE), Integer.MIN_VALUE));
   }

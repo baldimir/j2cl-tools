@@ -1,0 +1,18 @@
+/** @externs */
+
+/**
+ * @template T
+ * @constructor
+ */
+var jstype_SomeJsType = function() {};
+
+/** @type {number} */
+jstype_SomeJsType.prototype.publicField;
+
+/**
+ */
+jstype_SomeJsType.prototype.publicMethod = function() {};
+
+/**
+ */
+jstype_SomeJsType.prototype.useFieldsAndMethods = function() {};

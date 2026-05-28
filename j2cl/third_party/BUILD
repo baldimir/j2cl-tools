@@ -1,6 +1,7 @@
 # Description:
 #   Thirdparty dependencies indirection for bazel.
 
+load("@rules_java//java:defs.bzl", "java_import", "java_library")
 load("//build_defs:rules.bzl", "j2cl_import", "j2cl_library")
 
 package(
@@ -56,14 +57,6 @@ alias(
 alias(
     name = "args4j",
     actual = "@maven//:args4j_args4j",
-)
-
-java_library(
-    name = "jdt-core",
-    exports = [
-        "@maven//:org_eclipse_jdt_org_eclipse_jdt_core",
-        "@maven//:org_eclipse_platform_org_eclipse_equinox_common",
-    ],
 )
 
 alias(

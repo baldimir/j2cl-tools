@@ -1,0 +1,7 @@
+goog.module('dataclass.JvmRecordDataClassOverridingEquals');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const JvmRecordDataClassOverridingEquals = goog.require('dataclass.JvmRecordDataClassOverridingEquals$impl');
+exports = JvmRecordDataClassOverridingEquals;

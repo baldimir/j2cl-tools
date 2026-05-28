@@ -19,7 +19,6 @@ import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.AbstractVisitor;
 import com.google.j2cl.transpiler.ast.AstUtils;
-import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
 import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Field;
@@ -109,10 +108,10 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
                       adaptorTypeDescriptor));
 
               // new A$$LambdaAdaptor( (...) -> {...} )
-              return NewInstance.newBuilder()
+              return NewInstance.builder()
                   .setTarget(adaptorTypeDescriptor.getSingleConstructor())
                   .setArguments(
-                      FunctionExpression.Builder.from(functionExpression)
+                      functionExpression.toBuilder()
                           // Change the function expression type from the functional interface to
                           // the corresponding synthetic @JsFunction interface.
                           .setTypeDescriptor(
@@ -125,13 +124,13 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
             DeclaredTypeDescriptor functionalInterfaceTypeDescriptor =
                 typeDescriptor.getFunctionalInterface();
             // A.$adapt((...) -> {...})
-            return MethodCall.Builder.from(
+            return MethodCall.builderFrom(
                     getAdaptMethodDescriptor(
                         functionalInterfaceTypeDescriptor,
                         LambdaAdaptorTypeDescriptors.createJsFunctionTypeDescriptor(
                             functionalInterfaceTypeDescriptor)))
                 .setArguments(
-                    FunctionExpression.Builder.from(functionExpression)
+                    functionExpression.toBuilder()
                         .setTypeDescriptor(
                             createJsFunctionTypeDescriptor(functionalInterfaceTypeDescriptor))
                         .build())
@@ -187,7 +186,7 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
         getAdaptMethodDescriptor(functionalInterfaceTypeTypeDescriptor, jsFunctionTypeDescriptor);
 
     Variable jsFunctionParameter =
-        Variable.newBuilder()
+        Variable.builder()
             .setName("fn")
             .setTypeDescriptor(jsFunctionTypeDescriptor)
             .setParameter(true)
@@ -196,16 +195,16 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
     MethodDescriptor adaptorConstructor = adaptorTypeDescriptor.getSingleConstructor();
     // FunctionalInterface$$LambdaAdaptor $adapt(
     //     FunctionalInterface$$LambdaAdaptor$$JsFunctionInterface fn) {
-    //   return new FunctionalInterface$$LambdaAadaptor(fn);
+    //   return new FunctionalInterface$$LambdaAdaptor(fn);
     // }
     functionalInterfaceType.addMember(
-        Method.newBuilder()
+        Method.builder()
             .setMethodDescriptor(adaptMethodDescriptor)
             .setParameters(jsFunctionParameter)
             .addStatements(
-                ReturnStatement.newBuilder()
+                ReturnStatement.builder()
                     .setExpression(
-                        NewInstance.newBuilder()
+                        NewInstance.builder()
                             .setTarget(adaptorConstructor)
                             .setArguments(jsFunctionParameter.createReference())
                             .build())
@@ -217,9 +216,9 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
 
   private MethodDescriptor getAdaptMethodDescriptor(
       DeclaredTypeDescriptor enclosingTypeDescriptor, TypeDescriptor jsFunctionTypeDescriptor) {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setName("$adapt")
-        .setOriginalJsInfo(enclosingTypeDescriptor.isNative() ? JsInfo.RAW_OVERLAY : JsInfo.RAW)
+        .setOriginalJsInfo(enclosingTypeDescriptor.isNative() ? JsInfo.OVERLAY : JsInfo.RAW)
         .setStatic(true)
         .setParameterTypeDescriptors(jsFunctionTypeDescriptor)
         .setTypeParameterTypeDescriptors(jsFunctionTypeDescriptor.getAllTypeVariables())
@@ -290,13 +289,13 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
 
     // Create the field to contain the lambda function as a JsFunction.
     FieldDescriptor jsFunctionFieldDescriptor =
-        FieldDescriptor.newBuilder()
+        FieldDescriptor.builder()
             .setEnclosingTypeDescriptor(adaptorTypeDescriptor)
             .setName("fn")
             .setTypeDescriptor(jsFunctionTypeDescriptor)
             .build();
     adaptorType.addMember(
-        Field.Builder.from(jsFunctionFieldDescriptor).setSourcePosition(sourcePosition).build());
+        Field.builderFrom(jsFunctionFieldDescriptor).setSourcePosition(sourcePosition).build());
 
     // Create the forwarding method that forwards calls to the functional interface method to
     // the JsFunction lambda.
@@ -304,7 +303,7 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
         LambdaAdaptorTypeDescriptors.getAdaptorForwardingMethod(adaptorTypeDescriptor);
 
     MethodDescriptor jsFunctionMethodDescriptor =
-        MethodDescriptor.Builder.from(jsFunctionTypeDescriptor.getSingleAbstractMethodDescriptor())
+        jsFunctionTypeDescriptor.getSingleAbstractMethodDescriptor().toBuilder()
             .setEnclosingTypeDescriptor(jsFunctionTypeDescriptor)
             .build();
 
@@ -324,7 +323,7 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
     adaptorType.addMember(
         AstUtils.createForwardingMethod(
             sourcePosition,
-            FieldAccess.Builder.from(jsFunctionFieldDescriptor)
+            FieldAccess.builderFrom(jsFunctionFieldDescriptor)
                 .setDefaultInstanceQualifier()
                 .build(),
             adaptorForwarderMethodDescriptor,
@@ -345,22 +344,23 @@ public class ImplementLambdaExpressionsViaJsFunctionAdaptor extends Normalizatio
 
     // The constructor receives the JsFunction lambda as a parameter.
     Variable jsFunctionParameter =
-        Variable.newBuilder()
+        Variable.builder()
             .setFinal(true)
             .setParameter(true)
             .setName("fn")
             .setTypeDescriptor(jsFunctionTypeDescriptor)
             .build();
 
-    return Method.newBuilder()
+    return Method.builder()
         .setMethodDescriptor(adaptorConstructor)
         .setParameters(jsFunctionParameter)
         .addStatements(
             // Store the JsFunction lambda in the corresponding field.
             // this.fn = fn;
-            BinaryExpression.Builder.asAssignmentTo(jsFunctionFieldDescriptor)
-                .setRightOperand(jsFunctionParameter)
+            FieldAccess.builderFrom(jsFunctionFieldDescriptor)
+                .setDefaultInstanceQualifier()
                 .build()
+                .infixAssign(jsFunctionParameter.createReference())
                 .makeStatement(sourcePosition))
         .setSourcePosition(sourcePosition)
         .build();

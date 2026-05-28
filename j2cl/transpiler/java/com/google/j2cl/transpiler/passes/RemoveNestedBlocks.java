@@ -35,12 +35,12 @@ public class RemoveNestedBlocks extends NormalizationPass {
         new AbstractRewriter() {
           @Override
           public Node rewriteBlock(Block block) {
-            return Block.Builder.from(block).setStatements(flatten(block.getStatements())).build();
+            return block.toBuilder().setStatements(flatten(block.getStatements())).build();
           }
 
           @Override
           public Node rewriteSwitchCase(SwitchCase switchCase) {
-            return SwitchCase.Builder.from(switchCase)
+            return switchCase.toBuilder()
                 .setStatements(flatten(switchCase.getStatements()))
                 .build();
           }

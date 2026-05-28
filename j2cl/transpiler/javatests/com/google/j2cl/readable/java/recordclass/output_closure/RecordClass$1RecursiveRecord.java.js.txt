@@ -1,0 +1,7 @@
+goog.module('recordclass.RecordClass.$1RecursiveRecord');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const $1RecursiveRecord = goog.require('recordclass.RecordClass.$1RecursiveRecord$impl');
+exports = $1RecursiveRecord;

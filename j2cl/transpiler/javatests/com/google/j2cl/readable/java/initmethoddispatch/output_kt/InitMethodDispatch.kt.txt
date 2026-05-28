@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package initmethoddispatch
 
@@ -25,9 +26,9 @@ import kotlin.jvm.JvmField
 open class InitMethodDispatch<T> {
  @JvmField
  internal var value_pp_initmethoddispatch: Int = 0
-
+ 
  internal constructor(): this(1)
-
+ 
  internal constructor(i: Int) {
   this.value_pp_initmethoddispatch = i
  }

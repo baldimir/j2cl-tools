@@ -1,0 +1,7 @@
+goog.module('recordclass.RecordClass.$1GenericRecord');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const $1GenericRecord = goog.require('recordclass.RecordClass.$1GenericRecord$impl');
+exports = $1GenericRecord;

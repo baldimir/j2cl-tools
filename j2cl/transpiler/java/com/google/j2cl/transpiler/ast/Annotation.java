@@ -19,6 +19,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /** Represents an annotation instance and its element values. */
 @AutoValue
@@ -26,9 +27,18 @@ public abstract class Annotation {
 
   public abstract DeclaredTypeDescriptor getTypeDescriptor();
 
-  public abstract ImmutableMap<String, Literal> getValues();
+  public abstract ImmutableMap<String, AnnotationValue> getValues();
 
-  public static Builder newBuilder() {
+  @Nullable
+  public String getStringValue(String elementName) {
+    AnnotationValue value = getValues().get(elementName);
+    if (value instanceof StringLiteral stringLiteral) {
+      return stringLiteral.getValue();
+    }
+    return null;
+  }
+
+  public static Builder builder() {
     return new AutoValue_Annotation.Builder();
   }
 
@@ -40,18 +50,18 @@ public abstract class Annotation {
     public abstract Builder setTypeDescriptor(DeclaredTypeDescriptor typeDescriptor);
 
     @CanIgnoreReturnValue
-    public Builder addValue(String elementName, Literal value) {
+    public Builder addValue(String elementName, AnnotationValue value) {
       valuesBuilder().put(elementName, value);
       return this;
     }
 
     @CanIgnoreReturnValue
-    public Builder addAllValues(Iterable<? extends Map.Entry<String, Literal>> values) {
+    public Builder addAllValues(Iterable<? extends Map.Entry<String, AnnotationValue>> values) {
       valuesBuilder().putAll(values);
       return this;
     }
 
-    abstract ImmutableMap.Builder<String, Literal> valuesBuilder();
+    abstract ImmutableMap.Builder<String, AnnotationValue> valuesBuilder();
 
     public Annotation build() {
       // TODO(b/399477543): Some annotations are not recognized as annotations by javac. Fix this,

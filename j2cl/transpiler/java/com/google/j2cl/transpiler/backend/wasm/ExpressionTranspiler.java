@@ -129,42 +129,47 @@ final class ExpressionTranspiler {
       }
 
       private void renderAccessExpression(Expression expression, boolean setter) {
-        if (expression instanceof VariableReference variableReference) {
-          sourceBuilder.append(
-              format(
-                  "local.%s %s",
-                  setter ? "set" : "get",
-                  environment.getDeclarationName(variableReference.getTarget())));
+        switch (expression) {
+          case VariableReference variableReference ->
+              sourceBuilder.append(
+                  format(
+                      "local.%s %s",
+                      setter ? "set" : "get",
+                      environment.getDeclarationName(variableReference.getTarget())));
 
-        } else if (expression instanceof FieldAccess fieldAccess) {
-          FieldDescriptor fieldDescriptor = fieldAccess.getTarget();
-          Expression qualifier = fieldAccess.getQualifier();
-          if (fieldDescriptor.isStatic()) {
-            sourceBuilder.append(
-                format(
-                    "global.%s %s",
-                    setter ? "set" : "get", environment.getFieldName(fieldDescriptor)));
-          } else {
-            sourceBuilder.append(
-                format(
-                    "struct.%s %s %s ",
-                    setter ? "set" : getGetterInstruction(fieldDescriptor.getTypeDescriptor()),
-                    environment.getWasmTypeName(fieldDescriptor.getEnclosingTypeDescriptor()),
-                    environment.getFieldName(fieldDescriptor)));
-            render(qualifier);
+          case FieldAccess fieldAccess -> {
+            FieldDescriptor fieldDescriptor = fieldAccess.getTarget();
+            Expression qualifier = fieldAccess.getQualifier();
+            if (fieldDescriptor.isStatic()) {
+              sourceBuilder.append(
+                  format(
+                      "global.%s %s",
+                      setter ? "set" : "get", environment.getFieldName(fieldDescriptor)));
+            } else {
+              sourceBuilder.append(
+                  format(
+                      "struct.%s %s %s ",
+                      setter ? "set" : getGetterInstruction(fieldDescriptor.getTypeDescriptor()),
+                      environment.getWasmTypeName(fieldDescriptor.getEnclosingTypeDescriptor()),
+                      environment.getFieldName(fieldDescriptor)));
+              render(qualifier);
+            }
           }
 
-        } else if (expression instanceof ArrayAccess arrayAccess) {
-          Expression arrayExpression = arrayAccess.getArrayExpression();
+          case ArrayAccess arrayAccess -> {
+            Expression arrayExpression = arrayAccess.getArrayExpression();
 
-          sourceBuilder.append(
-              format(
-                  "array.%s %s ",
-                  setter ? "set" : getGetterInstruction(arrayAccess.getTypeDescriptor()),
-                  environment.getWasmTypeName(arrayExpression.getTypeDescriptor())));
-          render(arrayExpression);
-          sourceBuilder.append(" ");
-          render(arrayAccess.getIndexExpression());
+            sourceBuilder.append(
+                format(
+                    "array.%s %s ",
+                    setter ? "set" : getGetterInstruction(arrayAccess.getTypeDescriptor()),
+                    environment.getWasmTypeName(arrayExpression.getTypeDescriptor())));
+            render(arrayExpression);
+            sourceBuilder.append(" ");
+            render(arrayAccess.getIndexExpression());
+          }
+
+          default -> throw new IllegalStateException("Unsupported expression type: " + expression);
         }
       }
 
@@ -218,7 +223,7 @@ final class ExpressionTranspiler {
         // TODO(b/183661534): JsDocCastExpressions should not reach the output stage.
         // Render JsDoc casts as regular casts for now.
         return enterCastExpression(
-            CastExpression.newBuilder()
+            CastExpression.builder()
                 .setExpression(expression.getExpression())
                 .setCastTypeDescriptor(expression.getTypeDescriptor())
                 .build());
@@ -423,7 +428,7 @@ final class ExpressionTranspiler {
         if (environment.isCustomDescriptorsEnabled()) {
           sourceBuilder.append(
               format(
-                  "(struct.new %s (global.get %s)",
+                  "(struct.new_desc %s (global.get %s)",
                   environment.getWasmTypeName(newInstance.getTypeDescriptor()),
                   environment.getWasmItableGlobalName(newInstance.getTypeDescriptor())));
         } else {

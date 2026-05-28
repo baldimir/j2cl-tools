@@ -27,11 +27,14 @@ fun main(vararg unused: String) {
   testJsConstructors()
   testMethods()
   testExtFun()
+  testLocalFun()
   testComplexDefault()
+  testCapturedDefault()
   testDefaultInitializerCallsWithDefaults()
   testVarargs()
   testInterface()
   testUninitialized()
+  testReferencesToPreviousParams()
 }
 
 open class DefaultParams(val a: Int = 1, val b: Int) {
@@ -98,6 +101,34 @@ private fun testExtFun() {
   assertEquals(7, DefaultParams(b = 2).extFunWithDefault(4))
 }
 
+fun testLocalFun() {
+  fun localFun(a: Int, b: Int = 1) = a + b
+  assertEquals(11, localFun(10))
+  assertEquals(30, localFun(10, 20))
+
+  fun localFunWithNonPrimitive(o: Any? = "defaulted", unused: Any? = null) = o
+
+  assertEquals("defaulted", localFunWithNonPrimitive())
+  assertEquals("test", localFunWithNonPrimitive("test"))
+
+  object {
+      fun testInNestedObj() {
+        fun nestedLocalFun(a: Int, b: Int = 1) = a + b
+
+        assertEquals(11, nestedLocalFun(10))
+        assertEquals(30, nestedLocalFun(10, 20))
+
+        // Also try calling the local funs from the outer scope
+        assertEquals(11, localFun(10))
+        assertEquals(30, localFun(10, 20))
+
+        assertEquals("defaulted", localFunWithNonPrimitive())
+        assertEquals("test", localFunWithNonPrimitive("test"))
+      }
+    }
+    .testInNestedObj()
+}
+
 fun complexDefault(
   a: Int,
   b: Int =
@@ -113,6 +144,14 @@ private fun testComplexDefault() {
   assertEquals(1, complexDefault(a = -1))
   assertEquals(2, complexDefault(a = 1))
   assertEquals(123, complexDefault(a = 1, b = 123))
+}
+
+fun captureDefault(str: String = "defaulted", f: () -> String = { "f: $str" }): String = f()
+
+private fun testCapturedDefault() {
+  assertEquals("f: defaulted", captureDefault())
+  assertEquals("f: foo", captureDefault("foo"))
+  assertEquals("bar", captureDefault("foo") { "bar" })
 }
 
 fun identityOrCreate(o: Any? = Any(), unused: Any = Any()) = o
@@ -211,8 +250,10 @@ interface IFoo {
   fun interfaceMethod(a: Int = 2): Int
 }
 
-class FooImpl : IFoo {
+class FooImpl : IFoo, InterfaceWithDefaultParams {
   override fun interfaceMethod(a: Int) = a
+
+  override fun functionRequiringInterfaceClinit(a: Int) = a
 }
 
 class FooImplWithDefaultOverride : IFoo {
@@ -227,6 +268,7 @@ private fun testInterface() {
   assertEquals(2, FooImpl().interfaceMethod())
   assertEquals(3, FooImpl().interfaceMethod(3))
   assertEquals(3, FooImplWithDefaultOverride().defaultMethod(2))
+  assertEquals(2, FooImpl().functionRequiringInterfaceClinit())
 }
 
 fun strOrDefault(str: String? = "defaulted", unused: Any? = null) = str
@@ -241,4 +283,18 @@ private fun testUninitialized() {
   assertNull(strOrDefault(getUndefined()))
   assertNull(boxedIntOrDefault(getUndefined()))
   assertNull(boxedDoubleOrDefault(getUndefined()))
+}
+
+fun referencesPreviousParams(a: Int = 1, b: Int = a + 1, c: Int = b + 1) = a + b + c
+
+private fun testReferencesToPreviousParams() {
+  assertEquals(6, referencesPreviousParams())
+  assertEquals(3, referencesPreviousParams(0))
+  assertEquals(2, referencesPreviousParams(b = 0))
+
+  fun localReferencesPreviousParams(a: Int = 1, b: Int = a + 1, c: Int = b + 1) = a + b + c
+
+  assertEquals(6, localReferencesPreviousParams())
+  assertEquals(3, localReferencesPreviousParams(0))
+  assertEquals(2, localReferencesPreviousParams(b = 0))
 }

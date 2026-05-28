@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package localclassinstaticcontext
 
@@ -28,7 +29,7 @@ open class LocalClassInStaticContext {
  companion object {
   @JvmField
   var f: Any? = object : Any() {}
-
+  
   @JvmStatic
   fun test() {
    open class A internal constructor()
@@ -39,18 +40,18 @@ open class LocalClassInStaticContext {
     }
    }
   }
-
+  
   init {
    open class B internal constructor()
    B()
    val b: Any = object : Any() {}
   }
  }
-
+ 
  open class C {
   @JvmField
   var f: Int = 1
-
+  
   open fun test() {
    open class D internal constructor() {
     open fun `fun`(): Int {

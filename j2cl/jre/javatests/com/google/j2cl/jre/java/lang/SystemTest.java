@@ -16,6 +16,7 @@
 package com.google.j2cl.jre.java.lang;
 
 import static com.google.j2cl.jre.testing.TestUtils.isWasm;
+import static org.junit.Assert.assertThrows;
 
 import com.google.j2cl.jre.testing.J2ktIncompatible;
 import java.util.Arrays;
@@ -26,8 +27,7 @@ import org.jspecify.annotations.Nullable;
 public class SystemTest extends TestCase {
 
   private static class Bar extends Foo {
-    public Bar() {
-    }
+    public Bar() {}
   }
 
   private enum EnumImpl implements Interfaz {
@@ -37,12 +37,10 @@ public class SystemTest extends TestCase {
   }
 
   private static class Foo {
-    public Foo() {
-    }
+    public Foo() {}
   }
 
-  private interface Interfaz {
-  }
+  private interface Interfaz {}
 
   private static class InterfazImpl implements Interfaz {
 
@@ -57,8 +55,7 @@ public class SystemTest extends TestCase {
 
     @Override
     public boolean equals(Object obj) {
-      return (obj instanceof InterfazImpl) && ((InterfazImpl) obj).data.equals(
-          data);
+      return (obj instanceof InterfazImpl) && ((InterfazImpl) obj).data.equals(data);
     }
 
     @Override
@@ -73,9 +70,9 @@ public class SystemTest extends TestCase {
   }
 
   public void testArraycopyEnumToInterface() {
-    EnumImpl[] src = new EnumImpl[]{ EnumImpl.FOO, null, EnumImpl.BAZ };
+    EnumImpl[] src = new EnumImpl[] {EnumImpl.FOO, null, EnumImpl.BAZ};
     Interfaz[] dest = new Interfaz[5];
-    Arrays.fill(dest, null);  // undefined != null, weird.
+    Arrays.fill(dest, null); // undefined != null, weird.
 
     System.arraycopy(src, 0, dest, 1, 3);
     // TODO(b/315476228): Ideally, the explicit generic type wouldn't be needed for j2kt
@@ -85,9 +82,9 @@ public class SystemTest extends TestCase {
   }
 
   public void testArraycopyEnumToObject() {
-    EnumImpl[] src = new EnumImpl[]{ EnumImpl.FOO, null, EnumImpl.BAZ };
+    EnumImpl[] src = new EnumImpl[] {EnumImpl.FOO, null, EnumImpl.BAZ};
     Object[] dest = new Object[5];
-    Arrays.fill(dest, null);  // undefined != null, weird.
+    Arrays.fill(dest, null); // undefined != null, weird.
 
     System.arraycopy(src, 0, dest, 1, 3);
     assertEquals(
@@ -100,63 +97,22 @@ public class SystemTest extends TestCase {
     int[] dest = new int[] {1, 1, 1, 1};
     double[] destDouble = new double[4];
     String[] strings = new String[4];
-    try {
-      System.arraycopy(src, 5, dest, 0, 7);
-      fail("Should have thrown IndexOutOfBoundsException: src past end");
-    } catch (IndexOutOfBoundsException e) {
-    }
-    try {
-      System.arraycopy(src, 0, dest, 5, 7);
-      fail("Should have thrown IndexOutOfBoundsException: dest past end");
-    } catch (IndexOutOfBoundsException e) {
-    }
-    try {
-      System.arraycopy(src, -1, dest, 0, 4);
-      fail("Should have thrown IndexOutOfBoundsException: src ofs negative");
-    } catch (IndexOutOfBoundsException e) {
-    }
-    try {
-      System.arraycopy(src, 0, dest, -1, 4);
-      fail("Should have thrown IndexOutOfBoundsException: dest ofs negative");
-    } catch (IndexOutOfBoundsException e) {
-    }
-    try {
-      System.arraycopy(src, 0, dest, 0, -1);
-      fail("Should have thrown IndexOutOfBoundsException: negative length");
-    } catch (IndexOutOfBoundsException e) {
-    }
-    try {
-      System.arraycopy("test", 0, dest, 0, 4);
-      fail("Should have thrown ArrayStoreException: src not array");
-    } catch (ArrayStoreException e) {
-    }
-    try {
-      System.arraycopy(src, 0, "test", 0, 4);
-      fail("Should have thrown ArrayStoreException: dest not array");
-    } catch (ArrayStoreException e) {
-    }
-    try {
-      System.arraycopy(src, 0, destDouble, 0, 4);
-      fail("Should have thrown ArrayStoreException: different primitive types");
-    } catch (ArrayStoreException e) {
-    }
-    try {
-      System.arraycopy(strings, 0, dest, 0, 4);
-      fail("Should have thrown ArrayStoreException: reference/primitive mismatch");
-    } catch (ArrayStoreException e) {
-    }
-    try {
-      System.arraycopy(src, 0, strings, 0, 4);
-      fail("Should have thrown ArrayStoreException: primitive/reference mismatch");
-    } catch (ArrayStoreException e) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> System.arraycopy(src, 5, dest, 0, 7));
+    assertThrows(IndexOutOfBoundsException.class, () -> System.arraycopy(src, 0, dest, 5, 7));
+    assertThrows(IndexOutOfBoundsException.class, () -> System.arraycopy(src, -1, dest, 0, 4));
+    assertThrows(IndexOutOfBoundsException.class, () -> System.arraycopy(src, 0, dest, -1, 4));
+    assertThrows(IndexOutOfBoundsException.class, () -> System.arraycopy(src, 0, dest, 0, -1));
+    assertThrows(ArrayStoreException.class, () -> System.arraycopy("test", 0, dest, 0, 4));
+    assertThrows(ArrayStoreException.class, () -> System.arraycopy(src, 0, "test", 0, 4));
+    assertThrows(ArrayStoreException.class, () -> System.arraycopy(src, 0, destDouble, 0, 4));
+    assertThrows(ArrayStoreException.class, () -> System.arraycopy(strings, 0, dest, 0, 4));
+    assertThrows(ArrayStoreException.class, () -> System.arraycopy(src, 0, strings, 0, 4));
   }
 
   public void testArraycopyInterfaceToObject() {
-    Interfaz[] src = new Interfaz[]{
-        new InterfazImpl("foo"), null, new InterfazImpl("bar") };
+    Interfaz[] src = new Interfaz[] {new InterfazImpl("foo"), null, new InterfazImpl("bar")};
     Object[] dest = new Object[5];
-    Arrays.fill(dest, null);  // undefined != null, weird.
+    Arrays.fill(dest, null); // undefined != null, weird.
 
     System.arraycopy(src, 0, dest, 1, 3);
 
@@ -167,7 +123,7 @@ public class SystemTest extends TestCase {
   }
 
   @J2ktIncompatible // We don't have this information at runtime.
-  public static void testArraycopyMultidim() {
+  public void testArraycopyMultidim() {
     Object[][] objArray = new Object[1][1];
     String[][] strArray = new String[1][1];
     strArray[0][0] = "Test";
@@ -181,39 +137,23 @@ public class SystemTest extends TestCase {
       return;
     }
 
-    try {
-      System.arraycopy(strArray, 0, intArray, 0, 1);
-      fail("Should have thrown ArrayStoreException: incompatible multidimensional arrays");
-    } catch (ArrayStoreException e) {
-    }
-    try {
-      System.arraycopy(new String[] {"T2"}, 0, objArray, 0, 1);
-      fail("Should have thrown ArrayStoreException: store string array in multi-dim Object array");
-    } catch (ArrayStoreException e) {
-    }
+    assertThrows(ArrayStoreException.class, () -> System.arraycopy(strArray, 0, intArray, 0, 1));
+    assertThrows(
+        ArrayStoreException.class, () -> System.arraycopy(new String[] {"T2"}, 0, objArray, 0, 1));
   }
 
   public void testArraycopyNulls() {
     int[] src = new int[4];
     int[] dest = new int[] {1, 1, 1, 1};
-    try {
-      System.arraycopy(null, 0, dest, 0, 4);
-      fail("Should have thrown NullPointerException: src null");
-    } catch (NullPointerException e) {
-      // verify dest unchanged
-      for (int i = 0; i < dest.length; ++i) {
-        assertEquals(1, dest[i]);
-      }
+    assertThrows(NullPointerException.class, () -> System.arraycopy(null, 0, dest, 0, 4));
+    for (int i = 0; i < dest.length; ++i) {
+      assertEquals(1, dest[i]);
     }
-    try {
-      System.arraycopy(src, 0, null, 0, 4);
-      fail("Should have thrown NullPointerException: dest null");
-    } catch (NullPointerException e) {
-    }
+    assertThrows(NullPointerException.class, () -> System.arraycopy(src, 0, null, 0, 4));
   }
 
   @J2ktIncompatible // We don't have this information at runtime.
-  public static void testArraycopyObjects() {
+  public void testArraycopyObjects() {
     Foo[] fooArray = new Foo[4];
     Bar[] barArray = new Bar[4];
     Object[] src = new Object[] {new Bar(), new Bar(), new Foo(), new Bar()};
@@ -227,16 +167,11 @@ public class SystemTest extends TestCase {
       return;
     }
 
-    try {
-      System.arraycopy(src, 0, barArray, 0, 4);
-      fail("Should have thrown ArrayStoreException: foo into bar");
-    } catch (ArrayStoreException e) {
-      // verify we changed only up to the element causing the exception
-      assertEquals(src[0], barArray[0]);
-      assertEquals(src[1], barArray[1]);
-      assertNull(barArray[2]);
-      assertNull(barArray[3]);
-    }
+    assertThrows(ArrayStoreException.class, () -> System.arraycopy(src, 0, barArray, 0, 4));
+    assertEquals(src[0], barArray[0]);
+    assertEquals(src[1], barArray[1]);
+    assertNull(barArray[2]);
+    assertNull(barArray[3]);
   }
 
   public void testArraycopyOverlap() {
@@ -252,20 +187,21 @@ public class SystemTest extends TestCase {
     for (int i = 0; i < intArray.length - 1; ++i) {
       assertEquals("fwd int copy index " + i, i, intArray[i]);
     }
-    assertEquals("fwd int copy index " + (intArray.length - 2),
-        intArray.length - 2, intArray[intArray.length - 1]);
+    assertEquals(
+        "fwd int copy index " + (intArray.length - 2),
+        intArray.length - 2,
+        intArray[intArray.length - 1]);
     System.arraycopy(strArray, 0, strArray, 1, strArray.length - 1);
     assertEquals(0, Integer.valueOf(strArray[0]).intValue());
     for (int i = 1; i < strArray.length; ++i) {
-      assertEquals("rev str copy index " + i, i - 1, Integer.valueOf(
-          strArray[i]).intValue());
+      assertEquals("rev str copy index " + i, i - 1, Integer.valueOf(strArray[i]).intValue());
     }
     System.arraycopy(strArray, 1, strArray, 0, strArray.length - 1);
     for (int i = 0; i < strArray.length - 1; ++i) {
-      assertEquals("fwd str copy index " + i, i, Integer.valueOf(
-          strArray[i]).intValue());
+      assertEquals("fwd str copy index " + i, i, Integer.valueOf(strArray[i]).intValue());
     }
-    assertEquals("fwd str copy index " + (strArray.length - 2),
+    assertEquals(
+        "fwd str copy index " + (strArray.length - 2),
         strArray.length - 2,
         Integer.valueOf(strArray[strArray.length - 1]).intValue());
     /*
@@ -331,4 +267,3 @@ public class SystemTest extends TestCase {
     assertTrue(System.currentTimeMillis() > /* 1/1/2021 */ 1609488000000L);
   }
 }
-

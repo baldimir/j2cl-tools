@@ -117,6 +117,10 @@ private fun interface SomeProvider<T> {
   fun provide(): T
 }
 
+fun lambdaWithNothingReturn(throwError: () -> Nothing): Int {
+  throwError()
+}
+
 // See b/377685454.
 fun nestedLambdaWithNothingReturn() {
   val x =
@@ -126,4 +130,8 @@ fun nestedLambdaWithNothingReturn() {
         }
         .provide()
     }
+}
+
+fun <T : Nothing> typeParameterExtendingNothing(x: T): T {
+  alwaysThrows()
 }

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -33,7 +34,7 @@ open class LambdaReturnFromBlock {
    return@Function null
   } as Function<Void>
  }
-
+ 
  open fun testSynchronized() {
   val fn: Function<Void> = Function {
    synchronized<Unit>(LambdaReturnFromBlock.lock) {
@@ -42,10 +43,10 @@ open class LambdaReturnFromBlock {
    throw AssertionError("Unreachable")
   } as Function<Void>
  }
-
+ 
  @JvmField
  internal var x_pp_j2kt: Int = 1
-
+ 
  open fun testSwitchInLambda() {
   val fn: Function<Void> = Function {
    when (this.x_pp_j2kt) {
@@ -59,12 +60,12 @@ open class LambdaReturnFromBlock {
    throw AssertionError("Unreachable")
   } as Function<Void>
  }
-
+ 
  companion object {
   private val lock: J2ktMonitor = J2ktMonitor()
  }
-
- fun interface Function<O> {
+ 
+ internal fun interface Function<O> {
   fun apply(): O
  }
 }

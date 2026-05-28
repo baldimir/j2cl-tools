@@ -2,46 +2,7 @@
 
 visibility(["//build_defs/internal_do_not_use/..."])
 
-def _is_package_in_allowlist(package, allowlist):
-    """Returns whether the given package is in the allowlist.
-
-    Args:
-      package: a str, the package to check is in the allowlist.
-      allowlist: an allowlist created via allowlists.of_packages()
-
-    Returns:
-      True if package is in the allowlist, else False.
-    """
-    _check_is_allowlist_of_type(allowlist, "package")
-
-    package = _normalize_package(package)
-
-    for entry in allowlist.entries:
-        if package == entry or _is_subpackage_of(package, entry):
-            return True
-    return False
-
-def _is_target_in_allowlist(target, allowlist):
-    """Returns whether the given target is in the allowlist.
-
-    Args:
-      target: a str or Label, the target to check is in the allowlist.
-      allowlist: an allowlist created via make_target_allowlist
-
-    Returns:
-      True if target is in the allowlist, else False.
-    """
-    _check_is_allowlist_of_type(allowlist, "target")
-
-    return _as_label(target) in allowlist.entries
-
-def _check_is_allowlist_of_type(allowlist, allowlist_type):
-    if type(allowlist) == "struct" and allowlist._j2cl_allowlist_type == allowlist_type:
-        return
-    create_function = "of_targets" if allowlist_type == "target" else "of_packages"
-    fail("Improper allowlist, was it created with allowlists.%s()?" % create_function)
-
-def _make_package_allowlist(packages, include = []):
+def _make_package_allowlist(packages, include = [], exclude = []):
     """Returns an allowlist struct configured for package matching.
 
     Args:
@@ -53,18 +14,14 @@ def _make_package_allowlist(packages, include = []):
     Returns:
       An allowlist struct configured for package matching.
     """
-    entries = [_check_package_definition(p) for p in packages]
-
-    for allowlist in include:
-        _check_is_allowlist_of_type(allowlist, "package")
-        entries += allowlist.entries
-
-    return struct(
-        _j2cl_allowlist_type = "package",
-        entries = entries,
+    return _make_allowlist(
+        check_fn = _is_or_subpackage_of,
+        entries = [_check_package_definition(p) for p in packages],
+        include = include,
+        exclude = exclude,
     )
 
-def _make_target_allowlist(targets, include = []):
+def _make_target_allowlist(targets, include = [], exclude = []):
     """Returns an allowlist struct configured for target matching.
 
     Args:
@@ -75,40 +32,64 @@ def _make_target_allowlist(targets, include = []):
       An allowlist struct configured for target matching.
     """
 
-    entries = [_as_label(t) for t in targets]
-
-    for allowlist in include:
-        _check_is_allowlist_of_type(allowlist, "target")
-        entries += allowlist.entries
-
-    return struct(
-        _j2cl_allowlist_type = "target",
-        entries = entries,
+    return _make_allowlist(
+        check_fn = lambda label, entry: label == entry,
+        entries = [_as_label(t) for t in targets],
+        include = include,
+        exclude = exclude,
     )
+
+def _make_allowlist(check_fn, entries, include, exclude):
+    """Returns an allowlist struct configured for the given check and entries."""
+
+    def _accepts(target):
+        label = _as_label(target)
+        for e in entries:
+            if check_fn(label, e):
+                return True
+        for i in include:
+            if i.accepts(label):
+                return True
+        return False
+
+    def _rejects(target):
+        label = _as_label(target)
+        for e in exclude:
+            if e.accepts(label):
+                return True
+        return False
+
+    # Partial workaround to https://github.com/bazelbuild/bazel/issues/9163 via two lambdas.
+    if exclude:
+        fn = lambda label: not _rejects(label) and _accepts(label)
+    else:
+        fn = _accepts
+    return struct(accepts = fn)
 
 def _as_label(target):
     if type(target) == "Label":
         return target
     return Label(target)
 
-def _normalize_package(package):
-    if not package.startswith("//"):
-        package = "//" + package
-    return package
-
 def _check_package_definition(package):
     if not package.startswith("//"):
-        fail("Package should start with //, but '%s' does not." % package)
+        fail("Packages should start with //, but '%s' does not." % package)
 
     if package.endswith("/"):
-        fail("Package end with /, but '%s' does." % package)
+        fail("Packages should not end with /, but '%s' does." % package)
 
     if ":" in package:
-        fail("Package should not include a label, but '%s' does." % package)
+        fail("Packages should not include a label, but '%s' does." % package)
 
     return package
 
-def _is_subpackage_of(package, target_package):
+def _is_or_subpackage_of(label, target_package):
+    package = "//" + label.package
+
+    # If the target package is an exact match, return true.
+    if package == target_package:
+        return True
+
     # If the target package doesn't allow subpackage matching, return false.
     if not target_package.endswith("/..."):
         return False
@@ -123,6 +104,4 @@ def _is_subpackage_of(package, target_package):
 allowlists = struct(
     of_packages = _make_package_allowlist,
     of_targets = _make_target_allowlist,
-    is_package_allowed = _is_package_in_allowlist,
-    is_target_allowed = _is_target_in_allowlist,
 )

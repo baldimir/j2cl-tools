@@ -18,9 +18,10 @@ package com.google.j2cl.transpiler.ast;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Predicates.not;
+import static com.google.common.base.Predicates.notNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -31,6 +32,7 @@ import com.google.j2cl.transpiler.ast.MethodDescriptor.ParameterDescriptor;
 import com.google.j2cl.transpiler.ast.TypeDeclaration.Kind;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -46,12 +48,12 @@ public final class AstUtils {
 
   /** Returns the loadModules method descriptor for a particular type */
   public static MethodDescriptor getLoadModulesDescriptor(DeclaredTypeDescriptor typeDescriptor) {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setStatic(true)
         .setEnclosingTypeDescriptor(typeDescriptor)
         .setName(MethodDescriptor.LOAD_MODULES_METHOD_NAME)
         .setOrigin(MethodOrigin.SYNTHETIC_CLASS_INITIALIZER)
-        .setOriginalJsInfo(typeDescriptor.isNative() ? JsInfo.RAW_OVERLAY : JsInfo.RAW)
+        .setOriginalJsInfo(typeDescriptor.isNative() ? JsInfo.OVERLAY : JsInfo.RAW)
         .build();
   }
 
@@ -60,9 +62,12 @@ public final class AstUtils {
       DeclaredTypeDescriptor enclosingTypeDescriptor) {
     JsInfo jsInfo =
         isImplicitJsConstructor(enclosingTypeDescriptor.getTypeDeclaration())
-            ? JsInfo.newBuilder().setJsMemberType(JsMemberType.CONSTRUCTOR).build()
+            ? JsInfo.builder().setJsMemberType(JsMemberType.CONSTRUCTOR).build()
             : JsInfo.NONE;
-    return MethodDescriptor.newBuilder()
+    // Do not mark the implicit constructor as synthetic. Implicit members are never marked as
+    // synthetic because the usage sites have to agree, and they don't have the information of
+    // whether they are synthesized or not.
+    return MethodDescriptor.builder()
         .setVisibility(
             getImplicitConstructorVisibility(enclosingTypeDescriptor.getTypeDeclaration()))
         .setEnclosingTypeDescriptor(enclosingTypeDescriptor)
@@ -113,7 +118,15 @@ public final class AstUtils {
     if (statement == null) {
       return null;
     }
-    checkArgument(statement.getExpression() instanceof MethodCall);
+    return getConstructorInvocation(statement);
+  }
+
+  /**
+   * Returns the constructor invocation (super call or this call) in a specified constructor
+   * invocation statement.
+   */
+  public static MethodCall getConstructorInvocation(ExpressionStatement statement) {
+    checkArgument(isConstructorInvocationStatement(statement));
     MethodCall methodCall = (MethodCall) statement.getExpression();
     checkArgument(methodCall.getTarget().isConstructor());
     return methodCall;
@@ -183,7 +196,7 @@ public final class AstUtils {
             /* isStaticDispatch= */ false,
             parameters.stream().map(Variable::createReference).collect(toImmutableList()),
             fromMethodDescriptor.getReturnTypeDescriptor());
-    return Method.newBuilder()
+    return Method.builder()
         .setMethodDescriptor(fromMethodDescriptor)
         .setParameters(parameters)
         .addStatements(statement)
@@ -196,7 +209,7 @@ public final class AstUtils {
     List<Variable> parameters = new ArrayList<>();
     for (int i = 0; i < parameterTypes.size(); i++) {
       parameters.add(
-          Variable.newBuilder()
+          Variable.builder()
               .setName("arg" + i)
               .setTypeDescriptor(parameterTypes.get(i))
               .setParameter(true)
@@ -215,7 +228,7 @@ public final class AstUtils {
     // TODO(rluble): Casts are probably needed on arguments if the types differ between the
     // targetMethodDescriptor and its declarationMethodDescriptor.
     Expression forwardingMethodCall =
-        MethodCall.Builder.from(toMethodDescriptor)
+        MethodCall.builderFrom(toMethodDescriptor)
             .setQualifier(qualifier)
             .setArguments(maybePackageVarargs(toMethodDescriptor, arguments))
             .setStaticDispatch(isStaticDispatch)
@@ -430,8 +443,8 @@ public final class AstUtils {
     String functionalMethodMangledName = jsFunctionMethodDescriptor.getMangledName();
 
     FieldAccess applyFunctionFieldAccess =
-        FieldAccess.Builder.from(
-                FieldDescriptor.newBuilder()
+        FieldAccess.builderFrom(
+                FieldDescriptor.builder()
                     .setEnclosingTypeDescriptor(lambdaType)
                     .setName(functionalMethodMangledName)
                     .setTypeDescriptor(TypeDescriptors.get().nativeFunction)
@@ -443,8 +456,8 @@ public final class AstUtils {
             .build();
 
     FieldAccess copyFunctionFieldAccess =
-        FieldAccess.Builder.from(
-                FieldDescriptor.newBuilder()
+        FieldAccess.builderFrom(
+                FieldDescriptor.builder()
                     .setEnclosingTypeDescriptor(lambdaType)
                     .setName("$copy")
                     .setTypeDescriptor(TypeDescriptors.get().nativeFunction)
@@ -463,20 +476,17 @@ public final class AstUtils {
     boolean isPublic = fieldDescriptor.getOrigin() != FieldOrigin.SYNTHETIC_BACKING_FIELD;
 
     Expression declarationExpression =
-        FieldAccess.newBuilder()
+        FieldAccess.builder()
             .setTarget(fieldDescriptor)
             .setDefaultInstanceQualifier()
-            .setSourcePosition(field.getNameSourcePosition())
+            .setSourcePosition(field.getSourcePosition())
             .build();
 
     if (field.getInitializer() != null) {
-      declarationExpression =
-          BinaryExpression.Builder.asAssignmentTo(declarationExpression)
-              .setRightOperand(field.getInitializer())
-              .build();
+      declarationExpression = declarationExpression.infixAssign(field.getInitializer());
     }
 
-    return FieldDeclarationStatement.newBuilder()
+    return FieldDeclarationStatement.builder()
         .setExpression(declarationExpression)
         .setFieldDescriptor(fieldDescriptor)
         .setPublic(isPublic)
@@ -588,7 +598,7 @@ public final class AstUtils {
         constructorDescriptor.getParameterTypeDescriptors()) {
       String parameterName = "$_" + index;
       constructorParameters.add(
-          Variable.newBuilder()
+          Variable.builder()
               .setName(parameterName)
               .setTypeDescriptor(parameterTypeDescriptor)
               .setParameter(true)
@@ -599,11 +609,11 @@ public final class AstUtils {
     ImmutableList<Expression> superConstructorArguments =
         constructorParameters.stream().map(Variable::createReference).collect(toImmutableList());
 
-    return Method.newBuilder()
+    return Method.builder()
         .setMethodDescriptor(constructorDescriptor)
         .setParameters(constructorParameters)
         .addStatements(
-            MethodCall.Builder.from(superConstructorDescriptor)
+            MethodCall.builderFrom(superConstructorDescriptor)
                 .setQualifier(superCallQualifier)
                 .setArguments(superConstructorArguments)
                 .build()
@@ -627,12 +637,21 @@ public final class AstUtils {
       SourcePosition sourcePosition,
       Expression expression,
       TypeDescriptor methodReturnTypeDescriptor) {
-
     if (TypeDescriptors.isPrimitiveVoid(methodReturnTypeDescriptor)) {
       return expression.makeStatement(sourcePosition);
     }
 
-    return ReturnStatement.newBuilder()
+    // We may hit a Kotlin rough edge where Kotlin needs Unit to be returned, but expression has a
+    // void type. In which case we can just use a multi-expression: (expression, Unit.INSTANCE)
+    if (TypeDescriptors.isPrimitiveVoid(expression.getTypeDescriptor())
+        && TypeDescriptors.isKotlinUnit(methodReturnTypeDescriptor)) {
+      expression =
+          MultiExpression.builder()
+              .addExpressions(expression, RuntimeMethods.getKotlinUnitInstance())
+              .build();
+    }
+
+    return ReturnStatement.builder()
         .setExpression(expression)
         .setSourcePosition(sourcePosition)
         .build();
@@ -664,10 +683,7 @@ public final class AstUtils {
 
   /** Returns a qualified name, ignoring empty and {@code null} {@code parts}. */
   public static String buildQualifiedName(Stream<String> parts) {
-    return parts
-        .filter(Predicates.notNull())
-        .filter(Predicates.not(String::isEmpty))
-        .collect(Collectors.joining("."));
+    return parts.filter(notNull()).filter(not(String::isEmpty)).collect(Collectors.joining("."));
   }
 
   /**
@@ -675,18 +691,27 @@ public final class AstUtils {
    * {@code method}.
    */
   public static Method createStaticOverlayMethod(
-      Method method, DeclaredTypeDescriptor targetTypeDescriptor) {
-    MethodDescriptor methodDescriptor = method.getDescriptor();
+      Method method, TypeDeclaration overlayTypeDeclaration) {
+    return method.toBuilder()
+        .setMethodDescriptor(
+            createStaticOverlayMethodDescriptor(method.getDescriptor(), overlayTypeDeclaration))
+        .build();
+  }
+
+  /**
+   * Creates a static MethodDescriptor in {@code targetTypeDescriptor} with the same signature as
+   * {@code methodDescriptor}.
+   */
+  public static MethodDescriptor createStaticOverlayMethodDescriptor(
+      MethodDescriptor methodDescriptor, TypeDeclaration overlayTypeDeclaration) {
     checkArgument(methodDescriptor.isStatic());
 
-    return Method.Builder.from(method)
-        .setMethodDescriptor(
-            MethodDescriptor.Builder.from(methodDescriptor)
+    return methodDescriptor.transform(
+        builder ->
+            builder
                 .setOriginalJsInfo(methodDescriptor.isJsAsync() ? JsInfo.NONE_ASYNC : JsInfo.NONE)
-                .setEnclosingTypeDescriptor(targetTypeDescriptor)
-                .removeParameterOptionality()
-                .build())
-        .build();
+                .setEnclosingTypeDescriptor(overlayTypeDeclaration.toDescriptor())
+                .removeParameterOptionality());
   }
 
   /**
@@ -722,7 +747,7 @@ public final class AstUtils {
             method.getDescriptor(), enclosingTypeDescriptor, Optional.ofNullable(postfix));
 
     final Variable thisArg =
-        Variable.newBuilder()
+        Variable.builder()
             .setName("$thisArg")
             .setTypeDescriptor(method.getDescriptor().getEnclosingTypeDescriptor().toNonNullable())
             .setParameter(true)
@@ -745,7 +770,7 @@ public final class AstUtils {
         });
 
     // Add the static method to current type.
-    return Method.newBuilder()
+    return Method.builder()
         .setMethodDescriptor(devirtualizedMethodDescriptor)
         .setParameters(
             ImmutableList.<Variable>builder().add(thisArg).addAll(method.getParameters()).build())
@@ -801,7 +826,7 @@ public final class AstUtils {
             .add(qualifier)
             .addAll(methodCall.getArguments())
             .build();
-    return MethodCall.Builder.from(devirtualizedMethodDescriptor).setArguments(arguments).build();
+    return MethodCall.builderFrom(devirtualizedMethodDescriptor).setArguments(arguments).build();
   }
 
   /**
@@ -825,10 +850,12 @@ public final class AstUtils {
                 .setEnclosingTypeDescriptor(targetTypeDescriptor)
                 // The instance ($thisArg) parameter is assumed non nullable for
                 // the typing perspective.
-                .addParameterTypeDescriptors(0, enclosingTypeDescriptor.toNonNullable())
+                .addParameterTypeDescriptors(
+                    0, enclosingTypeDescriptor.getDeclarationDescriptor().toNonNullable())
                 .addTypeParameterTypeDescriptors(
                     0, enclosingTypeDescriptor.getTypeDeclaration().getTypeParameterDescriptors())
                 .setStatic(true)
+                .setSynthetic(true)
                 .setConstructor(false)
                 .setAbstract(false)
                 .setDefaultMethod(false)
@@ -880,7 +907,7 @@ public final class AstUtils {
     int varargsParameterIndex = methodDescriptor.getParameterDescriptors().size() - 1;
     TypeDescriptor varargsTypeDescriptor =
         methodDescriptor.getParameterTypeDescriptors().get(varargsParameterIndex);
-    return ArrayLiteral.newBuilder()
+    return ArrayLiteral.builder()
         .setTypeDescriptor((ArrayTypeDescriptor) varargsTypeDescriptor)
         .setValueExpressions(arguments.subList(varargsParameterIndex, arguments.size()))
         .build();
@@ -917,7 +944,7 @@ public final class AstUtils {
         .setReturnTypeDescriptor(PrimitiveTypes.VOID)
         .setOriginalJsInfo(
             fieldDescriptor.isJsProperty()
-                ? JsInfo.Builder.from(fieldDescriptor.getJsInfo())
+                ? fieldDescriptor.getJsInfo().toBuilder()
                     .setJsMemberType(JsMemberType.SETTER)
                     .setJsName(fieldDescriptor.getSimpleJsName())
                     .build()
@@ -932,7 +959,7 @@ public final class AstUtils {
         .setReturnTypeDescriptor(fieldDescriptor.getTypeDescriptor())
         .setOriginalJsInfo(
             fieldDescriptor.isJsProperty()
-                ? JsInfo.Builder.from(fieldDescriptor.getJsInfo())
+                ? fieldDescriptor.getJsInfo().toBuilder()
                     .setJsMemberType(JsMemberType.GETTER)
                     .setJsName(fieldDescriptor.getSimpleJsName())
                     .build()
@@ -954,7 +981,7 @@ public final class AstUtils {
 
   private static MethodDescriptor.Builder createMethodDescriptorBuilderFrom(
       FieldDescriptor fieldDescriptor) {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setEnclosingTypeDescriptor(fieldDescriptor.getEnclosingTypeDescriptor())
         .setName(fieldDescriptor.getName())
         .setVisibility(fieldDescriptor.getVisibility())
@@ -976,7 +1003,7 @@ public final class AstUtils {
   public static FieldDescriptor getEnumOrdinalConstantFieldDescriptor(
       FieldDescriptor fieldDescriptor) {
     checkArgument(fieldDescriptor.isStatic());
-    return FieldDescriptor.Builder.from(fieldDescriptor)
+    return fieldDescriptor.toBuilder()
         .setName("$ordinal_" + fieldDescriptor.getName())
         .setEnumConstant(false)
         .setCompileTimeConstant(true)
@@ -1014,7 +1041,7 @@ public final class AstUtils {
       FieldDescriptor fieldDescriptor) {
     TypeDescriptor enumValueType =
         getJsEnumValueFieldType(fieldDescriptor.getEnclosingTypeDescriptor().getTypeDeclaration());
-    return FieldDescriptor.Builder.from(fieldDescriptor)
+    return fieldDescriptor.toBuilder()
         .setTypeDescriptor(enumValueType)
         .setFinal(true)
         .setCompileTimeConstant(true)
@@ -1062,7 +1089,7 @@ public final class AstUtils {
   /** Return the static field that will hold the value for a system property. */
   public static MethodDescriptor getSystemGetPropertyGetter(
       String systemPropertyString, boolean requiredProperty) {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setEnclosingTypeDescriptor(getSystemPropertyHolder().toDescriptor())
         // TODO(rluble): Sanitize the system property string.
         .setName(systemPropertyString)
@@ -1079,7 +1106,7 @@ public final class AstUtils {
 
   /** Return the type descriptor for the holder of system properties. */
   public static TypeDeclaration getSystemPropertyHolder() {
-    return TypeDeclaration.newBuilder()
+    return TypeDeclaration.builder()
         .setQualifiedSourceName("javaemul.internal.SystemPropertyPool")
         .setKind(Kind.INTERFACE)
         .build();
@@ -1139,10 +1166,10 @@ public final class AstUtils {
     // The outer JsDoc cast guarantees that the expression is treated as of being the type of value
     // and conversions such as boxing are correctly preserved (e.g. if the expression was assigned
     // to an Integer variable).
-    return JsDocCastExpression.newBuilder()
+    return JsDocCastExpression.builder()
         .setCastTypeDescriptor(valueTypeDescriptor)
         .setExpression(
-            CastExpression.newBuilder()
+            CastExpression.builder()
                 .setCastTypeDescriptor(jsEnumExpression.getTypeDescriptor())
                 .setExpression(jsEnumExpression)
                 .build())
@@ -1192,7 +1219,7 @@ public final class AstUtils {
             ? contextTypeDescriptor.getEnclosingTypeDescriptor()
             : contextTypeDescriptor;
 
-    return MemberReference.Builder.from(memberReference)
+    return memberReference.toBuilder()
         .setQualifier(createImplicitQualifierExpression(contextTypeDescriptor, targetQualifierType))
         .build();
   }
@@ -1304,6 +1331,146 @@ public final class AstUtils {
   /** Returns true if the specified type is annotated with Wasm. */
   public static boolean isAnnotatedWithWasm(HasAnnotations node) {
     return node.getAnnotation("javaemul.internal.annotations.Wasm") != null;
+  }
+
+  /**
+   * Returns true if the given type should have a JS prototype populated in Wasm.
+   *
+   * <p>A new prototype is populated if the type adds exported members.
+   */
+  public static boolean hasWasmJsPrototype(TypeDeclaration typeDeclaration) {
+    return !typeDeclaration.isInterface() && declaresWasmJsExports(typeDeclaration);
+  }
+
+  /** Returns true if the given type introduces any exported members in Wasm. */
+  public static boolean declaresWasmJsExports(TypeDeclaration typeDeclaration) {
+    return !typeDeclaration.isNative()
+        && (typeDeclaration.getDeclaredMethodDescriptors().stream()
+                .anyMatch(AstUtils::needsWasmJsExport)
+            || typeDeclaration.getDeclaredFieldDescriptors().stream()
+                .anyMatch(AstUtils::needsWasmJsExport)
+            || typeDeclaration.toDescriptor().getAccidentalOverrides().stream()
+                .anyMatch(AstUtils::needsWasmJsExport));
+  }
+
+  /** Returns true if this type defined in Wasm is exported to/visible in JS. */
+  public static boolean isWasmJsExportedType(TypeDeclaration typeDeclaration) {
+    return findSuperTypeWithWasmJsExportsIncludingSelf(typeDeclaration) != null;
+  }
+
+  /** Returns true if this type defined in Wasm is exported to/visible in JS. */
+  public static boolean isWasmJsExportedType(TypeDescriptor typeDescriptor) {
+    return typeDescriptor instanceof DeclaredTypeDescriptor dtd
+        && findSuperTypeWithWasmJsExportsIncludingSelf(dtd) != null;
+  }
+
+  /**
+   * Returns the first supertype of the given type that has a JS prototype in Wasm, including the
+   * type itself.
+   *
+   * <p>If no supertype has a JS prototype, returns null.
+   */
+  @Nullable
+  public static DeclaredTypeDescriptor findSuperTypeWithWasmJsExportsIncludingSelf(
+      TypeDeclaration typeDeclaration) {
+    return findSuperTypeWithWasmJsExportsIncludingSelf(typeDeclaration.toDescriptor());
+  }
+
+  /**
+   * Returns the first supertype of the given type that has a JS prototype in Wasm, including the
+   * type itself.
+   *
+   * <p>If no supertype has a JS prototype, returns null.
+   */
+  @Nullable
+  public static DeclaredTypeDescriptor findSuperTypeWithWasmJsExportsIncludingSelf(
+      @Nullable DeclaredTypeDescriptor typeDescriptor) {
+    while (typeDescriptor != null) {
+      if (declaresWasmJsExports(typeDescriptor.getTypeDeclaration())) {
+        return typeDescriptor;
+      }
+      typeDescriptor = typeDescriptor.getSuperTypeDescriptor();
+    }
+    return null;
+  }
+
+  /**
+   * Returns true if the specified member in Wasm needs an export to be generated (ie, a bridge and
+   * a JS extern).
+   */
+  public static boolean needsWasmJsExport(MemberDescriptor memberDescriptor) {
+    if (!memberDescriptor.canBeReferencedExternally()) {
+      return false;
+    }
+
+    // TODO(b/481799839): Consider "@Wasm native ..." methods.
+    if (memberDescriptor.isNative()) {
+      return false;
+    }
+
+    // Exclude native js constructors.
+    // TODO(b/264676817): Consider refactoring to have MethodDescriptor.isNative return true
+    // for native constructors, or exposing isNativeConstructor from MethodDescriptor.
+    if (memberDescriptor.isConstructor()
+        && memberDescriptor.getEnclosingTypeDescriptor().isNative()) {
+      return false;
+    }
+
+    if (memberDescriptor instanceof MethodDescriptor methodDescriptor) {
+      // Exclude generated export bridges themselves.
+      if (methodDescriptor.getOrigin().isWasmJsExport()) {
+        return false;
+      }
+
+      // JS members that override an already exported JS member don't need a bridge in the
+      // overriding type. The bridge in the overridden method does a polymorphic dispatch.
+      // Exclude interface methods from this check because there's no export bridges
+      // generated for interface methods themselves.
+      if (methodDescriptor.getJsOverriddenMethodDescriptors().stream()
+          .anyMatch(m -> !m.getEnclosingTypeDescriptor().isInterface() && m.isJsOverrideable())) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  public static boolean isKotlinUnitInstanceAccess(Expression expression) {
+    if (expression instanceof FieldAccess fieldAccess) {
+      var field = fieldAccess.getTarget();
+      return field.getName().equals("INSTANCE")
+          && field.getEnclosingTypeDescriptor().isSameBaseType(TypeDescriptors.get().kotlinUnit);
+    }
+    return false;
+  }
+
+  public static void preserveFields(Type type, Collection<FieldDescriptor> excludedFields) {
+    var preserveFn =
+        TypeDescriptors.get().javaemulInternalValueType.getMethodDescriptorByName("preserve");
+
+    ImmutableList<Expression> fieldReferences =
+        type.getFields().stream()
+            .map(Field::getDescriptor)
+            .filter(f -> f.isInstanceMember() && !excludedFields.contains(f))
+            .map(
+                f ->
+                    FieldAccess.builderFrom(f)
+                        .setQualifier(new ThisReference(type.getTypeDescriptor()))
+                        .build())
+            .collect(toImmutableList());
+
+    // This special call will make JsCompiler think that all these fields are used. There is a
+    // special pass in JsCompiler that later removes this call itself so they won't exist in the
+    // final output.
+    var preserveCall =
+        MethodCall.builderFrom(preserveFn)
+            .setArguments(maybePackageVarargs(preserveFn, fieldReferences))
+            .build()
+            .makeStatement(SourcePosition.NONE);
+
+    // Add the call to preserve fields in the primary constructor since all other constructors
+    // will delegate to it.
+    type.getPrimaryConstructor().getBody().getStatements().add(preserveCall);
   }
 
   private AstUtils() {}

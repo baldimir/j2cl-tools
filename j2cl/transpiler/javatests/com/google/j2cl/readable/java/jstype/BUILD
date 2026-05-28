@@ -10,6 +10,8 @@ package(
 
 readable_example(
     srcs = glob(["*.java"]),
+    generate_wasm_externs = True,
+    generate_wasm_imports = True,
     deps = [
         "//jre/java:javaemul_internal_annotations-j2cl",
         "//third_party:jsinterop-annotations-j2cl",

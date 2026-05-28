@@ -1,0 +1,4 @@
+[StringJsEnum] => [StringJsEnum]
+[A] => [A]
+[B] => [B]
+[C] => [C]

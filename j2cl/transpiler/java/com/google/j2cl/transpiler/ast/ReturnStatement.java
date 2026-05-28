@@ -38,8 +38,13 @@ public class ReturnStatement extends Statement {
   }
 
   @Override
+  public boolean terminatesAbruptly() {
+    return true;
+  }
+
+  @Override
   public ReturnStatement clone() {
-    return ReturnStatement.newBuilder()
+    return ReturnStatement.builder()
         .setExpression(AstUtils.clone(expression))
         .setSourcePosition(getSourcePosition())
         .build();
@@ -50,7 +55,13 @@ public class ReturnStatement extends Statement {
     return Visitor_ReturnStatement.visit(processor, this);
   }
 
-  public static Builder newBuilder() {
+  public Builder toBuilder() {
+    return builder()
+        .setExpression(this.getExpression())
+        .setSourcePosition(this.getSourcePosition());
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
@@ -58,12 +69,6 @@ public class ReturnStatement extends Statement {
   public static class Builder {
     private Expression expression;
     private SourcePosition sourcePosition;
-
-    public static Builder from(ReturnStatement returnStatement) {
-      return newBuilder()
-          .setExpression(returnStatement.getExpression())
-          .setSourcePosition(returnStatement.getSourcePosition());
-    }
 
     @CanIgnoreReturnValue
     public Builder setExpression(Expression expression) {

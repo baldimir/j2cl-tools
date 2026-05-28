@@ -1,0 +1,77 @@
+goog.module('recordclass.RecordClass.StaticFieldRecord$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class StaticFieldRecord extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {number} @nodts*/
+  this.f_nonstaticField__recordclass_RecordClass_StaticFieldRecord_ = 0;
+ }
+ //Factory method corresponding to constructor 'StaticFieldRecord(boolean)'.
+ /** @nodts @return {!StaticFieldRecord} */
+ static $create__boolean(/** boolean */ initializeWithStaticField) {
+  StaticFieldRecord.$clinit();
+  let $instance = new StaticFieldRecord();
+  $instance.$ctor__recordclass_RecordClass_StaticFieldRecord__boolean__void(initializeWithStaticField);
+  return $instance;
+ }
+ //Initialization from constructor 'StaticFieldRecord(boolean)'.
+ /** @nodts */
+ $ctor__recordclass_RecordClass_StaticFieldRecord__boolean__void(/** boolean */ initializeWithStaticField) {
+  this.$ctor__recordclass_RecordClass_StaticFieldRecord__int__void(initializeWithStaticField ? StaticFieldRecord.$static_staticField__recordclass_RecordClass_StaticFieldRecord : 0);
+ }
+ //Factory method corresponding to constructor 'StaticFieldRecord(int)'.
+ /** @nodts @return {!StaticFieldRecord} */
+ static $create__int(/** number */ nonstaticField) {
+  StaticFieldRecord.$clinit();
+  let $instance = new StaticFieldRecord();
+  $instance.$ctor__recordclass_RecordClass_StaticFieldRecord__int__void(nonstaticField);
+  return $instance;
+ }
+ //Initialization from constructor 'StaticFieldRecord(int)'.
+ /** @nodts */
+ $ctor__recordclass_RecordClass_StaticFieldRecord__int__void(/** number */ nonstaticField) {
+  this.$ctor__java_lang_Record__void();
+  this.f_nonstaticField__recordclass_RecordClass_StaticFieldRecord_ = nonstaticField;
+  $J2CL_PRESERVE$(this.f_nonstaticField__recordclass_RecordClass_StaticFieldRecord_);
+ }
+ /** @nodts @return {number} */
+ m_nonstaticField__int() {
+  return this.f_nonstaticField__recordclass_RecordClass_StaticFieldRecord_;
+ }
+ /** @nodts @return {number} */
+ static get f_staticField__recordclass_RecordClass_StaticFieldRecord() {
+  return (StaticFieldRecord.$clinit(), StaticFieldRecord.$static_staticField__recordclass_RecordClass_StaticFieldRecord);
+ }
+ /** @nodts */
+ static set f_staticField__recordclass_RecordClass_StaticFieldRecord(/** number */ value) {
+  (StaticFieldRecord.$clinit(), StaticFieldRecord.$static_staticField__recordclass_RecordClass_StaticFieldRecord = value);
+ }
+ /** @nodts */
+ static $clinit() {
+  StaticFieldRecord.$clinit = () =>{};
+  StaticFieldRecord.$loadModules();
+  Record.$clinit();
+  StaticFieldRecord.$static_staticField__recordclass_RecordClass_StaticFieldRecord = 1;
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof StaticFieldRecord;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+/**@private {number} @nodts*/
+StaticFieldRecord.$static_staticField__recordclass_RecordClass_StaticFieldRecord = 0;
+$Util.$setClassMetadata(StaticFieldRecord, 'recordclass.RecordClass$StaticFieldRecord');
+
+exports = StaticFieldRecord;
+
+//# sourceMappingURL=RecordClass$StaticFieldRecord.js.map

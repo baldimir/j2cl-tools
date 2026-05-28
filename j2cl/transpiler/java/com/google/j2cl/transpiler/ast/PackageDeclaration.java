@@ -16,12 +16,14 @@
 package com.google.j2cl.transpiler.ast;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableList;
 import com.google.j2cl.common.ThreadLocalInterner;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /** A package declaration. */
 @AutoValue
-public abstract class PackageDeclaration {
+public abstract class PackageDeclaration implements HasAnnotations {
 
   public abstract String getName();
 
@@ -32,8 +34,11 @@ public abstract class PackageDeclaration {
     return getCustomizedJsNamespace() != null ? getCustomizedJsNamespace() : getName();
   }
 
-  public static Builder newBuilder() {
-    return new AutoValue_PackageDeclaration.Builder();
+  @Override
+  public abstract ImmutableList<Annotation> getAnnotations();
+
+  public static Builder builder() {
+    return new AutoValue_PackageDeclaration.Builder().setAnnotations(ImmutableList.of());
   }
 
   /** Builder for a PackageDeclaration. */
@@ -43,6 +48,8 @@ public abstract class PackageDeclaration {
     public abstract Builder setName(String name);
 
     public abstract Builder setCustomizedJsNamespace(@Nullable String jsNamespace);
+
+    public abstract Builder setAnnotations(List<Annotation> annotations);
 
     private static final ThreadLocalInterner<PackageDeclaration> interner =
         new ThreadLocalInterner<>();

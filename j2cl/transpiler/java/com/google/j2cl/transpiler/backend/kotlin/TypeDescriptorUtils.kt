@@ -79,7 +79,8 @@ internal fun TypeDescriptor.contains(
             upperBoundTypeDescriptor.contains(typeVariable, seenTypeVariablesPlusThis) ||
               (lowerBoundTypeDescriptor?.contains(typeVariable, seenTypeVariablesPlusThis) ?: false)
           }
-    else -> false
+    is PrimitiveTypeDescriptor,
+    is UnionTypeDescriptor -> false
   }
 
 internal val TypeDescriptor.isDenotableNonWildcard: Boolean
@@ -88,6 +89,15 @@ internal val TypeDescriptor.isDenotableNonWildcard: Boolean
       is TypeVariable -> !isWildcard && isDenotable
       else -> isDenotable
     }
+
+internal val TypeVariable.ktVariance: KtVariance?
+  get() =
+    when {
+      hasAnnotation("javaemul.internal.annotations.KtIn") -> KtVariance.IN
+      hasAnnotation("javaemul.internal.annotations.KtOut") -> KtVariance.OUT
+      else -> null
+    }
+
 internal val TypeVariable.hasNullableBounds: Boolean
   get() = upperBoundTypeDescriptor.canBeNull() && hasNullableRecursiveBounds
 
@@ -110,15 +120,15 @@ internal fun TypeDescriptor.makeNonNull(): TypeDescriptor =
           // for wildcards and captures should also be done by `toNonNullable()`. The only
           // kotlin output specific piece is the handling of `*`.
           if (hasNullableBounds) {
-            TypeVariable.Builder.from(this).setNullabilityAnnotation(NOT_NULLABLE).build()
+            toBuilder().setNullabilityAnnotation(NOT_NULLABLE).build()
           } else {
             withoutNullabilityAnnotations()
           }
         } else if (upperBoundTypeDescriptor.isImplicitUpperBound) {
-          // Ignore type variables which will be rendered as star (unbounded wildcard).
+          // Ignore type variables which will be transpiled as star (unbounded wildcard).
           this
         } else {
-          TypeVariable.Builder.from(this)
+          toBuilder()
             .setUpperBoundTypeDescriptorFactory { _ -> upperBoundTypeDescriptor.makeNonNull() }
             // Set some unique ID to avoid conflict with other type variables.
             // TODO(b/246332093): Remove when the bug is fixed, and uniqueId reflects bounds
@@ -131,11 +141,11 @@ internal fun TypeDescriptor.makeNonNull(): TypeDescriptor =
             .build()
         }
       is IntersectionTypeDescriptor ->
-        IntersectionTypeDescriptor.newBuilder()
+        IntersectionTypeDescriptor.builder()
           .setIntersectionTypeDescriptors(intersectionTypeDescriptors + anyTypeDescriptor)
           .build()
       is UnionTypeDescriptor ->
-        UnionTypeDescriptor.newBuilder()
+        UnionTypeDescriptor.builder()
           .setUnionTypeDescriptors(unionTypeDescriptors.map { it.makeNonNull() })
           .build()
       is PrimitiveTypeDescriptor -> toNonNullable()
@@ -172,7 +182,7 @@ internal val TypeDescriptor.variableHasAmpersandAny: Boolean
 
 internal val arrayComponentTypeParameter: TypeVariable
   get() =
-    TypeVariable.newBuilder()
+    TypeVariable.builder()
       .setName("T")
       .setUpperBoundTypeDescriptorFactory { _ -> nullableAnyTypeDescriptor }
       .setUniqueKey("kotlin.Array:T")
@@ -196,3 +206,9 @@ internal val TypeDescriptor.withoutRedundantNullabilityAnnotation: TypeDescripto
 
 internal val TypeDescriptor.isProtobuf: Boolean
   get() = this is DeclaredTypeDescriptor && typeDeclaration.isProtobuf
+
+internal val TypeDescriptor.isCollection: Boolean
+  get() = collectionTypeDescriptors.any { isAssignableTo(it) }
+
+private val collectionTypeDescriptors: Set<TypeDescriptor>
+  get() = setOf(typeDescriptors.javaUtilCollection, typeDescriptors.javaUtilMap)

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package nativejstypes
 
@@ -26,6 +27,6 @@ import kotlin.Suppress
 @JsType(namespace = JsPackage.GLOBAL, isNative = true)
 open class Headers {
  external open fun append(name: String?, value: String?)
-
+ 
  external open fun get(name: String?): String?
 }

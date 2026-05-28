@@ -24,15 +24,34 @@ import com.google.j2cl.jre.java.io.InputStreamTest;
 import com.google.j2cl.jre.java.io.OutputStreamTest;
 import com.google.j2cl.jre.java.io.OutputStreamWriterTest;
 import com.google.j2cl.jre.java.io.PrintStreamTest;
+import com.google.j2cl.jre.java.io.PrintWriterTest;
+import com.google.j2cl.jre.java.io.StringWriterTest;
 import com.google.j2cl.jre.java.io.WriterTest;
 import com.google.j2cl.jre.java.math.MathContextTest;
 import com.google.j2cl.jre.java.math.RoundingModeTest;
 import com.google.j2cl.jre.java.nio.charset.CharsetTest;
 import com.google.j2cl.jre.java.nio.charset.StandardCharsetsTest;
 import com.google.j2cl.jre.java.security.MessageDigestTest;
+import com.google.j2cl.jre.java.util.Base64Test;
 import com.google.j2cl.jre.java.util.ComparatorTest;
+import com.google.j2cl.jre.java.util.DoubleSummaryStatisticsTest;
+import com.google.j2cl.jre.java.util.IntSummaryStatisticsTest;
+import com.google.j2cl.jre.java.util.LongSummaryStatisticsTest;
 import com.google.j2cl.jre.java.util.ObjectsTest;
+import com.google.j2cl.jre.java.util.OptionalDoubleTest;
+import com.google.j2cl.jre.java.util.OptionalIntTest;
+import com.google.j2cl.jre.java.util.OptionalLongTest;
+import com.google.j2cl.jre.java.util.OptionalTest;
+import com.google.j2cl.jre.java.util.PrimitiveIteratorTest;
 import com.google.j2cl.jre.java.util.RandomTest;
+import com.google.j2cl.jre.java.util.SpliteratorsTest;
+import com.google.j2cl.jre.java.util.StringJoinerTest;
+import com.google.j2cl.jre.java.util.stream.CollectorsTest;
+import com.google.j2cl.jre.java.util.stream.DoubleStreamTest;
+import com.google.j2cl.jre.java.util.stream.IntStreamTest;
+import com.google.j2cl.jre.java.util.stream.LongStreamTest;
+import com.google.j2cl.jre.java.util.stream.StreamSupportTest;
+import com.google.j2cl.jre.java.util.stream.StreamTest;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
@@ -50,6 +69,8 @@ import org.junit.runners.Suite.SuiteClasses;
   OutputStreamTest.class,
   OutputStreamWriterTest.class,
   PrintStreamTest.class,
+  PrintWriterTest.class,
+  StringWriterTest.class,
   WriterTest.class,
 
   // -- java.math
@@ -66,8 +87,27 @@ import org.junit.runners.Suite.SuiteClasses;
   MessageDigestTest.class,
 
   // -- java.util
+  Base64Test.class,
   ComparatorTest.class,
   ObjectsTest.class,
   RandomTest.class,
+  OptionalTest.class,
+  OptionalDoubleTest.class,
+  OptionalIntTest.class,
+  OptionalLongTest.class,
+  PrimitiveIteratorTest.class,
+  SpliteratorsTest.class,
+  StringJoinerTest.class,
+  DoubleSummaryStatisticsTest.class,
+  IntSummaryStatisticsTest.class,
+  LongSummaryStatisticsTest.class,
+
+  // -- java.util.stream
+  DoubleStreamTest.class,
+  IntStreamTest.class,
+  LongStreamTest.class,
+  StreamTest.class,
+  StreamSupportTest.class,
+  CollectorsTest.class,
 })
 public class EmulSuite {}

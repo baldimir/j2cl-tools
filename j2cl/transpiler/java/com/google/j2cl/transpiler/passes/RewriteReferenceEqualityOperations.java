@@ -45,9 +45,9 @@ public class RewriteReferenceEqualityOperations extends NormalizationPass {
             }
 
             if (expression.getOperator() == BinaryOperator.EQUALS) {
-              return rewriteNullEquality(expression);
+              return rewriteEquality(expression);
             } else {
-              return rewriteNullEquality(
+              return rewriteEquality(
                       expression.getLeftOperand().infixEquals(expression.getRightOperand()))
                   .prefixNot();
             }
@@ -55,10 +55,14 @@ public class RewriteReferenceEqualityOperations extends NormalizationPass {
         });
   }
 
-  private static Expression rewriteNullEquality(BinaryExpression expression) {
+  private static Expression rewriteEquality(BinaryExpression expression) {
     checkArgument(expression.getOperator() == BinaryOperator.EQUALS);
 
-    if (expression.getRightOperand() instanceof NullLiteral) {
+    if (expression.getLeftOperand().getTypeDescriptor().isNative()
+        || expression.getRightOperand().getTypeDescriptor().isNative()) {
+      return RuntimeMethods.createWasmExternEqualityMethodCall(
+          expression.getLeftOperand(), expression.getRightOperand());
+    } else if (expression.getRightOperand() instanceof NullLiteral) {
       return RuntimeMethods.createPlatformIsNullCall(expression.getLeftOperand());
     } else if (expression.getLeftOperand() instanceof NullLiteral) {
       return RuntimeMethods.createPlatformIsNullCall(expression.getRightOperand());

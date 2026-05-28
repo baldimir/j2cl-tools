@@ -78,7 +78,7 @@ public class StringLiteralGettersCreator {
           .reduce(RuntimeMethods::createStringConcatMethodCall)
           .get();
     }
-    return RuntimeMethods.createStringFromJsStringMethodCall(new StringLiteral(value));
+    return RuntimeMethods.createStringFromSafeJsStringMethodCall(new StringLiteral(value));
   }
 
   private static boolean isValidUtf8String(String value) {
@@ -90,7 +90,7 @@ public class StringLiteralGettersCreator {
   /** Returns the descriptor for the getter of the string literal. */
   private static MethodDescriptor getLazyStringLiteralGettterMethodDescriptor(
       DeclaredTypeDescriptor enclosingTypeDescriptor, String name) {
-    return MethodDescriptor.newBuilder()
+    return MethodDescriptor.builder()
         .setName(name)
         .setReturnTypeDescriptor(TypeDescriptors.get().javaLangString)
         .setEnclosingTypeDescriptor(enclosingTypeDescriptor)

@@ -25,7 +25,7 @@ def j2cl_multi_test(name, test_class, deps, enable_jvm = True, enable_j2kt_nativ
         generate_build_test = False,
         runtime_deps = j2cl_deps,
         browsers = [
-            "//build_defs/internal_do_not_use/browser:chrome-wasm-linux",
+            "//build_defs/internal_do_not_use/browser:chrome-linux",
         ],
         **kwargs
     )
@@ -36,8 +36,10 @@ def j2cl_multi_test(name, test_class, deps, enable_jvm = True, enable_j2kt_nativ
         generate_build_test = False,
         runtime_deps = j2cl_deps,
         browsers = [
-            "//build_defs/internal_do_not_use/browser:chrome-wasm-linux",
+            "//build_defs/internal_do_not_use/browser:chrome-linux",
         ],
+        browser_overrides = {
+        },
         **kwargs
     )
 
@@ -53,7 +55,7 @@ def j2cl_multi_test(name, test_class, deps, enable_jvm = True, enable_j2kt_nativ
     if enable_wasm:
         tests += [name + "-j2wasm", name + "-j2wasm_optimized"]
         j2wasm_deps = [dep + "-j2wasm" for dep in deps]
-        j2wasm_defines = {"jre.checks.checkLevel": "NORMAL"}
+        j2wasm_defines = {"jre.checks.checkLevel": "NORMAL", "jre.classMetadata": "SIMPLE"}
         j2wasm_test(
             name = name + "-j2wasm",
             test_class = test_class,
@@ -68,9 +70,9 @@ def j2cl_multi_test(name, test_class, deps, enable_jvm = True, enable_j2kt_nativ
             optimize = 1,
             wasm_defs = j2wasm_defines,
             browsers = [
-                "//build_defs/internal_do_not_use/browser:chrome-wasm-linux",
+                "//build_defs/internal_do_not_use/browser:chrome-linux",
             ],
             **kwargs
         )
 
-    native.test_suite(name = name, tests = tests, tags = kwargs.pop("tags", []))
+    native.test_suite(name = name, tests = tests, tags = ["manual"] + kwargs.get("tags", []))

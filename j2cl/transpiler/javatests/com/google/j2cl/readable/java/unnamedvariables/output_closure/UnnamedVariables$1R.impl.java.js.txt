@@ -1,0 +1,58 @@
+goog.module('unnamedvariables.UnnamedVariables.$1R$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class $1R extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {*} @nodts*/
+  this.f_o__unnamedvariables_UnnamedVariables_1R_;
+  /**@type {?string} @nodts*/
+  this.f_s__unnamedvariables_UnnamedVariables_1R_;
+ }
+ /** @nodts @return {!$1R} */
+ static $create__java_lang_Object__java_lang_String(/** * */ o, /** ?string */ s) {
+  $1R.$clinit();
+  let $instance = new $1R();
+  $instance.$ctor__unnamedvariables_UnnamedVariables_1R__java_lang_Object__java_lang_String__void(o, s);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__unnamedvariables_UnnamedVariables_1R__java_lang_Object__java_lang_String__void(/** * */ o, /** ?string */ s) {
+  this.$ctor__java_lang_Record__void();
+  this.f_o__unnamedvariables_UnnamedVariables_1R_ = o;
+  this.f_s__unnamedvariables_UnnamedVariables_1R_ = s;
+  $J2CL_PRESERVE$(this.f_o__unnamedvariables_UnnamedVariables_1R_, this.f_s__unnamedvariables_UnnamedVariables_1R_);
+ }
+ /** @nodts @return {*} */
+ m_o__java_lang_Object() {
+  return this.f_o__unnamedvariables_UnnamedVariables_1R_;
+ }
+ /** @nodts @return {?string} */
+ m_s__java_lang_String() {
+  return this.f_s__unnamedvariables_UnnamedVariables_1R_;
+ }
+ /** @nodts */
+ static $clinit() {
+  $1R.$clinit = () =>{};
+  $1R.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof $1R;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata($1R, 'unnamedvariables.UnnamedVariables$1R');
+
+exports = $1R;
+
+//# sourceMappingURL=UnnamedVariables$1R.js.map

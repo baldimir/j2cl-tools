@@ -1,0 +1,66 @@
+goog.module('recordclass.RecordClass.RecordWithDeferringConstructor$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class RecordWithDeferringConstructor extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {number} @nodts*/
+  this.f_value__recordclass_RecordClass_RecordWithDeferringConstructor_ = 0;
+ }
+ //Factory method corresponding to constructor 'RecordWithDeferringConstructor()'.
+ /** @nodts @return {!RecordWithDeferringConstructor} */
+ static $create__() {
+  RecordWithDeferringConstructor.$clinit();
+  let $instance = new RecordWithDeferringConstructor();
+  $instance.$ctor__recordclass_RecordClass_RecordWithDeferringConstructor__void();
+  return $instance;
+ }
+ //Initialization from constructor 'RecordWithDeferringConstructor()'.
+ /** @nodts */
+ $ctor__recordclass_RecordClass_RecordWithDeferringConstructor__void() {
+  this.$ctor__recordclass_RecordClass_RecordWithDeferringConstructor__int__void(123);
+ }
+ //Factory method corresponding to constructor 'RecordWithDeferringConstructor(int)'.
+ /** @nodts @return {!RecordWithDeferringConstructor} */
+ static $create__int(/** number */ value) {
+  RecordWithDeferringConstructor.$clinit();
+  let $instance = new RecordWithDeferringConstructor();
+  $instance.$ctor__recordclass_RecordClass_RecordWithDeferringConstructor__int__void(value);
+  return $instance;
+ }
+ //Initialization from constructor 'RecordWithDeferringConstructor(int)'.
+ /** @nodts */
+ $ctor__recordclass_RecordClass_RecordWithDeferringConstructor__int__void(/** number */ value) {
+  this.$ctor__java_lang_Record__void();
+  this.f_value__recordclass_RecordClass_RecordWithDeferringConstructor_ = value;
+  $J2CL_PRESERVE$(this.f_value__recordclass_RecordClass_RecordWithDeferringConstructor_);
+ }
+ /** @nodts @return {number} */
+ m_value__int() {
+  return this.f_value__recordclass_RecordClass_RecordWithDeferringConstructor_;
+ }
+ /** @nodts */
+ static $clinit() {
+  RecordWithDeferringConstructor.$clinit = () =>{};
+  RecordWithDeferringConstructor.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof RecordWithDeferringConstructor;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(RecordWithDeferringConstructor, 'recordclass.RecordClass$RecordWithDeferringConstructor');
+
+exports = RecordWithDeferringConstructor;
+
+//# sourceMappingURL=RecordClass$RecordWithDeferringConstructor.js.map

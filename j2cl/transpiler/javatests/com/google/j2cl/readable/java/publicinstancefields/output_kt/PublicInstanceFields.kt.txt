@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package publicinstancefields
 
@@ -25,7 +26,10 @@ import kotlin.jvm.JvmField
 open class PublicInstanceFields {
  @JvmField
  var a: Int = 1
-
+ 
  @JvmField
  var b: Int = 0
+ 
+ @JvmField
+ var getA: Int = 0
 }

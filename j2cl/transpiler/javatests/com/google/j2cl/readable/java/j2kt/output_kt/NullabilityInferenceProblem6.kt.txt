@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -26,60 +27,60 @@ open class NullabilityInferenceProblem6 {
  companion object {
   @JvmStatic
   internal fun testLambda_pp_j2kt(from: Container<*>, to: Container<in Any?>) {
-   (from as Container<Any?>).forEach(
+   from.forEach(
     Consumer { it: Any? ->
      to.add(it)
     },
    )
   }
-
+  
   @JvmStatic
   internal fun testMethodReference_pp_j2kt(from: Container<*>, to: Container<in Any?>) {
-   (from as Container<Any?>).forEach(
+   from.forEach(
     Consumer { arg0: Any? ->
      to.add(arg0)
     },
    )
   }
-
+  
   @JvmStatic
   internal fun testLambda_pp_j2kt(from: FooContainer<*>, to: FooContainer<in Foo?>) {
-   (from as FooContainer<Foo?>).forEach(
+   from.forEach(
     Consumer { it: Foo? ->
      to.add(it)
     },
    )
   }
-
+  
   @JvmStatic
   internal fun testMethodReference_pp_j2kt(from: FooContainer<*>, to: FooContainer<in Foo?>) {
-   (from as FooContainer<Foo?>).forEach(
+   from.forEach(
     Consumer { arg0: Foo? ->
      to.add(arg0)
     },
    )
   }
  }
-
- fun interface Consumer<V> {
+ 
+ internal fun interface Consumer<V> {
   fun accept(v: V)
  }
-
- interface Container<V> {
+ 
+ internal interface Container<V> {
   fun forEach(consumer: Consumer<V>)
-
+  
   fun add(v: V)
  }
-
- interface Foo
-
- fun interface FooConsumer<V: Foo?> {
+ 
+ internal interface Foo
+ 
+ internal fun interface FooConsumer<V: Foo?> {
   fun accept(v: V)
  }
-
- interface FooContainer<V: Foo?> {
+ 
+ internal interface FooContainer<V: Foo?> {
   fun forEach(consumer: Consumer<V>)
-
+  
   fun add(v: V)
  }
 }

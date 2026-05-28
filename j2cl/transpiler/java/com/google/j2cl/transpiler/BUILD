@@ -1,5 +1,5 @@
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
-load(":compiler_java_binary.bzl", "compiler_java_binary")
+load("//transpiler/java/com/google/j2cl/common/bazel:compiler_java_binary.bzl", "compiler_java_binary")
 load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
 
 package(
@@ -15,6 +15,7 @@ java_library(
     ],
     deps = [
         "//third_party:auto_value",
+        "//third_party:error_prone_annotations",
         "//third_party:guava",
         "//third_party:jsr305_annotations",
         "//transpiler/java/com/google/j2cl/common",
@@ -25,26 +26,6 @@ java_library(
         "//transpiler/java/com/google/j2cl/transpiler/passes",
     ],
 )
-
-javadoc_library(
-    name = "transpiler_lib-javadoc",
-    srcs = [
-        "J2clTranspiler.java",
-        "J2clTranspilerOptions.java",
-    ],
-    deps = [
-        "//third_party:auto_value",
-        "//third_party:guava",
-        "//third_party:jsr305_annotations",
-        "//transpiler/java/com/google/j2cl/common",
-        "//transpiler/java/com/google/j2cl/transpiler/ast",
-        "//transpiler/java/com/google/j2cl/transpiler/backend",
-        "//transpiler/java/com/google/j2cl/transpiler/frontend",
-        "//transpiler/java/com/google/j2cl/transpiler/frontend/common",
-        "//transpiler/java/com/google/j2cl/transpiler/passes",
-    ],
-)
-
 
 java_library(
     name = "commandlinerunner_lib",
@@ -57,7 +38,6 @@ java_library(
         "//third_party:guava",
         "//transpiler/java/com/google/j2cl/common",
         "//transpiler/java/com/google/j2cl/transpiler/backend",
-        "//transpiler/java/com/google/j2cl/transpiler/frontend",
     ],
 )
 
@@ -82,7 +62,6 @@ java_library(
         "//transpiler/java/com/google/j2cl/common",
         "//transpiler/java/com/google/j2cl/common/bazel",
         "//transpiler/java/com/google/j2cl/transpiler/backend",
-        "//transpiler/java/com/google/j2cl/transpiler/frontend",
     ],
 )
 
@@ -93,14 +72,13 @@ java_library(
         "//third_party:args4j",
         "//third_party:auto_value",
         "//third_party:guava",
-        # TODO(b/294284380): Make this independent of the frontend.
-        "//third_party:jdt-core",
         "//transpiler/java/com/google/j2cl/common",
         "//transpiler/java/com/google/j2cl/common/bazel",
         "//transpiler/java/com/google/j2cl/transpiler/ast",
         "//transpiler/java/com/google/j2cl/transpiler/backend/wasm",
         "//transpiler/java/com/google/j2cl/transpiler/frontend/common",
-        "//transpiler/java/com/google/j2cl/transpiler/frontend/jdt",
+        # TODO(b/294284380): Make this independent of the frontend.
+        "//transpiler/java/com/google/j2cl/transpiler/frontend/javac",
     ],
 )
 
@@ -111,15 +89,14 @@ java_library(
         "//third_party:args4j",
         "//third_party:auto_value",
         "//third_party:guava",
-        # TODO(b/294284380): Make this independent of the frontend.
-        "//third_party:jdt-core",
         "//transpiler/java/com/google/j2cl/common",
         "//transpiler/java/com/google/j2cl/common/bazel",
         "//transpiler/java/com/google/j2cl/transpiler/ast",
         "//transpiler/java/com/google/j2cl/transpiler/backend/common",
         "//transpiler/java/com/google/j2cl/transpiler/backend/wasm",
         "//transpiler/java/com/google/j2cl/transpiler/backend/wasm:summary_java_proto",
-        "//transpiler/java/com/google/j2cl/transpiler/frontend/jdt",
+        # TODO(b/294284380): Make this independent of the frontend.
+        "//transpiler/java/com/google/j2cl/transpiler/frontend/javac",
         "//transpiler/java/com/google/j2cl/transpiler/passes",
     ],
 )
@@ -147,7 +124,21 @@ compiler_java_binary(
     runtime_deps = [":bazelj2wasmbundler_lib"],
 )
 
-config_setting(
-    name = "profiling_disabled",
-    flag_values = {"//:profiling_filter": "<disabled>"},
+javadoc_library(
+    name = "transpiler_lib-javadoc",
+    srcs = [
+        "J2clTranspiler.java",
+        "J2clTranspilerOptions.java",
+    ],
+    deps = [
+        "//third_party:auto_value",
+        "//third_party:guava",
+        "//third_party:jsr305_annotations",
+        "//transpiler/java/com/google/j2cl/common",
+        "//transpiler/java/com/google/j2cl/transpiler/ast",
+        "//transpiler/java/com/google/j2cl/transpiler/backend",
+        "//transpiler/java/com/google/j2cl/transpiler/frontend",
+        "//transpiler/java/com/google/j2cl/transpiler/frontend/common",
+        "//transpiler/java/com/google/j2cl/transpiler/passes",
+    ],
 )

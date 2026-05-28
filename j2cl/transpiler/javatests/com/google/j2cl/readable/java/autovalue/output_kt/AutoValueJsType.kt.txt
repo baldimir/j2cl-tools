@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package autovalue
 
@@ -30,9 +31,12 @@ import kotlin.Suppress
 abstract class AutoValueJsType {
  @JsIgnore
  constructor()
-
+ 
  abstract fun getField(): Int
-
+ 
  @JsMethod(name = "getField2")
  internal abstract fun getWithJsMethod_pp_autovalue(): Int
+ 
+ @JsIgnore
+ abstract fun ignored(): Int
 }

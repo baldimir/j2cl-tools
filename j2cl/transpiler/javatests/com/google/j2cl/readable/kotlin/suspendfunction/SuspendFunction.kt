@@ -18,11 +18,12 @@ package suspendfunction
 import jsinterop.annotations.JsMethod
 import jsinterop.annotations.JsPackage
 import kotlin.coroutines.Continuation
+import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 open class SuspendFunction : SuspendFunInterface {
-  fun nonSuspendingFunction(param: String) {}
+  fun nonSuspendingFunction(param: String): String = param
 
   suspend fun anotherSuspendFunction(foo: String): String = "Foo$foo"
 
@@ -33,6 +34,7 @@ open class SuspendFunction : SuspendFunInterface {
     testSuspendLambda(anotherSuspendFunction(s))
 
     s = testSuspendFunctionReference(::anotherSuspendFunction)
+    s = testSuspendFunctionReference(::nonSuspendingFunction)
 
     // Test boxing on return type of suspend function
     val boxedInteger: Int? = GenericSuspendFunInterface<Int> { param -> param }.suspendMe(0)
@@ -148,4 +150,27 @@ suspend fun testYield() {
 
 suspend fun testSuspendInlining() {
   suspendCoroutine { continuation -> continuation.resume(Unit) }
+}
+
+class GenericClass<T> {
+  fun <V> testSuspendLambdReferingGenerics(param: V) {
+    val suspendLambdaReferingGeneric: suspend () -> Unit = {
+      val tRef: T? = null
+      val vRef: V? = null
+    }
+  }
+}
+
+fun (suspend (String) -> Unit).extFunOnSuspendLambda() {}
+
+fun testSuspendReferenceAsVariable() {
+  suspend fun testIsActive(foo: String) {}
+  ::testIsActive.extFunOnSuspendLambda()
+
+  val suspendFunReference = ::testIsActive
+  suspendFunReference.extFunOnSuspendLambda()
+}
+
+suspend fun testAccessCoroutineContext() {
+  val context = coroutineContext
 }

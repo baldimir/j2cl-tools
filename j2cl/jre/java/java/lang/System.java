@@ -27,23 +27,22 @@ import jsinterop.annotations.JsMethod;
 import jsinterop.annotations.JsPackage;
 
 /**
- * General-purpose low-level utility methods. GWT only supports a limited subset
- * of these methods due to browser limitations. Only the documented methods are
- * available.
+ * General-purpose low-level utility methods. GWT only supports a limited subset of these methods
+ * due to browser limitations. Only the documented methods are available.
  */
 public final class System {
 
   private static final int MILLIS_TO_NANOS = 1_000_000;
 
   /**
-   * Does nothing in web mode. To get output in web mode, subclass PrintStream
-   * and call {@link #setErr(PrintStream)}.
+   * Does nothing in web mode. To get output in web mode, subclass PrintStream and call {@link
+   * #setErr(PrintStream)}.
    */
   public static PrintStream err = new PrintStream(null);
 
   /**
-   * Does nothing in web mode. To get output in web mode, subclass
-   * {@link PrintStream} and call {@link #setOut(PrintStream)}.
+   * Does nothing in web mode. To get output in web mode, subclass {@link PrintStream} and call
+   * {@link #setOut(PrintStream)}.
    */
   public static PrintStream out = new PrintStream(null);
 
@@ -98,8 +97,7 @@ public final class System {
    *
    * @skip
    */
-  public static void gc() {
-  }
+  public static void gc() {}
 
   @Wasm("nop") // Calls are replaced by a pass for Wasm.
   @JsMethod(name = "$getDefine", namespace = "nativebootstrap.Util")
@@ -108,6 +106,24 @@ public final class System {
   @Wasm("nop") // Calls are replaced by a pass for Wasm.
   @JsMethod(name = "$getDefine", namespace = "nativebootstrap.Util")
   public static native String getProperty(String key, String def);
+
+  // TODO(b/477643941): Remove this if/when Checker Framework tolerates it being absent.
+  static void setProperty(String key, String value) {
+    // Stub for Checker Framework which expects this method to exist or will crash.
+    throw new AssertionError();
+  }
+
+  // TODO(b/477643941): Remove this if/when Checker Framework tolerates it being absent.
+  static void setProperties(Object properties) {
+    // Stub for Checker Framework which expects this method to exist or will crash.
+    throw new AssertionError();
+  }
+
+  // TODO(b/477643941): Remove this if/when Checker Framework tolerates it being absent.
+  static void clearProperty(String key) {
+    // Stub for Checker Framework which expects this method to exist or will crash.
+    throw new AssertionError();
+  }
 
   public static int identityHashCode(Object o) {
     return HashCodes.getIdentityHashCode(o);

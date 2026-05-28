@@ -16,6 +16,15 @@
 package j2ktiosinterop;
 
 import com.google.j2objc.annotations.ObjectiveCName;
+import com.google.j2objc.annotations.SwiftName;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.CLASS)
+@Target(ElementType.METHOD)
+@interface J2ktIncompatible {}
 
 @ObjectiveCName("Custom")
 public final class CustomNames {
@@ -61,6 +70,19 @@ public final class CustomNames {
   @ObjectiveCName("customLongStringMethod")
   public void longStringMethod(long i, String s) {}
 
+  @ObjectiveCName("customCustomNamesMethod")
+  public void customNamesMethod(CustomNames c) {}
+
+  @ObjectiveCName("customDefaultNamesMethod")
+  public void defaultNamesMethod(DefaultNames c) {}
+
+  @ObjectiveCName("customObjectiveCSwiftStringMethodWithString:")
+  @SwiftName("customObjectiveCSwiftStringMethod(with:)")
+  public void objectiveCSwiftStringMethod(String s) {}
+
+  @SwiftName("customSwiftStringMethod(with:)")
+  public void swiftStringMethod(String s) {}
+
   @ObjectiveCName("customStaticMethod")
   public static void staticMethod() {}
 
@@ -75,4 +97,10 @@ public final class CustomNames {
 
   @ObjectiveCName("customStaticLongStringMethod")
   public static void staticLongStringMethod(long i, String s) {}
+
+  @ObjectiveCName("lowercase:")
+  public void lowercase(String t) {}
+
+  @ObjectiveCName("staticlowercase:")
+  public static void staticlowercase(String s) {}
 }

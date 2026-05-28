@@ -16,6 +16,7 @@
 package com.google.j2cl.transpiler.passes;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.j2cl.transpiler.ast.DebugDescriber.newDebugDescriber;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
@@ -23,6 +24,7 @@ import com.google.j2cl.transpiler.ast.ArrayTypeDescriptor;
 import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.CastExpression;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
+import com.google.j2cl.transpiler.ast.DebugDescriber;
 import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Expression;
 import com.google.j2cl.transpiler.ast.FieldAccess;
@@ -30,7 +32,6 @@ import com.google.j2cl.transpiler.ast.IntersectionTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Invocation;
 import com.google.j2cl.transpiler.ast.MemberDescriptor;
 import com.google.j2cl.transpiler.ast.MethodDescriptor;
-import com.google.j2cl.transpiler.ast.Node;
 import com.google.j2cl.transpiler.ast.PrimitiveTypeDescriptor;
 import com.google.j2cl.transpiler.ast.TypeDescriptor;
 import com.google.j2cl.transpiler.ast.TypeVariable;
@@ -80,12 +81,17 @@ public final class InsertQualifierProjectionCasts extends AbstractJ2ktNormalizat
     compilationUnit.accept(
         new AbstractRewriter() {
           @Override
-          public Node rewriteBinaryExpression(BinaryExpression binaryExpression) {
-            return projectFieldAccessQualifierInLhs(binaryExpression);
+          public FieldAccess rewriteFieldAccess(FieldAccess fieldAccess) {
+            if (getParent() instanceof BinaryExpression binaryExpression
+                && binaryExpression.getLeftOperand() == fieldAccess
+                && binaryExpression.isSimpleAssignment()) {
+              return projectFieldAccessQualifier(fieldAccess);
+            }
+            return fieldAccess;
           }
 
           @Override
-          public Node rewriteInvocation(Invocation invocation) {
+          public Invocation rewriteInvocation(Invocation invocation) {
             return projectInvocationQualifier(invocation);
           }
 
@@ -99,57 +105,46 @@ public final class InsertQualifierProjectionCasts extends AbstractJ2ktNormalizat
               return expression;
             }
 
+            DebugDescriber describer = newDebugDescriber();
             debug(
-                getSourcePosition(this),
+                getSourcePosition(),
                 "Inserting qualifier projection cast from %s to %s",
-                getDescription(typeDescriptor),
-                getDescription(projectedTypeDescriptor));
+                describer.getDescription(typeDescriptor),
+                describer.getDescription(projectedTypeDescriptor));
 
-            return CastExpression.newBuilder()
+            return CastExpression.builder()
                 .setExpression(expression)
                 .setCastTypeDescriptor(projectedTypeDescriptor)
                 .build();
           }
 
-          private Expression projectFieldAccessQualifierInLhs(BinaryExpression binaryExpression) {
-            if (!binaryExpression.getOperator().isSimpleAssignment()) {
-              return binaryExpression;
-            }
-
-            Expression leftOperand = binaryExpression.getLeftOperand();
-            if (!(leftOperand instanceof FieldAccess fieldAccess)) {
-              return binaryExpression;
-            }
-
+          private FieldAccess projectFieldAccessQualifier(FieldAccess fieldAccess) {
             Expression qualifier = fieldAccess.getQualifier();
             if (qualifier == null) {
-              return binaryExpression;
+              return fieldAccess;
             }
 
-            if (!containsCaptureWithoutLowerBound(fieldAccess.getTypeDescriptor())) {
-              return binaryExpression;
+            if (!needsCast(fieldAccess.getTypeDescriptor())) {
+              return fieldAccess;
             }
 
-            return BinaryExpression.Builder.from(binaryExpression)
-                .setLeftOperand(
-                    FieldAccess.Builder.from(fieldAccess)
-                        .setQualifier(projectExpression(fieldAccess.getQualifier()))
-                        .build())
+            return fieldAccess.toBuilder()
+                .setQualifier(projectExpression(fieldAccess.getQualifier()))
                 .build();
           }
 
-          private Expression projectInvocationQualifier(Invocation invocation) {
+          private Invocation projectInvocationQualifier(Invocation invocation) {
             Expression qualifier = invocation.getQualifier();
             if (qualifier == null) {
               return invocation;
             }
 
             if (invocation.getTarget().getParameterTypeDescriptors().stream()
-                .allMatch(it -> !containsCaptureWithoutLowerBound(it))) {
+                .noneMatch(InsertQualifierProjectionCasts::needsCast)) {
               return invocation;
             }
 
-            return Invocation.Builder.from(invocation)
+            return invocation.toBuilder()
                 .setQualifier(projectExpression(invocation.getQualifier()))
                 .build();
           }
@@ -223,6 +218,20 @@ public final class InsertQualifierProjectionCasts extends AbstractJ2ktNormalizat
     return builder.build();
   }
 
+  private static boolean needsCast(TypeDescriptor typeDescriptor) {
+    // Javac frontend produces wildcards for recursive types that require special treatment.
+    return isWildcardWithoutLowerBound(typeDescriptor)
+        || containsCaptureWithoutLowerBound(typeDescriptor);
+  }
+
+  private static boolean isWildcardWithoutLowerBound(TypeDescriptor typeDescriptor) {
+    return switch (typeDescriptor) {
+      case TypeVariable typeVariable ->
+          typeVariable.isWildcard() && typeVariable.getLowerBoundTypeDescriptor() == null;
+      default -> false;
+    };
+  }
+
   private static boolean containsCaptureWithoutLowerBound(TypeDescriptor typeDescriptor) {
     return containsCaptureWithoutLowerBound(typeDescriptor, ImmutableSet.of());
   }
@@ -230,40 +239,37 @@ public final class InsertQualifierProjectionCasts extends AbstractJ2ktNormalizat
   // TODO(b/362475932): Clean-up after type model visitor is implemented.
   private static boolean containsCaptureWithoutLowerBound(
       TypeDescriptor typeDescriptor, ImmutableSet<TypeVariable> seen) {
-    if (typeDescriptor instanceof PrimitiveTypeDescriptor) {
-      return false;
-    } else if (typeDescriptor instanceof ArrayTypeDescriptor descriptor) {
-      return containsCaptureWithoutLowerBound(descriptor.getComponentTypeDescriptor(), seen);
-    } else if (typeDescriptor instanceof DeclaredTypeDescriptor descriptor) {
-      return descriptor.getTypeArgumentDescriptors().stream()
-          .anyMatch(it -> containsCaptureWithoutLowerBound(it, seen));
-    } else if (typeDescriptor instanceof TypeVariable typeVariable) {
-      if (seen.contains(typeVariable)) {
-        return false;
+    return switch (typeDescriptor) {
+      case PrimitiveTypeDescriptor primitiveTypeDescriptor -> false;
+
+      case ArrayTypeDescriptor descriptor ->
+          containsCaptureWithoutLowerBound(descriptor.getComponentTypeDescriptor(), seen);
+
+      case DeclaredTypeDescriptor descriptor ->
+          descriptor.getTypeArgumentDescriptors().stream()
+              .anyMatch(it -> containsCaptureWithoutLowerBound(it, seen));
+
+      case TypeVariable typeVariable
+          when typeVariable.isCapture() && typeVariable.getLowerBoundTypeDescriptor() == null ->
+          true;
+      case TypeVariable typeVariable when !typeVariable.isWildcardOrCapture() -> false;
+      case TypeVariable typeVariable when seen.contains(typeVariable) -> false;
+      case TypeVariable typeVariable -> {
+        ImmutableSet<TypeVariable> newSeen =
+            ImmutableSet.<TypeVariable>builder().addAll(seen).add(typeVariable).build();
+        TypeDescriptor upperBound = typeVariable.getUpperBoundTypeDescriptor();
+        TypeDescriptor lowerBound = typeVariable.getLowerBoundTypeDescriptor();
+        yield containsCaptureWithoutLowerBound(upperBound, newSeen)
+            || (lowerBound != null && containsCaptureWithoutLowerBound(lowerBound, newSeen));
       }
 
-      if (!typeVariable.isWildcardOrCapture()) {
-        return false;
-      }
+      case IntersectionTypeDescriptor descriptor ->
+          descriptor.getIntersectionTypeDescriptors().stream()
+              .anyMatch(it -> containsCaptureWithoutLowerBound(it, seen));
 
-      if (typeVariable.isCapture() && typeVariable.getLowerBoundTypeDescriptor() == null) {
-        return true;
-      }
-
-      ImmutableSet<TypeVariable> newSeen =
-          ImmutableSet.<TypeVariable>builder().addAll(seen).add(typeVariable).build();
-      TypeDescriptor upperBound = typeVariable.getUpperBoundTypeDescriptor();
-      TypeDescriptor lowerBound = typeVariable.getLowerBoundTypeDescriptor();
-      return containsCaptureWithoutLowerBound(upperBound, newSeen)
-          || (lowerBound != null && containsCaptureWithoutLowerBound(lowerBound, newSeen));
-    } else if (typeDescriptor instanceof IntersectionTypeDescriptor descriptor) {
-      return descriptor.getIntersectionTypeDescriptors().stream()
-          .anyMatch(it -> containsCaptureWithoutLowerBound(it, seen));
-    } else if (typeDescriptor instanceof UnionTypeDescriptor descriptor) {
-      return descriptor.getUnionTypeDescriptors().stream()
-          .anyMatch(it -> containsCaptureWithoutLowerBound(it, seen));
-    } else {
-      throw new AssertionError("Unknown type descriptor: " + typeDescriptor.getClass());
-    }
+      case UnionTypeDescriptor descriptor ->
+          descriptor.getUnionTypeDescriptors().stream()
+              .anyMatch(it -> containsCaptureWithoutLowerBound(it, seen));
+    };
   }
 }

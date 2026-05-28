@@ -13,41 +13,41 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package jsproperties
 
 import javaemul.lang.*
-import jsinterop.annotations.JsPackage
 import jsinterop.annotations.JsProperty
-import kotlin.Any
-import kotlin.Double
+import jsproperties.FooWithNativeProperty
 import kotlin.Int
 import kotlin.Suppress
+import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 
 open class Foo internal constructor() {
  companion object {
   private var f: Int = 0
-
+  
   @JvmStatic
   @JsProperty
   fun getA(): Int {
    return Foo.f + 1
   }
-
+  
   @JvmStatic
   @JsProperty
   fun setA(x: Int) {
    Foo.f = x + 2
   }
-
+  
   @JvmStatic
   @JsProperty(name = "abc")
   fun getB(): Int {
    return Foo.f + 3
   }
-
+  
   @JvmStatic
   @JsProperty(name = "abc")
   fun setB(x: Int) {
@@ -58,39 +58,48 @@ open class Foo internal constructor() {
 
 open class Bar internal constructor() {
  private var f: Int = 0
-
+ 
  @JsProperty
- private var privateField: Int = - 1
-
+ private var privateField: Int = -1
+ 
  @JsProperty
  open fun getA(): Int {
   return this.f + 1
  }
-
+ 
  @JsProperty
  open fun setA(x: Int) {
   this.f = x + 2
  }
-
+ 
  @JsProperty(name = "abc")
  open fun getB(): Int {
   return this.f + 3
  }
-
+ 
  @JsProperty(name = "abc")
  open fun setB(x: Int) {
   this.f = x + 4
  }
 }
 
-open class NativeFoo internal constructor() {
- @JsProperty(name = "hasOwnProperty")
- external open fun getA(): Any?
-
+open class ReadOnlyJsProperty internal constructor() {
+ @JvmField
+ val a: Int = 1
+ 
+ @JsProperty
+ open fun getC(): Int {
+  return 3
+ }
+ 
  companion object {
+  const val b: Int = 2
+  
   @JvmStatic
-  @JsProperty(name = "Math.PI", namespace = JsPackage.GLOBAL)
-  external fun getB(): Double
+  @JsProperty
+  fun getD(): Int {
+   return 4
+  }
  }
 }
 
@@ -99,7 +108,7 @@ interface InterfaceWithDefaultJsProperties {
  fun getM(): Int {
   return 3
  }
-
+ 
  @JsProperty
  fun setM(value: Int) {}
 }
@@ -108,22 +117,31 @@ open class ImplementsInterfaceWithDefaultJsProperties internal constructor(): In
 
 open class Main {
  open fun testNativeJsProperty() {
-  NativeFoo().getA()
-  NativeFoo.getB()
+  FooWithNativeProperty().getA()
+  FooWithNativeProperty.getB()
  }
-
+ 
  open fun testStaticJsProperty() {
   Foo.getA()
   Foo.setA(10)
   Foo.getB()
   Foo.setB(10)
  }
-
+ 
  open fun testInstanceJsProperty() {
   val bar: Bar = Bar()
   bar.getA()
   bar.setA(10)
   bar.getB()
   bar.setB(10)
+ }
+ 
+ open fun testReadOnlyJsProperty() {
+  val readOnlyJsProperty: ReadOnlyJsProperty = ReadOnlyJsProperty()
+  var r: Int = 0
+  r = readOnlyJsProperty.a
+  r = ReadOnlyJsProperty.b
+  readOnlyJsProperty.getC()
+  ReadOnlyJsProperty.getD()
  }
 }

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package simplelongs
 
@@ -27,23 +28,23 @@ import kotlin.run
 open class SimpleLongs {
  @JvmField
  var foo: Long = 0L
-
+ 
  open fun getBar(): Long {
   return 0L
  }
-
+ 
  private var sideEffect: Int = 0
-
+ 
  open fun getWithSideEffect(): SimpleLongs? {
   this.sideEffect = this.sideEffect + 1
   return this
  }
-
+ 
  open fun main() {
   var a: Long = 0L
-  a = - 100000L
+  a = -100000L
   a = 100000L
-  var b: Long = - 2147483648L
+  var b: Long = -2147483648L
   b = 2147483648L
   b = -9223372036854775807L - 1L
   b = 9223372036854775807L

@@ -17,8 +17,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.j2cl.common.SourceUtils.checkSourceFiles;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.j2cl.common.CommandLineParser;
 import com.google.j2cl.common.CommandLineTool;
 import com.google.j2cl.common.OutputUtils;
 import com.google.j2cl.common.OutputUtils.Output;
@@ -26,39 +26,55 @@ import com.google.j2cl.common.Problems;
 import com.google.j2cl.common.SourceUtils;
 import com.google.j2cl.common.SourceUtils.FileInfo;
 import com.google.j2cl.transpiler.backend.Backend;
-import com.google.j2cl.transpiler.frontend.Frontend;
-import java.io.File;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.MapOptionHandler;
 
 /** A javac-like command line driver for J2clTranspiler. */
 public final class J2clCommandLineRunner extends CommandLineTool {
 
   @Argument(metaVar = "<source files>", required = true)
-  List<String> files = new ArrayList<>();
+  List<Path> files = new ArrayList<>();
 
   @Option(
       name = "-classpath",
       aliases = "-cp",
       metaVar = "<path>",
-      usage = "Specifies where to find user class files and annotation processors.")
-  String classPath = "";
+      usage = "Specifies where to find user class files and annotation processors.",
+      handler = CommandLineParser.MultiPathOptionHandler.class)
+  List<Path> classPath = new ArrayList<>();
+
+  @Option(
+      name = "-system",
+      metaVar = "<path>",
+      usage = "Specifies the location of the system modules.")
+  Path system;
+
+  @Option(
+      name = "-processor",
+      metaVar = "<class>",
+      usage = "Names of the annotation processors to run.")
+  List<String> processors = new ArrayList<>();
+
+  @Option(
+      name = "-processorpath",
+      metaVar = "<path>",
+      usage = "Specifies where to find annotation processors.",
+      handler = CommandLineParser.MultiPathOptionHandler.class)
+  List<Path> processorPath = new ArrayList<>();
 
   @Option(
       name = "-nativesourcepath",
       metaVar = "<path>",
-      usage = "Specifies where to find zip files containing native.js files for native methods.")
-  String nativeSourcePath = "";
+      usage = "Specifies where to find zip files containing native.js files for native methods.",
+      handler = CommandLineParser.MultiPathOptionHandler.class)
+  List<Path> nativeSourcePath = new ArrayList<>();
 
   @Option(
       name = "-d",
@@ -87,13 +103,6 @@ public final class J2clCommandLineRunner extends CommandLineTool {
           "Generates Kythe indexing metadata and appends it onto the generated JavaScript files.",
       hidden = true)
   boolean generateKytheIndexingMetadata = false;
-
-  @Option(
-      name = "-frontend",
-      metaVar = "(JDT | JAVAC)",
-      usage = "Select the frontend to use: JDT (default), JAVAC (experimental).",
-      hidden = true)
-  Frontend frontEnd = Frontend.JDT;
 
   @Option(
       name = "-backend",
@@ -129,11 +138,11 @@ public final class J2clCommandLineRunner extends CommandLineTool {
   @Option(name = "-generateWasmExport", hidden = true)
   List<String> wasmEntryPoints = new ArrayList<>();
 
+  @Option(name = "-experimentalEnableWasmCustomDescriptorsJsInterop", hidden = true)
+  boolean enableWasmCustomDescriptorsJsInterop = false;
+
   @Option(name = "-forbiddenAnnotation", hidden = true)
   List<String> forbiddenAnnotations = new ArrayList<>();
-
-  @Option(name = "-defineForWasm", handler = MapOptionHandler.class, hidden = true)
-  Map<String, String> definesForWasm = new HashMap<>();
 
   @Option(name = "-objCNamePrefix", hidden = true)
   String objCNamePrefix = "J2kt";
@@ -155,7 +164,7 @@ public final class J2clCommandLineRunner extends CommandLineTool {
   @Override
   protected void run() {
     problems.abortIfCancelled();
-    try (Output out = OutputUtils.initOutput(this.output, problems)) {
+    try (Output out = OutputUtils.initOutput(this.output, this.tempDir, problems)) {
       problems.abortIfCancelled();
       J2clTranspiler.transpile(createOptions(out), problems);
     }
@@ -164,70 +173,47 @@ public final class J2clCommandLineRunner extends CommandLineTool {
   private J2clTranspilerOptions createOptions(Output output) {
     checkSourceFiles(problems, files, ".java", ".srcjar", ".jar", ".kt");
 
-    if (this.readableSourceMaps && this.generateKytheIndexingMetadata) {
-      problems.warning(
-          "Readable source maps are not available when generating Kythe indexing metadata.");
-      this.readableSourceMaps = false;
-    }
-
     ImmutableList<FileInfo> allSources =
-        SourceUtils.getAllSources(this.files.stream(), tempDir.resolve("_source_jars"), problems)
+        SourceUtils.getAllSources(
+                this.files.stream(), output.createTempDirectory("_source_jars"), problems)
             .collect(toImmutableList());
     problems.abortIfCancelled();
 
-    ImmutableList<FileInfo> allJavaSources =
-        allSources.stream()
-            .filter(p -> p.sourcePath().endsWith(".java"))
-            .collect(toImmutableList());
-
-    ImmutableList<FileInfo> allKotlinSources =
-        allSources.stream().filter(p -> p.sourcePath().endsWith(".kt")).collect(toImmutableList());
-
-    // TODO(b/226952880): add support for transpiling java and kotlin simultaneously.
-    if (!allJavaSources.isEmpty() && !allKotlinSources.isEmpty()) {
-      throw new AssertionError(
-          "Transpilation of Java and Kotlin files together is not supported yet.");
-    }
-
     ImmutableList<FileInfo> allNativeSources =
         SourceUtils.getAllSources(
-                getPathEntries(this.nativeSourcePath).stream(),
-                tempDir.resolve("_naitve_sources"),
+                this.nativeSourcePath.stream(),
+                output.createTempDirectory("_native_sources"),
                 problems)
             .filter(p -> p.sourcePath().endsWith(".native.js"))
             .collect(toImmutableList());
     problems.abortIfCancelled();
 
-    return J2clTranspilerOptions.newBuilder()
-        .setSources(allKotlinSources.isEmpty() ? allJavaSources : allKotlinSources)
+    return J2clTranspilerOptions.builder()
+        .setSources(allSources)
         .setNativeSources(allNativeSources)
-        .setClasspaths(getPathEntries(this.classPath))
+        .setClasspaths(this.classPath)
+        .setSystem(this.system)
+        .setAnnotationProcessors(this.processors)
+        .setAnnotationProcessorPath(this.processorPath)
         .setOutput(output)
         .setLibraryInfoOutput(this.libraryInfoOutput)
         .setEmitReadableLibraryInfo(false)
         .setEmitReadableSourceMap(this.readableSourceMaps)
         .setOptimizeAutoValue(this.optimizeAutoValue)
         .setGenerateKytheIndexingMetadata(this.generateKytheIndexingMetadata)
-        .setFrontend(this.frontEnd)
+
         .setBackend(this.backend)
         .setWasmEntryPointStrings(wasmEntryPoints)
-        .setDefinesForWasm(definesForWasm)
+        .setEnableWasmCustomDescriptorsJsInterop(this.enableWasmCustomDescriptorsJsInterop)
         .setNullMarkedSupported(this.enableJSpecifySupport)
         .setJavacOptions(javacOptions)
         .setKotlincOptions(kotlincOptions)
         .setForbiddenAnnotations(forbiddenAnnotations)
+        .setDependencyKlibs(ImmutableList.of())
+        .setFriendKlibs(ImmutableList.of())
+        .setEnableKlibs(false)
         .setObjCNamePrefix("J2kt")
         .build(problems);
-  }
-
-  private static List<String> getPathEntries(String path) {
-    List<String> entries = new ArrayList<>();
-    for (String entry : Splitter.on(File.pathSeparatorChar).omitEmptyStrings().split(path)) {
-      if (new File(entry).exists()) {
-        entries.add(entry);
-      }
-    }
-    return entries;
   }
 
   /**

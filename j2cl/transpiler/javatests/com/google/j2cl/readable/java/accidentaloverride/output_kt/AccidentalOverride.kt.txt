@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package accidentaloverride
 
@@ -24,16 +25,18 @@ import kotlin.Suppress
 
 open class Parent<T: Error?> internal constructor() {
  open fun foo(e: T) {}
-
+ 
  fun bar(e: T) {}
 }
 
 interface SuperInterface<T> {
  fun foo(t: T)
-
+ 
  fun bar(e: T)
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class AnotherAccidentalOverride internal constructor(): Parent<AssertionError?>(), SuperInterface<AssertionError?>
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class AccidentalOverride: Parent<Error?>(), SuperInterface<Error?>

@@ -13,11 +13,13 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package methodreferences
 
 import javaemul.lang.*
+import javaemul.lang.uninitializedArrayOf
 import jsinterop.annotations.JsFunction
 import kotlin.Any
 import kotlin.Array
@@ -35,7 +37,6 @@ import kotlin.Number
 import kotlin.ShortArray
 import kotlin.String
 import kotlin.Suppress
-import kotlin.arrayOfNulls
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmStatic
 import kotlin.run
@@ -44,19 +45,19 @@ open class MethodReferences<T> {
  open fun isA(): Boolean {
   return true
  }
-
+ 
  internal open fun self_pp_methodreferences(): Any {
   return this
  }
-
+ 
  internal open fun t_pp_methodreferences(): T {
   return null as T
  }
-
+ 
  internal open fun sameAs_pp_methodreferences(n: Number): Boolean {
   return false
  }
-
+ 
  internal open fun main_pp_methodreferences() {
   var objectFactory: Producer<Any> = Producer {
    return@Producer Any()
@@ -87,8 +88,8 @@ open class MethodReferences<T> {
    return@Producer ObjectCapturingOuter()
   }
   val arrayProducer: ArrayProducer<Any> = ArrayProducer { arg0_3: Int ->
-   return@ArrayProducer arrayOfNulls<Double>(arg0_3) as Array<Any?>
-  } as ArrayProducer<Any>
+   return@ArrayProducer uninitializedArrayOf<Double>(arg0_3) as Array<Any>
+  }
   objectFactory = run {
    val ______q_1: MethodReferences<Any> = MethodReferences<Any>()
    Producer {
@@ -123,20 +124,20 @@ open class MethodReferences<T> {
    return@Function DoubleArray(arg0_12.toInt())
   }
   val objectArrayFactory: Function<Int, Array<Any>> = Function { arg0_13: Int ->
-   return@Function arrayOfNulls<Any>(arg0_13.toInt())
-  } as Function<Int, Array<Any>>
+   return@Function uninitializedArrayOf<Any>(arg0_13.toInt())
+  }
   val nullableObjectArrayFactory: Function<Int, Array<Any?>> = Function { arg0_14: Int ->
-   return@Function arrayOfNulls<Any>(arg0_14.toInt())
+   return@Function uninitializedArrayOf<Any>(arg0_14.toInt()) as Array<Any?>
   }
   val stringArrayFactory: Function<Int, Array<String>> = Function { arg0_15: Int ->
-   return@Function arrayOfNulls<String>(arg0_15.toInt())
-  } as Function<Int, Array<String>>
+   return@Function uninitializedArrayOf<String>(arg0_15.toInt())
+  }
   val nullableStringArrayFactory: Function<Int, Array<String?>> = Function { arg0_16: Int ->
-   return@Function arrayOfNulls<String>(arg0_16.toInt())
+   return@Function uninitializedArrayOf<String>(arg0_16.toInt()) as Array<String?>
   }
   val superToStringProducer: Producer<String> = Producer {
    return@Producer super.toString()
-  } as Producer<String>
+  }
   var jsobjectFactory: JsProducer<Any> = JsProducer {
    return@JsProducer Any()
   }
@@ -153,11 +154,11 @@ open class MethodReferences<T> {
    return@JsFunctionInterface arg0_17.self_pp_methodreferences()
   }
   val jsarrayFactory: JsFunctionInterface<Int, Array<Any>> = JsFunctionInterface { arg0_18: Int ->
-   return@JsFunctionInterface arrayOfNulls<Any>(arg0_18.toInt())
-  } as JsFunctionInterface<Int, Array<Any>>
+   return@JsFunctionInterface uninitializedArrayOf<Any>(arg0_18.toInt())
+  }
   val jsSuperToStringProducer: JsProducer<String> = JsProducer {
    return@JsProducer super.toString()
-  } as JsProducer<String>
+  }
   val jsbiFunction: JsBiFunction<MethodReferences<T>, Number, Boolean> = JsBiFunction { arg0_19: MethodReferences<T>, arg1_1: Number ->
    return@JsBiFunction arg0_19.sameAs_pp_methodreferences(arg1_1)
   }
@@ -173,13 +174,13 @@ open class MethodReferences<T> {
    },
   )
  }
-
+ 
  companion object {
   @JvmStatic
   internal fun m_pp_methodreferences(): Any {
    return Any()
   }
-
+  
   @JvmField
   internal var staticStringProducer_pp_methodreferences: Producer<String> = run {
    val ______q: Any = MethodReferences.m_pp_methodreferences()
@@ -187,47 +188,47 @@ open class MethodReferences<T> {
     return@Producer ______q.toString()
    }
   }
-
+  
   @JvmStatic
   private fun <U, V> acceptFunctionSuperVariance(f: Function<in U, V>) {}
  }
-
+ 
  fun interface Producer<T> {
   fun produce(): T
  }
-
+ 
  fun interface Predicate<T> {
   fun apply(parameter: T): Boolean
  }
-
+ 
  fun interface ArrayProducer<T> {
   fun produce(size: Int): Array<T>
  }
-
+ 
  open inner class ObjectCapturingOuter internal constructor() {
   internal open fun getMain_pp_methodreferences(): MethodReferences<T> {
-   return this@MethodReferences as MethodReferences<T>
+   return this@MethodReferences
   }
  }
-
+ 
  fun interface Function<T, U> {
   fun apply(t: T): U
  }
-
+ 
  fun interface BiFunction<T, U, V> {
   fun apply(t: T, u: U): V
  }
-
+ 
  @JsFunction
  fun interface JsProducer<T> {
   fun produce(): T
  }
-
+ 
  @JsFunction
  fun interface JsFunctionInterface<T, U> {
   fun apply(t: T): U
  }
-
+ 
  @JsFunction
  fun interface JsBiFunction<T, U, V> {
   fun apply(t: T, u: U): V

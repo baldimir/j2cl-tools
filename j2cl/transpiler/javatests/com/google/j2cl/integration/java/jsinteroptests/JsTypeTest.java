@@ -62,6 +62,7 @@ public class JsTypeTest {
     testWildcard();
     testNativeFunctionalInterface();
     testInheritName();
+    testJsTypeRecord();
   }
 
   @JsType(isNative = true, namespace = "test.foo")
@@ -490,10 +491,10 @@ public class JsTypeTest {
     return new MyNamespacedNativeJsType();
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   public static native Object createNativeButton();
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   public static native Object createObject();
 
   private static void testConcreteJsTypeAccess() {
@@ -575,7 +576,7 @@ public class JsTypeTest {
     assertFalse((Boolean) callM(a, new Object()));
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native Object callM(Object obj, Object param);
 
   private static void testRevealedOverrideJsType() {
@@ -595,7 +596,7 @@ public class JsTypeTest {
     assertEquals(100, subclassInterface.publicMethodAlsoExposedAsNonJsMethod());
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native boolean hasFieldRun(Object obj);
 
   private static void testEnumeration() {
@@ -623,20 +624,20 @@ public class JsTypeTest {
     assertEquals(1, callPublicMethodFromEnumerationSubclass(MyEnumWithSubclassGen.C));
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native int callPublicMethod(Object object);
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native boolean isUndefined(Object value);
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   @SuppressWarnings("unusable-by-js")
   private static native void setTheField(ConcreteJsType obj, ConcreteJsType.A value);
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native int callPublicMethodFromEnumeration(MyEnumWithJsType enumeration);
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native int callPublicMethodFromEnumerationSubclass(MyEnumWithSubclassGen e);
 
   @JsType
@@ -656,10 +657,10 @@ public class JsTypeTest {
     assertNotNull(someField);
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   public static native void fillJsTypeField(SimpleJsTypeWithField jstype);
 
-  @JsType(isNative = true)
+  @JsType(isNative = true, namespace = "jsinteroptests.JsTypeTest")
   interface InterfaceWithSingleJavaConcrete {
     int m();
   }
@@ -671,7 +672,7 @@ public class JsTypeTest {
     }
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native Object nativeObjectImplementingM();
 
   private static void testSingleJavaConcreteInterface() {
@@ -694,7 +695,7 @@ public class JsTypeTest {
     }
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   private static native Object nativeJsFunction();
 
   private static void testSingleJavaConcreteJsFunction() {
@@ -726,10 +727,6 @@ public class JsTypeTest {
   }
 
   private static void testNamedBridge() {
-    // Bridges are sorted by signature in the JDT. Make sure that the bridge method appears second.
-    // GWT specific test.
-    // assertTrue(
-    //  SomeConcreteSubclass.class.getName().compareTo(SomeZAbstractSubclass.class.getName()) < 0);
     SomeConcreteSubclass o = new SomeConcreteSubclass();
     assertEquals(o, o.m());
   }
@@ -754,10 +751,10 @@ public class JsTypeTest {
     assertEquals("bar", callBar(instance, null));
   }
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   public static native Object callFoo(Object obj, Object param);
 
-  @JsMethod
+  @JsMethod(namespace = "jsinteroptests.JsTypeTestHelper")
   public static native Object callBar(Object obj, Object param);
 
   @JsType(isNative = true, namespace = JsPackage.GLOBAL, name = "*")
@@ -825,5 +822,22 @@ public class JsTypeTest {
     object = new ClassWithJsMethodInheritingName();
     assertEquals(ClassWithJsMethodInheritingName.class.getName(), object.className());
     assertEquals(ClassWithJsMethodInheritingName.class.getName(), callName(object));
+  }
+
+  @JsType
+  public record MyJsTypeRecord(int a, @JsProperty(name = "customB") String b) {}
+
+  @JsType(isNative = true, namespace = "woo.JsTypeTest", name = "MyJsTypeRecord")
+  public static class NativeMyJsTypeRecord {
+    public NativeMyJsTypeRecord(int a, String customB) {}
+
+    @JsProperty public int a;
+    @JsProperty public String customB;
+  }
+
+  private static void testJsTypeRecord() {
+    NativeMyJsTypeRecord r = new NativeMyJsTypeRecord(1, "2");
+    assertEquals(1, r.a);
+    assertEquals("2", r.customB);
   }
 }

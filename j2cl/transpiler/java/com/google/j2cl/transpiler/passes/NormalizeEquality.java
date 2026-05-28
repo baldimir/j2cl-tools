@@ -19,11 +19,20 @@ import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.BinaryOperator;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
+import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Expression;
+import com.google.j2cl.transpiler.ast.JsDocCastExpression;
 import com.google.j2cl.transpiler.ast.MethodCall;
+import com.google.j2cl.transpiler.ast.Node;
+import com.google.j2cl.transpiler.ast.NullLiteral;
 import com.google.j2cl.transpiler.ast.RuntimeMethods;
+import com.google.j2cl.transpiler.ast.SwitchStatement;
+import com.google.j2cl.transpiler.ast.TypeDescriptors;
 
-/** Replaces object == object expressions with Equality.$same(object, object) calls. */
+/**
+ * Replaces object == object expressions with Equality.$same(object, object) calls and coerces
+ * undefined to null in switch statement expressions.
+ */
 public class NormalizeEquality extends NormalizationPass {
   @Override
   public void applyTo(CompilationUnit compilationUnit) {
@@ -47,12 +56,49 @@ public class NormalizeEquality extends NormalizationPass {
             // null and undefined as equivalent.
             MethodCall sameCall =
                 RuntimeMethods.createEqualityMethodCall(
-                    "$same", binaryExpression.getLeftOperand(), binaryExpression.getRightOperand());
+                    "$same",
+                    hideNonComformingTypes(binaryExpression.getLeftOperand()),
+                    hideNonComformingTypes(binaryExpression.getRightOperand()));
             if (binaryExpression.getOperator() == BinaryOperator.NOT_EQUALS) {
               return sameCall.prefixNot();
             }
             return sameCall;
           }
+
+          @Override
+          public Node rewriteSwitchStatement(SwitchStatement switchStatement) {
+            boolean hasNonDefaultNullCase =
+                switchStatement.getCases().stream()
+                    .flatMap(c -> c.getCaseExpressions().stream())
+                    .anyMatch(NullLiteral.class::isInstance);
+            if (hasNonDefaultNullCase) {
+              // The coercion to null is only needed if there is an explicit `case null:` that is
+              // not the default case, since the default case will also handle `undefined` if not
+              // explicitly handled.
+              return switchStatement.toBuilder()
+                  .setExpression(
+                      MethodCall.builderFrom(
+                              TypeDescriptors.get()
+                                  .javaemulInternalJsUtils
+                                  .getMethodDescriptorByName("coerceToNull"))
+                          .setArguments(switchStatement.getExpression())
+                          .build())
+                  .build();
+            }
+            return switchStatement;
+          }
         });
+  }
+
+  // TODO(485937103): Remove when such types are handled properly in J2clEqualitySameRewriter.
+  private static Expression hideNonComformingTypes(Expression expression) {
+    if (expression.getTypeDescriptor() instanceof DeclaredTypeDescriptor declaredTypeDescriptor
+        && declaredTypeDescriptor.getQualifiedJsName().equals("gbigint")) {
+      return JsDocCastExpression.builder()
+          .setExpression(expression)
+          .setCastTypeDescriptor(TypeDescriptors.getUnknownType())
+          .build();
+    }
+    return expression;
   }
 }

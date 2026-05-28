@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package overwrittentypevariables
 
@@ -39,7 +40,7 @@ open class HashFunctions {
     }
    }
   }
-
+  
   @JvmStatic
   fun <T: Enum<T>> enumHashFunction(): HashFunction<T>? {
    return object : HashFunction<T> {

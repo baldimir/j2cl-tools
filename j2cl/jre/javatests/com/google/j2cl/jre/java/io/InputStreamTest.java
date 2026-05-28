@@ -15,13 +15,13 @@
  */
 package com.google.j2cl.jre.java.io;
 
+import static org.junit.Assert.assertThrows;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 
-/**
- * Unit test for the {@link java.io.InputStream} emulated class.
- */
+/** Unit test for the {@link java.io.InputStream} emulated class. */
 public class InputStreamTest extends InputStreamBaseTest {
 
   @Override
@@ -30,7 +30,9 @@ public class InputStreamTest extends InputStreamBaseTest {
       // note that GWT fails here when trying to use clone().
       private final byte[] b = Arrays.copyOf(expectedBytes, expectedBytes.length);
       private int index = 0;
-      @Override public int read() {
+
+      @Override
+      public int read() {
         int c = -1;
         if (index < b.length) {
           c = b[index];
@@ -67,10 +69,6 @@ public class InputStreamTest extends InputStreamBaseTest {
 
   public void testDefaultBehaviorOfReset() {
     final InputStream inputStream = createInputStream(new byte[] {});
-    try {
-      inputStream.reset();
-      fail("should have thrown IOException");
-    } catch (IOException expected) {
-    }
+    assertThrows(IOException.class, () -> inputStream.reset());
   }
 }

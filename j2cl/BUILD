@@ -27,6 +27,11 @@ closure_js_library(
 )
 
 alias(
+    name = "jre-j2wasm",
+    actual = "//jre/java:jre-j2wasm",
+)
+
+alias(
     name = "jsinterop-annotations",
     actual = "//third_party:jsinterop-annotations",
 )
@@ -64,24 +69,43 @@ alias(
 # J2CL this will be removed.
 string_flag(
     name = "experimental_java_frontend",
-    build_setting_default = "jdt",
+    build_setting_default = "",
     values = [
+        "",  # Default: let compiler itself decide.
         "jdt",
         "javac",
     ],
 )
 
-# Flag to enable j2kt-web experiment. Please talk to j2cl-team@ before using it.
+# Flag to configure j2kt-web experiment. Please talk to j2cl-team@ before using it.
+string_flag(
+    name = "j2kt_web_environment",
+    build_setting_default = "production",
+    values = [
+        # Enables J2KT/Web for the set packages in the J2KT_WEB_ENABLED allowlist.
+        "production",
+        # Enables J2KT/Web for the set packages in the J2KT_WEB_EXPERIMENT_ENABLED allowlist.
+        "experimental",
+        # Enables J2KT/Web for the set packages in the J2KT_WEB_STAGING_ENABLED allowlist.
+        "staging",
+        # Disables J2KT/Web for all targets, regardless of allowlist membership.
+        "disabled",
+    ],
+)
+
+# Flag to enable klibs experiment. Please talk to j2cl-team@ before using it.
 bool_flag(
-    name = "experimental_enable_j2kt_web",
+    name = "experimental_enable_klibs",
     build_setting_default = False,
 )
 
 # Flag to enable profiling for particular targets.
 # Example usage:
 #   blaze build <my_binary> --//:profiling_filter=<target_pattern>
-#   pprof --flame blaze-bin/<target>.profile
+#   pprof --flame blaze-bin/<target>_<mnemonic>.profile
+# You should also see the matched targets & corresponding pprof command in the blaze output.
 string_flag(
     name = "profiling_filter",
     build_setting_default = "<disabled>",
+    scope = "universal",
 )

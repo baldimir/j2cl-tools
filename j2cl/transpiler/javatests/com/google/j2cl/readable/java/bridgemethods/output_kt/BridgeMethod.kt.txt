@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package bridgemethods
 
@@ -30,7 +31,7 @@ import kotlin.Suppress
 
 interface SomeInterface<T, S> {
  fun foo(t: T, s: S)
-
+ 
  fun foo(t: T, n: Number?)
 }
 
@@ -40,15 +41,16 @@ open class SuperParent<T, S> internal constructor() {
 
 open class Parent<T: Error?> internal constructor(): SuperParent<T, Number?>() {
  override fun foo(t: T, s: Number?) {}
-
+ 
  open fun <T_1: Number?> bar(t: T_1) {}
-
+ 
  open fun <T_1> `fun`(t: T_1) {}
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class BridgeMethod: Parent<AssertionError?>(), SomeInterface<AssertionError?, Number?> {
  override fun foo(a: AssertionError?, n: Number?) {}
-
+ 
  open fun `fun`(t: Number?) {}
 }
 
@@ -56,18 +58,20 @@ fun interface SomeOtherFooInterface<T> {
  fun foo(t: T, s: Double?)
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class DualUnrelatedBridges internal constructor(): SomeInterface<String?, Double?>, SomeOtherFooInterface<String?> {
  override fun foo(s: String?, n: Double?) {}
-
+ 
  override fun foo(s: String?, n: Number?) {}
 }
 
 open class SuperDualUnrelatedAccidentalBridges internal constructor() {
  open fun foo(s: String?, n: Double?) {}
-
+ 
  open fun foo(s: String?, n: Number?) {}
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class DualUnrelatedAccidentalBridges internal constructor(): SuperDualUnrelatedAccidentalBridges(), SomeInterface<String?, Double?>, SomeOtherFooInterface<String?>
 
 fun interface Getter {
@@ -80,6 +84,7 @@ open class ClassWithParameterizedGet<T> internal constructor() {
  }
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class AccidentalOverrideBridge internal constructor(): ClassWithParameterizedGet<String?>(), Getter {
  open fun test() {
   val g: Getter = AccidentalOverrideBridge()
@@ -94,15 +99,16 @@ open class TestCase10036 internal constructor() {
    return "BI3 get String"
   }
  }
-
+ 
  fun interface BI2 {
   fun get(value: String?): String?
  }
-
+ 
  fun interface BI1: BI3 {
   override fun get(value: String?): String?
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  abstract class B<B1: Comparable<*>?> internal constructor(): BI1, BI2 {
   abstract fun get(value: B1): String?
  }
@@ -113,18 +119,19 @@ open class TestCase102 internal constructor() {
  fun interface BI2 {
   fun set(value: String?)
  }
-
+ 
  fun interface BI1 {
   fun set(value: String?)
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  abstract class B<B1> internal constructor(): BI1, BI2 {
   abstract fun set(value: B1)
  }
-
+ 
  open inner class C<B1> internal constructor(): B<B1>() {
   override fun set(value: String?) {}
-
+  
   override fun set(value: B1) {}
  }
 }
@@ -151,6 +158,7 @@ open class Consumer<T> internal constructor() {
  fun accept(t: T) {}
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class StringConsumerImpl internal constructor(): Consumer<String?>(), StringConsumer
 
 abstract class SpecializingReturnAbstractClass internal constructor() {
@@ -161,6 +169,7 @@ fun interface SpecializingReturnInterface {
  fun foo(): String?
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 abstract class SpecializingReturnAbstractSubclass internal constructor(): SpecializingReturnAbstractClass(), SpecializingReturnInterface
 
 interface InterfaceWithDefaultMethod {
@@ -173,8 +182,10 @@ fun interface InterfaceOverridingDefaultMethod: InterfaceWithDefaultMethod {
  override fun foo(): String?
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 abstract class DoesNotInheritDefaultMethod1 internal constructor(): InterfaceWithDefaultMethod, InterfaceOverridingDefaultMethod
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 abstract class DoesNotInheritDefaultMethod2 internal constructor(): InterfaceOverridingDefaultMethod, InterfaceWithDefaultMethod
 
 open class PackagePrivateBridgeSuper<T, U> internal constructor() {
@@ -183,7 +194,7 @@ open class PackagePrivateBridgeSuper<T, U> internal constructor() {
 
 class PackagePrivateBridge<V, W> internal constructor(): PackagePrivateBridgeSuper<V, W>() {
  public fun <S: V, R: PackagePrivateBridgeSuper<S, R>?> m(r: R, s: S, v: V, w: W) {}
-
+ 
  override fun <S: V, R: PackagePrivateBridgeSuper<S, R>?> m_pp_bridgemethods(arg0: R, arg1: S, arg2: V, arg3: W) {
   this.m(arg0, arg1, arg2, arg3)
  }

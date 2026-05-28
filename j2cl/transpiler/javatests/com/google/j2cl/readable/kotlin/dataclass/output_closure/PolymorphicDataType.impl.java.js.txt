@@ -5,10 +5,7 @@ const InterfaceType = goog.require('dataclass.InterfaceType$impl');
 const $Util = goog.require('nativebootstrap.Util$impl');
 
 let Integer = goog.forwardDeclare('java.lang.Integer$impl');
-let InternalPreconditions = goog.forwardDeclare('javaemul.internal.InternalPreconditions$impl');
-let JsUtils = goog.forwardDeclare('javaemul.internal.JsUtils$impl');
 let $Equality = goog.forwardDeclare('nativebootstrap.Equality$impl');
-let $Casts = goog.forwardDeclare('vmbootstrap.Casts$impl');
 let $Objects = goog.forwardDeclare('vmbootstrap.Objects$impl');
 
 /**
@@ -72,18 +69,12 @@ class PolymorphicDataType extends AbstractType {
  m_copy__int__int__int__dataclass_PolymorphicDataType(/** number */ a, /** number */ b, /** number */ c) {
   return PolymorphicDataType.$create__int__int__int(a, b, c);
  }
- /** @final @nodts @return {!PolymorphicDataType} */
- m_copy$default__int__int__int__dataclass_PolymorphicDataType(/** number= */ a, /** number= */ b, /** number= */ c) {
-  if (JsUtils.isUndefined(a)) {
-   a = this.f_a__dataclass_PolymorphicDataType_;
-  }
-  if (JsUtils.isUndefined(b)) {
-   b = this.f_b__dataclass_PolymorphicDataType_;
-  }
-  if (JsUtils.isUndefined(c)) {
-   c = this.f_c__dataclass_PolymorphicDataType_;
-  }
-  return this.m_copy__int__int__int__dataclass_PolymorphicDataType(a, b, c);
+ /** @nodts @return {!PolymorphicDataType} */
+ static m_copy$default__dataclass_PolymorphicDataType__int__int__int__dataclass_PolymorphicDataType(/** !PolymorphicDataType */ $this, /** number= */ a, /** number= */ b, /** number= */ c) {
+  let a$defaulted = $Util.$isUndefined(a) ? $this.f_a__dataclass_PolymorphicDataType_ : a;
+  let b$defaulted = $Util.$isUndefined(b) ? $this.f_b__dataclass_PolymorphicDataType_ : b;
+  let c$defaulted = $Util.$isUndefined(c) ? $this.f_c__dataclass_PolymorphicDataType_ : c;
+  return $this.m_copy__int__int__int__dataclass_PolymorphicDataType(a$defaulted, b$defaulted, c$defaulted);
  }
  /** @override @return {string} */
  toString() {
@@ -104,7 +95,7 @@ class PolymorphicDataType extends AbstractType {
   if (!PolymorphicDataType.$isInstance(other)) {
    return false;
   }
-  let tmp0_other_with_cast = /**@type {!PolymorphicDataType}*/ ($Casts.$to(InternalPreconditions.m_checkNotNull__java_lang_Object__java_lang_Object(other), PolymorphicDataType));
+  let tmp0_other_with_cast = /**@type {!PolymorphicDataType}*/ (other);
   if (this.f_a__dataclass_PolymorphicDataType_ != tmp0_other_with_cast.f_a__dataclass_PolymorphicDataType_) {
    return false;
   }
@@ -130,10 +121,7 @@ class PolymorphicDataType extends AbstractType {
  /** @nodts */
  static $loadModules() {
   Integer = goog.module.get('java.lang.Integer$impl');
-  InternalPreconditions = goog.module.get('javaemul.internal.InternalPreconditions$impl');
-  JsUtils = goog.module.get('javaemul.internal.JsUtils$impl');
   $Equality = goog.module.get('nativebootstrap.Equality$impl');
-  $Casts = goog.module.get('vmbootstrap.Casts$impl');
   $Objects = goog.module.get('vmbootstrap.Objects$impl');
  }
 }

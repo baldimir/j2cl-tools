@@ -10,6 +10,8 @@ let Number = goog.forwardDeclare('java.lang.Number$impl');
 let j_l_String = goog.forwardDeclare('java.lang.String$impl');
 let StringBuilder = goog.forwardDeclare('java.lang.StringBuilder$impl');
 let InternalPreconditions = goog.forwardDeclare('javaemul.internal.InternalPreconditions$impl');
+let Function0 = goog.forwardDeclare('kotlin.jvm.functions.Function0$impl');
+let $Long = goog.forwardDeclare('nativebootstrap.Long$impl');
 let $Numbers = goog.forwardDeclare('vmbootstrap.Numbers$impl');
 let $Objects = goog.forwardDeclare('vmbootstrap.Objects$impl');
 
@@ -50,15 +52,20 @@ class LocalFunctionKt extends j_l_Object {
   let message = '';
   let inductionVariable = start;
   if (inductionVariable <= end) {
-   let /** number */ k;
-   do {
-    k = inductionVariable;
-    inductionVariable = inductionVariable + 1 | 0;
-    let localFunctionInLoop = /**  @return {string}*/ (() =>{
-     return 'Hello';
-    });
-    message = j_l_String.m_valueOf__java_lang_Object__java_lang_String(message) + j_l_String.m_valueOf__java_lang_Object__java_lang_String(localFunctionInLoop());
-   } while (k != end);
+   while (true) {
+    let /** number */ k;
+    {
+     k = inductionVariable;
+     inductionVariable = inductionVariable + 1 | 0;
+     let localFunctionInLoop = /**  @return {string}*/ (() =>{
+      return 'Hello';
+     });
+     message = j_l_String.m_valueOf__java_lang_Object__java_lang_String(message) + j_l_String.m_valueOf__java_lang_Object__java_lang_String(localFunctionInLoop());
+    }
+    if (!(k != end)) {
+     break;
+    }
+   }
   }
   return message;
  }
@@ -83,7 +90,7 @@ class LocalFunctionKt extends j_l_Object {
  }
  /** @nodts @return {string} */
  static m_localFunctionInInlinedLambda__java_lang_String() {
-  let anonymous_$appendTwoDigit = (/** !Appendable */ this_1, /** !StringBuilder */ $this_apply, /** number */ number_1) =>{
+  let appendTwoDigits = (/** !Appendable */ this_1, /** !StringBuilder */ $this_apply, /** number */ number_1) =>{
    if (number_1 < 10) {
     this_1.m_append__char__java_lang_Appendable(48 /* '0' */);
    }
@@ -91,14 +98,14 @@ class LocalFunctionKt extends j_l_Object {
   };
   let tmp0__this_ = StringBuilder.$create__();
   let this_2 = tmp0__this_;
-  anonymous_$appendTwoDigit(this_2, this_2, 1);
+  appendTwoDigits(this_2, this_2, 1);
   return InternalPreconditions.m_checkNotNull__java_lang_Object__java_lang_Object(this_2.toString());
  }
  /** @nodts @template T @return {string} */
  static m_localFunctionWithGenericType__java_lang_Object__java_lang_String(/** T */ t) {
   let localFunction = /**  @template T @return {string}*/ ((/** T */ t_1) =>{
    let nestedLocalFunction = /**  @template T @return {string}*/ ((/** T */ t_2) =>{
-    return Integer.valueOf($Numbers.m_intValue__java_lang_Number__int(/**@type {!(Number|number)}*/ (t_2))).toString();
+    return Integer.valueOf($Numbers.m_intValue__java_lang_Number__int(/**@type {!(Number|number|!$Long)}*/ (t_2))).toString();
    });
    return j_l_String.m_valueOf__java_lang_Object__java_lang_String($Objects.m_toString__java_lang_Object__java_lang_String(t_1)) + j_l_String.m_valueOf__java_lang_Object__java_lang_String(nestedLocalFunction(1.2));
   });
@@ -122,10 +129,10 @@ class LocalFunctionKt extends j_l_Object {
   let localFunction = /**  @return {number}*/ ((/** number */ i) =>{
    return i;
   });
-  let localFunction_1 = /**  @return {number}*/ ((/** number */ i_1, /** number */ j) =>{
+  let localFunction_$1 = /**  @return {number}*/ ((/** number */ i_1, /** number */ j) =>{
    return i_1 + j | 0;
   });
-  return localFunction(1) + localFunction_1(1, 2) | 0;
+  return localFunction(1) + localFunction_$1(1, 2) | 0;
  }
  /** @nodts */
  static m_testBoxingUnboxing__void() {
@@ -135,6 +142,33 @@ class LocalFunctionKt extends j_l_Object {
    });
    return true;
   });
+ }
+ /** @nodts */
+ static m_testSameNameLocalFunctions__void() {
+  {
+   let local = /**  @return {string}*/ (() =>{
+    return 'foo';
+   });
+   local();
+  }
+  {
+   let local_$1 = /**  @return {string}*/ (() =>{
+    return 'bar';
+   });
+   local_$1();
+  }
+  let f = Function0.$adapt(/**  @return {string}*/ (() =>{
+   let local_1 = /**  @return {string}*/ (() =>{
+    return 'baz';
+   });
+   return local_1();
+  }));
+  f = Function0.$adapt(/**  @return {string}*/ (() =>{
+   let local_2 = /**  @return {string}*/ (() =>{
+    return 'zoo';
+   });
+   return local_2();
+  }));
  }
  /** @nodts */
  static $clinit() {
@@ -153,6 +187,7 @@ class LocalFunctionKt extends j_l_Object {
   j_l_String = goog.module.get('java.lang.String$impl');
   StringBuilder = goog.module.get('java.lang.StringBuilder$impl');
   InternalPreconditions = goog.module.get('javaemul.internal.InternalPreconditions$impl');
+  Function0 = goog.module.get('kotlin.jvm.functions.Function0$impl');
   $Numbers = goog.module.get('vmbootstrap.Numbers$impl');
   $Objects = goog.module.get('vmbootstrap.Objects$impl');
  }

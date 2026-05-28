@@ -1,0 +1,68 @@
+goog.module('dataclass.JvmRecordDataClassOverridingEquals$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class JvmRecordDataClassOverridingEquals extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {string} @nodts*/
+  this.f_s__dataclass_JvmRecordDataClassOverridingEquals_;
+ }
+ /** @nodts @return {!JvmRecordDataClassOverridingEquals} */
+ static $create__java_lang_String(/** string */ s) {
+  JvmRecordDataClassOverridingEquals.$clinit();
+  let $instance = new JvmRecordDataClassOverridingEquals();
+  $instance.$ctor__dataclass_JvmRecordDataClassOverridingEquals__java_lang_String__void(s);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__dataclass_JvmRecordDataClassOverridingEquals__java_lang_String__void(/** string */ s) {
+  this.$ctor__java_lang_Record__void();
+  this.f_s__dataclass_JvmRecordDataClassOverridingEquals_ = s;
+  $J2CL_PRESERVE$(this.f_s__dataclass_JvmRecordDataClassOverridingEquals_);
+ }
+ /** @final @nodts @return {string} */
+ m_s__java_lang_String() {
+  return this.f_s__dataclass_JvmRecordDataClassOverridingEquals_;
+ }
+ /** @override @return {boolean} */
+ equals(/** * */ other) {
+  return false;
+ }
+ /** @final @nodts @return {string} */
+ m_component1__java_lang_String() {
+  return this.f_s__dataclass_JvmRecordDataClassOverridingEquals_;
+ }
+ /** @final @nodts @return {!JvmRecordDataClassOverridingEquals} */
+ m_copy__java_lang_String__dataclass_JvmRecordDataClassOverridingEquals(/** string */ s) {
+  return JvmRecordDataClassOverridingEquals.$create__java_lang_String(s);
+ }
+ /** @nodts @return {!JvmRecordDataClassOverridingEquals} */
+ static m_copy$default__dataclass_JvmRecordDataClassOverridingEquals__java_lang_String__dataclass_JvmRecordDataClassOverridingEquals(/** !JvmRecordDataClassOverridingEquals */ $this, /** string= */ s) {
+  let s$defaulted = $Util.$isUndefined(s) ? $this.f_s__dataclass_JvmRecordDataClassOverridingEquals_ : s;
+  return $this.m_copy__java_lang_String__dataclass_JvmRecordDataClassOverridingEquals(s$defaulted);
+ }
+ /** @nodts */
+ static $clinit() {
+  JvmRecordDataClassOverridingEquals.$clinit = () =>{};
+  JvmRecordDataClassOverridingEquals.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof JvmRecordDataClassOverridingEquals;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(JvmRecordDataClassOverridingEquals, 'dataclass.JvmRecordDataClassOverridingEquals');
+
+exports = JvmRecordDataClassOverridingEquals;
+
+//# sourceMappingURL=JvmRecordDataClassOverridingEquals.js.map

@@ -1,0 +1,96 @@
+goog.module('recordclass.RecordClass$impl');
+
+const j_l_Object = goog.require('java.lang.Object$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+let j_l_String = goog.forwardDeclare('java.lang.String$impl');
+let $int = goog.forwardDeclare('javaemul.internal.primitives.$int$impl');
+let $Equality = goog.forwardDeclare('nativebootstrap.Equality$impl');
+let $1GenericRecord = goog.forwardDeclare('recordclass.RecordClass.$1GenericRecord$impl');
+let $1LocalRecord = goog.forwardDeclare('recordclass.RecordClass.$1LocalRecord$impl');
+let $1R1 = goog.forwardDeclare('recordclass.RecordClass.$1R1$impl');
+let $1R2 = goog.forwardDeclare('recordclass.RecordClass.$1R2$impl');
+let $1RecursiveRecord = goog.forwardDeclare('recordclass.RecordClass.$1RecursiveRecord$impl');
+let ArrayRecord = goog.forwardDeclare('recordclass.RecordClass.ArrayRecord$impl');
+let RecordWithConstructor = goog.forwardDeclare('recordclass.RecordClass.RecordWithConstructor$impl');
+let SimpleRecord = goog.forwardDeclare('recordclass.RecordClass.SimpleRecord$impl');
+let $Arrays = goog.forwardDeclare('vmbootstrap.Arrays$impl');
+let $Casts = goog.forwardDeclare('vmbootstrap.Casts$impl');
+let $Objects = goog.forwardDeclare('vmbootstrap.Objects$impl');
+
+class RecordClass extends j_l_Object {
+ /** @protected @nodts */
+ constructor() {
+  super();
+ }
+ /** @nodts @return {!RecordClass} */
+ static $create__() {
+  RecordClass.$clinit();
+  let $instance = new RecordClass();
+  $instance.$ctor__recordclass_RecordClass__void();
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass__void() {
+  this.$ctor__java_lang_Object__void();
+ }
+ /** @nodts */
+ m_main__void() {
+  let r = SimpleRecord.$create__int(1);
+  r.m_value__int();
+  let ar = ArrayRecord.$create__arrayOf_int(/**@type {!Array<number>}*/ ($Arrays.$stampType([1, 2], $int)));
+  let arValueResult = ar.m_value__arrayOf_int()[0];
+  let rwc = RecordWithConstructor.$create__int__int(1, 2);
+  rwc.m_a__int();
+  rwc.m_b__int();
+ }
+ /** @nodts */
+ static m_testLocalRecordClass__void() {
+  let lr = $1LocalRecord.$create__int(1);
+ }
+ /** @nodts */
+ static m_testRecordPatterns__void() {
+  let r = $1R1.$create__java_lang_Object__java_lang_String__recordclass_RecordClass_1R2($1R2.$create__int__java_lang_Object(1, 'a'), 'b', $1R2.$create__int__java_lang_Object(3, 'c'));
+  let /** $1R1 */ pattern$1R1, /** * */ exp, /** $1R2 */ pattern$1R2, /** number */ i1, /** * */ exp_1, /** ?string */ s1, /** * */ s2, /** $1R2 */ n, /** $1R1 */ pattern$1R1_1, /** * */ exp_2, /** $1R2 */ pattern$1R2_1, /** number */ i1_1, /** * */ exp_3, /** ?string */ s1_1, /** * */ s2_1, /** $1R2 */ n_1, /** $1RecursiveRecord */ pattern$1RecursiveRecord, /** $1RecursiveRecord */ exp_4, /** $1RecursiveRecord */ pattern$1RecursiveRecord_1, /** $1RecursiveRecord */ r1, /** $1GenericRecord<?string> */ pattern$1GenericRecord, /** ?string */ s;
+  let b = !$Equality.$same(r, null) && (pattern$1R1 = (/**@type {!$1R1}*/ (r)), exp = pattern$1R1.m_o__java_lang_Object(), $1R2.$isInstance(exp) && (pattern$1R2 = (/**@type {!$1R2}*/ ($Casts.$to(exp, $1R2))), i1 = pattern$1R2.m_i__int(), exp_1 = pattern$1R2.m_o__java_lang_Object(), j_l_String.$isInstance(exp_1) && (s1 = (/**@type {string}*/ ($Casts.$to(exp_1, j_l_String))), s2 = pattern$1R1.m_s__java_lang_String(), n = pattern$1R1.m_n__recordclass_RecordClass_1R2(), i1 == 1))) && j_l_String.m_equals__java_lang_String__java_lang_Object__boolean(s1, 'a') && $Objects.m_equals__java_lang_Object__java_lang_Object__boolean(s2, 'b') && n.m_i__int() == 3 && $Objects.m_equals__java_lang_Object__java_lang_Object__boolean(n.m_o__java_lang_Object(), 'c');
+  let o = $1R1.$create__java_lang_Object__java_lang_String__recordclass_RecordClass_1R2($1R2.$create__int__java_lang_Object(1, 'a'), 'b', $1R2.$create__int__java_lang_Object(3, 'c'));
+  let b1 = $1R1.$isInstance(o) && (pattern$1R1_1 = (/**@type {!$1R1}*/ ($Casts.$to(o, $1R1))), exp_2 = pattern$1R1_1.m_o__java_lang_Object(), $1R2.$isInstance(exp_2) && (pattern$1R2_1 = (/**@type {!$1R2}*/ ($Casts.$to(exp_2, $1R2))), i1_1 = pattern$1R2_1.m_i__int(), exp_3 = pattern$1R2_1.m_o__java_lang_Object(), j_l_String.$isInstance(exp_3) && (s1_1 = (/**@type {string}*/ ($Casts.$to(exp_3, j_l_String))), s2_1 = pattern$1R1_1.m_s__java_lang_String(), n_1 = pattern$1R1_1.m_n__recordclass_RecordClass_1R2(), true)));
+  o = $1RecursiveRecord.$create__recordclass_RecordClass_1RecursiveRecord(null);
+  b1 = $1RecursiveRecord.$isInstance(o) && (pattern$1RecursiveRecord = (/**@type {!$1RecursiveRecord}*/ ($Casts.$to(o, $1RecursiveRecord))), exp_4 = pattern$1RecursiveRecord.m_r__recordclass_RecordClass_1RecursiveRecord(), !$Equality.$same(exp_4, null) && (pattern$1RecursiveRecord_1 = (/**@type {!$1RecursiveRecord}*/ (exp_4)), r1 = pattern$1RecursiveRecord_1.m_r__recordclass_RecordClass_1RecursiveRecord(), true));
+  let genericRecord = /**@type {!$1GenericRecord<?string>}*/ ($1GenericRecord.$create__java_lang_Object('abc'));
+  let b2 = !$Equality.$same(genericRecord, null) && (pattern$1GenericRecord = (/**@type {!$1GenericRecord<?string>}*/ (genericRecord)), s = (/**@type {?string}*/ ($Casts.$to(pattern$1GenericRecord.m_value__java_lang_Object(), j_l_String))), true);
+ }
+ /** @nodts */
+ static $clinit() {
+  RecordClass.$clinit = () =>{};
+  RecordClass.$loadModules();
+  j_l_Object.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof RecordClass;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {
+  j_l_String = goog.module.get('java.lang.String$impl');
+  $int = goog.module.get('javaemul.internal.primitives.$int$impl');
+  $Equality = goog.module.get('nativebootstrap.Equality$impl');
+  $1GenericRecord = goog.module.get('recordclass.RecordClass.$1GenericRecord$impl');
+  $1LocalRecord = goog.module.get('recordclass.RecordClass.$1LocalRecord$impl');
+  $1R1 = goog.module.get('recordclass.RecordClass.$1R1$impl');
+  $1R2 = goog.module.get('recordclass.RecordClass.$1R2$impl');
+  $1RecursiveRecord = goog.module.get('recordclass.RecordClass.$1RecursiveRecord$impl');
+  ArrayRecord = goog.module.get('recordclass.RecordClass.ArrayRecord$impl');
+  RecordWithConstructor = goog.module.get('recordclass.RecordClass.RecordWithConstructor$impl');
+  SimpleRecord = goog.module.get('recordclass.RecordClass.SimpleRecord$impl');
+  $Arrays = goog.module.get('vmbootstrap.Arrays$impl');
+  $Casts = goog.module.get('vmbootstrap.Casts$impl');
+  $Objects = goog.module.get('vmbootstrap.Objects$impl');
+ }
+}
+$Util.$setClassMetadata(RecordClass, 'recordclass.RecordClass');
+
+exports = RecordClass;
+
+//# sourceMappingURL=RecordClass.js.map

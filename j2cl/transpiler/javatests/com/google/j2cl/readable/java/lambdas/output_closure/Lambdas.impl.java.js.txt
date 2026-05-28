@@ -7,12 +7,12 @@ let Enum = goog.forwardDeclare('java.lang.Enum$impl');
 let Error = goog.forwardDeclare('java.lang.Error$impl');
 let Integer = goog.forwardDeclare('java.lang.Integer$impl');
 let Iterable = goog.forwardDeclare('java.lang.Iterable$impl');
-let Long = goog.forwardDeclare('java.lang.Long$impl');
 let RuntimeException = goog.forwardDeclare('java.lang.RuntimeException$impl');
 let j_l_String = goog.forwardDeclare('java.lang.String$impl');
 let Throwable = goog.forwardDeclare('java.lang.Throwable$impl');
 let Iterator = goog.forwardDeclare('java.util.Iterator$impl');
-let $1 = goog.forwardDeclare('lambdas.Lambdas.$1$impl');
+let Exceptions = goog.forwardDeclare('javaemul.internal.Exceptions$impl');
+let $3 = goog.forwardDeclare('lambdas.Lambdas.$3$impl');
 let $4 = goog.forwardDeclare('lambdas.Lambdas.$4$impl');
 let $LambdaAdaptor$1 = goog.forwardDeclare('lambdas.Lambdas.$LambdaAdaptor$1$impl');
 let $LambdaAdaptor$2 = goog.forwardDeclare('lambdas.Lambdas.$LambdaAdaptor$2$impl');
@@ -34,7 +34,6 @@ let Wrapper = goog.forwardDeclare('lambdas.Lambdas.Wrapper$impl');
 let $Equality = goog.forwardDeclare('nativebootstrap.Equality$impl');
 let $Long = goog.forwardDeclare('nativebootstrap.Long$impl');
 let $Casts = goog.forwardDeclare('vmbootstrap.Casts$impl');
-let $Exceptions = goog.forwardDeclare('vmbootstrap.Exceptions$impl');
 
 class Lambdas extends j_l_Object {
  /** @protected @nodts */
@@ -176,15 +175,15 @@ class Lambdas extends j_l_Object {
   })), /**@type {Enum<T>}*/ (null));
   this.m_callWithBiFunction__lambdas_Lambdas_BiFunction__lambdas_Lambdas_GenericFunctionalInterface_$pp_lambdas(BiFunction.$adapt(/**  @return {?number}*/ ((/** * */ x, /** ?string */ y) =>{
    let y_1 = /**@type {?string}*/ ($Casts.$to(y, j_l_String));
-   throw $Exceptions.toJs(RuntimeException.$create__());
+   throw Exceptions.m_toJs__java_lang_Throwable__javaemul_internal_ThrowableUtils_JsObject(RuntimeException.$create__());
   })));
   this.m_callWithBiFunction__lambdas_Lambdas_BiFunction__lambdas_Lambdas_GenericFunctionalInterface_$pp_lambdas(BiFunction.$adapt(/**  @return {?number}*/ ((/** * */ x_1, /** ?string */ y_2) =>{
    let y_3 = /**@type {?string}*/ ($Casts.$to(y_2, j_l_String));
    return 3;
   })));
-  let f = Lambdas_Function.$adapt(/**  @return {?}*/ ((/** ? */ item) =>{
+  let f = Lambdas_Function.$adapt(/**  @return {*}*/ ((/** T */ item) =>{
    let item_1 = /**@type {T}*/ ($Casts.$to(item, Enum));
-   return Long.m_valueOf__long__java_lang_Long($Long.fromInt(1));
+   return $Long.fromInt(1);
   }));
   let f2 = Lambdas_Function.$adapt(/**  @return {?string}*/ ((/** Wrapper<?string> */ item_2) =>{
    let item_3 = /**@type {Wrapper<?string>}*/ ($Casts.$to(item_2, Wrapper));
@@ -199,7 +198,7 @@ class Lambdas extends j_l_Object {
  /** @nodts */
  static m_testLambdaCallingStaticMethod__void() {
   Lambdas.$clinit();
-  let f = Lambdas_Function.$adapt(/**  @return {?}*/ ((/** * */ l) =>{
+  let f = Lambdas_Function.$adapt(/**  @return {*}*/ ((/** * */ l) =>{
    return Lambdas.m_m__java_lang_Object();
   }));
  }
@@ -212,7 +211,7 @@ class Lambdas extends j_l_Object {
  /** @nodts */
  m_testAnonymousInsideLambda__void() {
   let runner = FunctionalInterfaceWithMethodReturningVoid.$adapt(() =>{
-   $4.$create__lambdas_Lambdas(this);
+   $3.$create__lambdas_Lambdas(this);
   });
  }
  /** @nodts @template E @return {?function(E):E} */
@@ -272,8 +271,8 @@ class Lambdas extends j_l_Object {
  }
  /** @nodts @template T */
  m_testParameterizedTypeWithUnusedTypeVariable__void() {
-  Lambdas.m_acceptsSupplier__lambdas_Lambdas_Supplier__void(Supplier.$adapt(/**  @return {$1<T>}*/ (() =>{
-   return $1.$create__lambdas_Lambdas(this);
+  Lambdas.m_acceptsSupplier__lambdas_Lambdas_Supplier__void(Supplier.$adapt(/**  @return {$4<T>}*/ (() =>{
+   return /**@type {!$4<T>}*/ ($4.$create__lambdas_Lambdas(this));
   })));
  }
  /** @nodts @template T */
@@ -300,10 +299,10 @@ class Lambdas extends j_l_Object {
   Error = goog.module.get('java.lang.Error$impl');
   Integer = goog.module.get('java.lang.Integer$impl');
   Iterable = goog.module.get('java.lang.Iterable$impl');
-  Long = goog.module.get('java.lang.Long$impl');
   RuntimeException = goog.module.get('java.lang.RuntimeException$impl');
   j_l_String = goog.module.get('java.lang.String$impl');
-  $1 = goog.module.get('lambdas.Lambdas.$1$impl');
+  Exceptions = goog.module.get('javaemul.internal.Exceptions$impl');
+  $3 = goog.module.get('lambdas.Lambdas.$3$impl');
   $4 = goog.module.get('lambdas.Lambdas.$4$impl');
   $LambdaAdaptor$1 = goog.module.get('lambdas.Lambdas.$LambdaAdaptor$1$impl');
   $LambdaAdaptor$2 = goog.module.get('lambdas.Lambdas.$LambdaAdaptor$2$impl');
@@ -324,7 +323,6 @@ class Lambdas extends j_l_Object {
   $Equality = goog.module.get('nativebootstrap.Equality$impl');
   $Long = goog.module.get('nativebootstrap.Long$impl');
   $Casts = goog.module.get('vmbootstrap.Casts$impl');
-  $Exceptions = goog.module.get('vmbootstrap.Exceptions$impl');
  }
 }
 /**@type {IdentityFunction} @nodts*/

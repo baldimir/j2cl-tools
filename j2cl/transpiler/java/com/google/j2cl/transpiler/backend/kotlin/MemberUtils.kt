@@ -41,7 +41,7 @@ private val Method.needsFinalModifier: Boolean
       isJavaOverride &&
       descriptor.enclosingTypeDescriptor.typeDeclaration.isOpen
 
-internal val Method.renderedStatements: List<Statement>
+internal val Method.includedStatements: List<Statement>
   get() {
     if (!descriptor.isKtDisabled) {
       return body.statements.filter { !AstUtils.isConstructorInvocationStatement(it) }
@@ -52,7 +52,7 @@ internal val Method.renderedStatements: List<Statement>
     }
 
     return listOf(
-      ReturnStatement.newBuilder()
+      ReturnStatement.builder()
         .setSourcePosition(sourcePosition)
         .setExpression(descriptor.returnTypeDescriptor.defaultValue)
         .build()
@@ -69,8 +69,10 @@ internal val Field.isKtLateInit: Boolean
               it.qualifiedSourceName == "org.junit.TestCase"
           }
       }
-    return (descriptor.ktInfo.isUninitializedWarningSuppressed || isTestProperty) &&
+    return (descriptor.isWarningSuppressed("nullness:initialization.field.uninitialized") ||
+      isTestProperty) &&
       !descriptor.isFinal &&
       !descriptor.typeDescriptor.isNullable &&
+      !TypeDescriptors.isBoxedType(descriptor.typeDescriptor) &&
       !hasInitializer()
   }

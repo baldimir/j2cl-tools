@@ -19,11 +19,16 @@ import com.google.j2cl.integration.testing.Asserts.assertEquals
 import com.google.j2cl.integration.testing.Asserts.assertFalse
 import com.google.j2cl.integration.testing.Asserts.assertSame
 import com.google.j2cl.integration.testing.Asserts.assertThrowsClassCastException
+import com.google.j2cl.integration.testing.AssertsBase.assertTrue
+import jsinterop.annotations.JsFunction
 
 fun main(vararg unused: String) {
-  testUnitVariable()
+  testUnitFun()
   testUnitVariable()
   testUnitGetterWithSideEffects()
+  testGenericUnitLambdas()
+  testUnitBlock()
+  testUnitSpecialization()
   testNothingCast()
   testNothingIs()
 }
@@ -62,6 +67,34 @@ fun testUnitGetterWithSideEffects() {
   assertEquals(1, counter)
 }
 
+fun testGenericUnitLambdas() {
+  genericFunExpectingUnitBlock {}
+  genericFunExpectingUnitBlock {
+    return@genericFunExpectingUnitBlock
+  }
+  genericFunExpectingUnitBlock(::unitFun)
+  genericFunExpectingUnitBlock(::unitField)
+  genericFunExpectingJsFunctionReturningUnit {}
+  genericFunExpectingJsFunctionReturningUnit {
+    return@genericFunExpectingJsFunctionReturningUnit
+  }
+  genericFunExpectingJsFunctionReturningUnit(::unitFun)
+  genericFunExpectingJsFunctionReturningUnit(::unitField)
+}
+
+private fun <T> genericFunExpectingUnitBlock(block: () -> T) {
+  assertSame(Unit, block())
+}
+
+@JsFunction
+fun interface GenericJsFunction<T> {
+  fun execute(): T
+}
+
+private fun <T> genericFunExpectingJsFunctionReturningUnit(returnUnit: GenericJsFunction<T>) {
+  assertSame(Unit, returnUnit.execute())
+}
+
 fun returnUnitBlock(a: Int): Unit =
   when (a) {
     1 -> unitFun()
@@ -76,6 +109,52 @@ fun testUnitBlock() {
       else -> Unit
     }
   assertSame(Unit, foo)
+}
+
+fun testUnitSpecialization() {
+  val unitHolder = UnitHolder(Unit)
+  assertSame(Unit, unitHolder.getValue())
+  val holder: Holder<out Unit> = UnitHolder(Unit)
+  assertSame(Unit, holder.getValue())
+
+  val unitList = UnitList()
+  unitList.add(Unit)
+  unitList.add(Unit)
+  unitList.add(Unit)
+
+  assertEquals(3, unitList.size)
+  assertTrue(unitList.contains(Unit))
+  assertEquals(0, unitList.indexOf(Unit))
+  assertEquals(2, unitList.lastIndexOf(Unit))
+  assertSame(Unit, unitList[1])
+
+  val anyList = unitList as List<Any>
+  assertFalse(anyList.contains(Any()))
+  assertTrue(anyList.contains(Unit))
+  assertEquals(-1, unitList.indexOf(Any()))
+  assertEquals(0, unitList.indexOf(Unit))
+}
+
+private interface Holder<T> {
+  fun getValue(): T
+}
+
+private class UnitHolder(private val v: Unit) : Holder<Unit> {
+  override fun getValue() = v
+}
+
+class UnitList : ArrayList<Unit>() {
+  override fun lastIndexOf(element: Unit): Int = super.lastIndexOf(element)
+
+  override fun indexOf(element: Unit): Int = super.indexOf(element)
+
+  override fun containsAll(elements: Collection<Unit>): Boolean = super.containsAll(elements)
+
+  override fun contains(element: Unit): Boolean = super.contains(element)
+
+  override fun removeAt(element: Int): Unit = super.removeAt(element)
+
+  override fun get(index: Int): Unit = super.get(index)
 }
 
 fun testNothingCast() {

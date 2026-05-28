@@ -22,7 +22,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.AstUtils;
-import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Field;
 import com.google.j2cl.transpiler.ast.FieldAccess;
@@ -77,7 +76,7 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
                 AstUtils.declarationStatement(field, type.getSourcePosition()));
             // Remove the initialization value from the field, to preserve the AST invariant that
             // the AST is a proper tree, i.e. a node has only one parent.
-            return Field.Builder.from(field).setInitializer(null).build();
+            return field.toBuilder().setInitializer(null).build();
           }
         });
   }
@@ -104,7 +103,7 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
             if (!triggersClinit(field.getDescriptor(), type)) {
               return field;
             }
-            return Field.Builder.from(getBackingFieldDescriptor(field.getDescriptor()))
+            return Field.builderFrom(getBackingFieldDescriptor(field.getDescriptor()))
                 .setInitializer(field.getInitializer())
                 .setSourcePosition(field.getSourcePosition())
                 .build();
@@ -127,7 +126,7 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
               // Accesses to the field directly trigger clinit, but that is not necessary
               // within the enclosing type, so access the actual backing field and skip
               // the redundant clinit call.
-              return FieldAccess.Builder.from(getBackingFieldDescriptor(fieldDescriptor)).build();
+              return FieldAccess.builderFrom(getBackingFieldDescriptor(fieldDescriptor)).build();
             }
 
             return fieldAccess;
@@ -138,17 +137,17 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
   public void synthesizePropertyGetter(Type type, Field field) {
     FieldDescriptor fieldDescriptor = field.getDescriptor();
     type.addMember(
-        Method.newBuilder()
+        Method.builder()
             .setSourcePosition(field.getSourcePosition())
             .setMethodDescriptor(AstUtils.getGetterMethodDescriptor(fieldDescriptor))
             .addStatements(
                 AstUtils.createReturnOrExpressionStatement(
                     field.getSourcePosition(),
-                    MultiExpression.newBuilder()
+                    MultiExpression.builder()
                         .addExpressions(
                             createClinitCallExpression(
                                 fieldDescriptor.getEnclosingTypeDescriptor()),
-                            FieldAccess.Builder.from(fieldDescriptor).build())
+                            FieldAccess.builderFrom(fieldDescriptor).build())
                         .build(),
                     fieldDescriptor.getTypeDescriptor()))
             .build());
@@ -157,23 +156,23 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
   public void synthesizePropertySetter(Type type, Field field) {
     FieldDescriptor fieldDescriptor = field.getDescriptor();
     Variable parameter =
-        Variable.newBuilder()
+        Variable.builder()
             .setName("value")
             .setTypeDescriptor(fieldDescriptor.getTypeDescriptor())
             .setParameter(true)
             .build();
     type.addMember(
-        Method.newBuilder()
+        Method.builder()
             .setSourcePosition(field.getSourcePosition())
             .setMethodDescriptor(AstUtils.getSetterMethodDescriptor(fieldDescriptor))
             .setParameters(parameter)
             .addStatements(
-                MultiExpression.newBuilder()
+                MultiExpression.builder()
                     .addExpressions(
                         createClinitCallExpression(fieldDescriptor.getEnclosingTypeDescriptor()),
-                        BinaryExpression.Builder.asAssignmentTo(fieldDescriptor)
-                            .setRightOperand(parameter)
-                            .build())
+                        FieldAccess.builderFrom(fieldDescriptor)
+                            .build()
+                            .infixAssign(parameter.createReference()))
                     .build()
                     .makeStatement(field.getSourcePosition()))
             .build());
@@ -184,7 +183,7 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
     checkArgument(
         fieldDescriptor.isStatic()
             && fieldDescriptor.getOrigin() != FieldOrigin.SYNTHETIC_BACKING_FIELD);
-    return FieldDescriptor.Builder.from(fieldDescriptor)
+    return fieldDescriptor.toBuilder()
         .setName("$static_" + fieldDescriptor.getName())
         .setEnumConstant(false)
         .setOriginalJsInfo(JsInfo.NONE)
@@ -208,18 +207,18 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
 
     // Class.$clinit = () => {};
     Statement noopClinitFunction =
-        BinaryExpression.Builder.asAssignmentTo(clinitMethodFieldDescriptor)
-            .setRightOperand(
-                FunctionExpression.newBuilder()
+        FieldAccess.builderFrom(clinitMethodFieldDescriptor)
+            .build()
+            .infixAssign(
+                FunctionExpression.builder()
                     .setTypeDescriptor(runnableJsFunctionDescriptor)
                     .setSourcePosition(sourcePosition)
                     .build())
-            .build()
             .makeStatement(sourcePosition);
 
     // Class.$loadModules();
     Statement callLoadModules =
-        MethodCall.Builder.from(AstUtils.getLoadModulesDescriptor(type.getTypeDescriptor()))
+        MethodCall.builderFrom(AstUtils.getLoadModulesDescriptor(type.getTypeDescriptor()))
             .build()
             .makeStatement(sourcePosition);
 
@@ -230,7 +229,7 @@ public class ImplementStaticInitializationViaClinitFunctionRedirection
             .collect(toImmutableList());
 
     type.addMember(
-        Method.newBuilder()
+        Method.builder()
             .setMethodDescriptor(type.getTypeDescriptor().getClinitMethodDescriptor())
             .addStatements(noopClinitFunction, callLoadModules)
             .addStatements(clinitStatements)

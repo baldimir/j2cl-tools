@@ -78,6 +78,14 @@ class ToStringRenderer {
       }
 
       @Override
+      public boolean enterBindingPattern(BindingPattern bindingPattern) {
+        print(bindingPattern.getTypeDescriptor());
+        print(" ");
+        print(bindingPattern.getVariable().getName());
+        return false;
+      }
+
+      @Override
       public boolean enterBlock(Block block) {
         print("{");
         indent();
@@ -430,6 +438,14 @@ class ToStringRenderer {
       }
 
       @Override
+      public boolean enterPatternMatchExpression(PatternMatchExpression patternMatchExpression) {
+        accept(patternMatchExpression.getExpression());
+        print(" instanceof ");
+        accept(patternMatchExpression.getPattern());
+        return false;
+      }
+
+      @Override
       public boolean enterPostfixExpression(PostfixExpression binaryExpression) {
         accept(binaryExpression.getOperand());
         print(binaryExpression.getOperator().getSymbol());
@@ -440,6 +456,15 @@ class ToStringRenderer {
       public boolean enterPrefixExpression(PrefixExpression binaryExpression) {
         print(binaryExpression.getOperator().getSymbol());
         accept(binaryExpression.getOperand());
+        return false;
+      }
+
+      @Override
+      public boolean enterRecordPattern(RecordPattern recordPattern) {
+        print(recordPattern.getTypeDescriptor());
+        print("(");
+        printSeparated(",", recordPattern.getNestedPatterns());
+        print(")");
         return false;
       }
 
@@ -486,13 +511,33 @@ class ToStringRenderer {
       }
 
       @Override
-      public boolean enterSwitchCase(SwitchCase switchCase) {
-        if (switchCase.isDefault()) {
-          print("default");
-        } else {
-          print("case ");
-          printSeparated(", ", switchCase.getCaseExpressions());
+      public boolean enterSwitchCaseDefault(SwitchCaseDefault switchCase) {
+        print("default");
+        printSwitchCaseBody(switchCase);
+        return false;
+      }
+
+      @Override
+      public boolean enterSwitchCaseExpressions(SwitchCaseExpressions switchCase) {
+        print("case ");
+        printSeparated(", ", switchCase.getCaseExpressions());
+        printSwitchCaseBody(switchCase);
+        return false;
+      }
+
+      @Override
+      public boolean enterSwitchCasePattern(SwitchCasePattern switchCase) {
+        print("case ");
+        accept(switchCase.getPattern());
+        if (switchCase.getGuard() != null) {
+          print(" when ");
+          accept(switchCase.getGuard());
         }
+        printSwitchCaseBody(switchCase);
+        return false;
+      }
+
+      private void printSwitchCaseBody(SwitchCase switchCase) {
         print(switchCase.canFallthrough() ? ":" : " ->");
         indent();
         for (Statement statement : switchCase.getStatements()) {
@@ -500,8 +545,6 @@ class ToStringRenderer {
           accept(statement);
         }
         unIndent();
-
-        return false;
       }
 
       @Override

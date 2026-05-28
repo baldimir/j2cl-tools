@@ -1,0 +1,6 @@
+
+
+;;; TestJsFunctionInJsOverlayCapturingOuter()
+(func $m_<init>__@jsfunction.Main.TestJsFunctionInJsOverlayCapturingOuter (import "imports" "Array.constructor") 
+ (result (ref null extern))
+)

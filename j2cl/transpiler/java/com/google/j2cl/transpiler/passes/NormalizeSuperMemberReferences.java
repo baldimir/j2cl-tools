@@ -40,10 +40,9 @@ public class NormalizeSuperMemberReferences extends NormalizationPass {
         new AbstractRewriter() {
           @Override
           public MethodCall rewriteMethodCall(MethodCall methodCall) {
-            if (!(methodCall.getQualifier() instanceof SuperReference)) {
+            if (!(methodCall.getQualifier() instanceof SuperReference qualifier)) {
               return methodCall;
             }
-            SuperReference qualifier = (SuperReference) methodCall.getQualifier();
 
             if (methodCall.getTarget().isDefaultMethod() || methodCall.isStaticDispatch()) {
               // Treat calls to interface default method as static dispatch (targeting the default
@@ -51,7 +50,7 @@ public class NormalizeSuperMemberReferences extends NormalizationPass {
               // Make all static dispatch calls to go through ThisReference instead of super, since
               // in that case the qualifier becomes a parameter of the explicit call and super
               // is only valid as a qualifier.
-              return MethodCall.Builder.from(methodCall)
+              return methodCall.toBuilder()
                   .setStaticDispatch(true)
                   .setQualifier(new ThisReference(qualifier.getTypeDescriptor(), false))
                   .build();
@@ -68,7 +67,7 @@ public class NormalizeSuperMemberReferences extends NormalizationPass {
             // use a ThisReference instead of a SuperReference and mark the class explicitly as
             // static dispatch. SuperReferences are only used when targeting methods of an actual
             // superclass of the class that enclosed the code in question.
-            return MethodCall.Builder.from(methodCall)
+            return methodCall.toBuilder()
                 .setQualifier(new ThisReference(qualifier.getTypeDescriptor(), true))
                 .setStaticDispatch(true)
                 .build();
@@ -76,14 +75,13 @@ public class NormalizeSuperMemberReferences extends NormalizationPass {
 
           @Override
           public FieldAccess rewriteFieldAccess(FieldAccess fieldAccess) {
-            if (!(fieldAccess.getQualifier() instanceof SuperReference)) {
+            if (!(fieldAccess.getQualifier() instanceof SuperReference qualifier)) {
               return fieldAccess;
             }
-            SuperReference qualifier = (SuperReference) fieldAccess.getQualifier();
 
             // Always rewrite super field accesses to go through "this" instead of super, the
             // FieldDescriptor uniquely determines which field to access.
-            return FieldAccess.Builder.from(fieldAccess)
+            return fieldAccess.toBuilder()
                 .setQualifier(
                     new ThisReference(qualifier.getTypeDescriptor(), qualifier.isQualified()))
                 .build();

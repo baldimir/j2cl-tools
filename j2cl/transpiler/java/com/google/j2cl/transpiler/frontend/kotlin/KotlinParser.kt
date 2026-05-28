@@ -23,7 +23,7 @@ import com.google.j2cl.transpiler.ast.CompilationUnit
 import com.google.j2cl.transpiler.ast.Library
 import com.google.j2cl.transpiler.frontend.common.FrontendOptions
 import com.google.j2cl.transpiler.frontend.kotlin.ir.IntrinsicMethods
-import com.google.j2cl.transpiler.frontend.kotlin.ir.JvmIrDeserializerImpl
+import com.google.j2cl.transpiler.frontend.kotlin.ir.J2clIrDeserializer
 import com.google.j2cl.transpiler.frontend.kotlin.lower.LoweringPasses
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
@@ -40,8 +40,6 @@ import org.jetbrains.kotlin.cli.common.arguments.parseCommandLineArguments
 import org.jetbrains.kotlin.cli.common.collectSources
 import org.jetbrains.kotlin.cli.common.computeKotlinPaths
 import org.jetbrains.kotlin.cli.common.fir.reportToMessageCollector
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.setupCommonArguments
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
@@ -75,33 +73,15 @@ import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmProtoBufUtil
 import org.jetbrains.kotlin.modules.TargetId
-import org.jetbrains.kotlin.progress.CompilationCanceledException
-import org.jetbrains.kotlin.progress.CompilationCanceledStatus
-import org.jetbrains.kotlin.progress.ProgressIndicatorAndCompilationCanceledStatus
 
 /** A parser for Kotlin sources that builds {@code CompilationtUnit}s. */
 class KotlinParser(private val problems: Problems) {
-
-  companion object {
-    // Track problems on a thread local so a cancelation doesn't effect other compilation threads.
-    private val globalProblems = ThreadLocal<Problems>()
-
-    init {
-      ProgressIndicatorAndCompilationCanceledStatus.setCompilationCanceledStatus(
-        object : CompilationCanceledStatus {
-          override fun checkCanceled() {
-            // throw CompilationCanceledException instead of our own which is properly handled by
-            // kotlinc to gracefully exit from the compilation.
-            if (globalProblems.get().isCancelled)
-              throw CompilationCanceledException().initCause(Problems.Exit())
-          }
-        }
-      )
-    }
-  }
-
   /** Returns a list of compilation units after Kotlinc parsing. */
   fun parseFiles(options: FrontendOptions): Library {
+    if (options.enableKlibs) {
+      return KlibsKotlinParser(problems).parseFiles(options)
+    }
+
     val compilerConfiguration = createCompilerConfiguration(options)
     problems.abortIfCancelled()
 
@@ -109,12 +89,12 @@ class KotlinParser(private val problems: Problems) {
 
     val kotlincDisposable = Disposer.newDisposable("J2CL Root Disposable")
     try {
-      globalProblems.set(problems)
+      problems.registerForCancellation()
 
       val compilationUnits =
         parseFiles(compilerConfiguration, kotlincDisposable, options.targetLabel)
 
-      return Library.newBuilder()
+      return Library.builder()
         .setCompilationUnits(compilationUnits)
         .setDisposableListener { Disposer.dispose(kotlincDisposable) }
         .build()
@@ -184,7 +164,7 @@ class KotlinParser(private val problems: Problems) {
 
     problems.abortIfCancelled()
 
-    val jvmIrDeserializer = JvmIrDeserializerImpl()
+    val irDeserializer = J2clIrDeserializer()
 
     val compilationUnitBuilderExtension =
       createAndRegisterCompilationUnitBuilder(
@@ -192,13 +172,13 @@ class KotlinParser(private val problems: Problems) {
         environment.project,
         state,
         packageInfoCache,
-        jvmIrDeserializer,
+        irDeserializer,
       )
     problems.abortIfCancelled()
 
     val unused =
       analysisResults.convertToIrAndActualizeForJvm(
-        JvmFir2IrExtensions(compilerConfiguration, jvmIrDeserializer),
+        JvmFir2IrExtensions(compilerConfiguration, irDeserializer),
         compilerConfiguration,
         diagnosticsReporter,
         IrGenerationExtension.getInstances(environment.project),
@@ -214,10 +194,10 @@ class KotlinParser(private val problems: Problems) {
     project: Project,
     state: GenerationState,
     packageInfoCache: PackageInfoCache,
-    jvmIrDeserializerImpl: JvmIrDeserializerImpl,
+    irDeserializer: J2clIrDeserializer,
   ): CompilationUnitBuilderExtension {
     // Lower the IR tree before to convert it to a j2cl ast
-    val lowerings = LoweringPasses(state, compilerConfiguration, jvmIrDeserializerImpl)
+    val lowerings = LoweringPasses(state, compilerConfiguration, irDeserializer)
     IrGenerationExtension.registerExtension(project, lowerings)
 
     val compilationUnitBuilderExtension =
@@ -228,7 +208,7 @@ class KotlinParser(private val problems: Problems) {
           compilationUnits =
             CompilationUnitBuilder(
                 KotlinEnvironment(pluginContext, packageInfoCache, lowerings.jvmBackendContext),
-                IntrinsicMethods(pluginContext.irBuiltIns),
+                IntrinsicMethods(pluginContext),
               )
               .convert(moduleFragment)
         }
@@ -246,7 +226,7 @@ class KotlinParser(private val problems: Problems) {
     val arguments = createCompilerArguments(options)
     val configuration = CompilerConfiguration()
 
-    val messageCollector = ProblemsMessageCollector(problems)
+    val messageCollector = problems.createMessageCollector()
     configuration.put(MESSAGE_COLLECTOR_KEY, messageCollector)
     configuration.put(ORIGINAL_MESSAGE_COLLECTOR_KEY, messageCollector)
 
@@ -299,32 +279,5 @@ class KotlinParser(private val problems: Problems) {
       )
     }
     problems.abortIfHasErrors()
-  }
-
-  private class ProblemsMessageCollector constructor(private val problems: Problems) :
-    MessageCollector {
-    override fun clear() {
-      // This implementation do not support clearing error messages.
-    }
-
-    override fun hasErrors(): Boolean {
-      return problems.hasErrors()
-    }
-
-    override fun report(
-      severity: CompilerMessageSeverity,
-      message: String,
-      location: CompilerMessageSourceLocation?,
-    ) {
-      if (!severity.isError) {
-        return
-      }
-
-      if (location != null) {
-        problems.error(location.line, location.path, "%s", message)
-      } else {
-        problems.error("%s", message)
-      }
-    }
   }
 }

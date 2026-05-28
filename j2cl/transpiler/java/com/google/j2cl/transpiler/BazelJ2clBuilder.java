@@ -15,26 +15,19 @@ package com.google.j2cl.transpiler;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
+import com.google.j2cl.common.CommandLineParser;
 import com.google.j2cl.common.OutputUtils;
 import com.google.j2cl.common.OutputUtils.Output;
-import com.google.j2cl.common.Problems.FatalError;
 import com.google.j2cl.common.SourceUtils;
 import com.google.j2cl.common.SourceUtils.FileInfo;
 import com.google.j2cl.common.bazel.BazelWorker;
 import com.google.j2cl.transpiler.backend.Backend;
-import com.google.j2cl.transpiler.frontend.Frontend;
-import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.MapOptionHandler;
 
 /**
  * The J2cl builder for Bazel that runs as a worker.
@@ -48,23 +41,34 @@ final class BazelJ2clBuilder extends BazelWorker {
       metaVar = "<source files>",
       required = true,
       usage = "Specifies individual files and jars/zips of sources (.java, .js, .native.js).")
-  List<String> sources = new ArrayList<>();
+  List<Path> sources = new ArrayList<>();
 
   @Option(
       name = "-classpath",
       required = true,
       metaVar = "<path>",
-      usage = "Specifies where to find user class files and annotation processors.")
-  String classPath;
-
-  @Option(name = "-directdeps", metaVar = "<path>", usage = "Specifies direct dependency jars.")
-  String directDeps = "";
+      usage = "Specifies where to find user class files and annotation processors.",
+      handler = CommandLineParser.MultiPathOptionHandler.class)
+  List<Path> classpaths;
 
   @Option(
       name = "-system",
       metaVar = "<path>",
       usage = "Specifies the location of the system modules.")
-  String system = "";
+  Path system;
+
+  @Option(
+      name = "-processor",
+      metaVar = "<class>",
+      usage = "Names of the annotation processors to run.")
+  List<String> processors = new ArrayList<>();
+
+  @Option(
+      name = "-processorpath",
+      metaVar = "<path>",
+      usage = "Specifies where to find annotation processors.",
+      handler = CommandLineParser.MultiPathOptionHandler.class)
+  List<Path> processorPath = new ArrayList<>();
 
   @Option(
       name = "-output",
@@ -118,16 +122,10 @@ final class BazelJ2clBuilder extends BazelWorker {
   boolean enableJSpecifySupport = false;
 
   @Option(
-      name = "-experimentalJavaFrontend",
-      usage = "Select the java frontend to use: JDT (default), JAVAC (experimental).",
-      hidden = true)
-  Frontend javaFrontend = Frontend.JDT;
-
-  @Option(
       name = "-experimentalBackend",
       usage =
-          "Select the backend to use: CLOSURE (default), WASM (experimental), "
-              + "WASM_MODULAR (experimental), KOTLIN (experimental).",
+          "Select the backend to use: CLOSURE (default), WASM (experimental), KOTLIN"
+              + " (experimental).",
       hidden = true)
   Backend backend = Backend.CLOSURE;
 
@@ -150,11 +148,33 @@ final class BazelJ2clBuilder extends BazelWorker {
       hidden = true)
   boolean enableWasmCustomDescriptors = false;
 
+  @Option(
+      name = "-experimentalEnableWasmCustomDescriptorsJsInterop",
+      usage =
+          "Enables JsInterop with custom descriptors for Wasm. Setting this also enables general"
+              + " custom descriptors functionality.",
+      hidden = true)
+  boolean enableWasmCustomDescriptorsJsInterop = false;
+
   @Option(name = "-forbiddenAnnotation", hidden = true)
   List<String> forbiddenAnnotations = new ArrayList<>();
 
-  @Option(name = "-experimentalDefineForWasm", handler = MapOptionHandler.class, hidden = true)
-  Map<String, String> definesForWasm = new HashMap<>();
+  @Option(
+      name = "-klibs",
+      metaVar = "<path>",
+      usage = "Paths to cross-platform libraries in the .klib format.",
+      handler = CommandLineParser.MultiPathOptionHandler.class)
+  List<Path> dependencyKlibs = new ArrayList<>();
+
+  @Option(
+      name = "-friendKlibs",
+      metaVar = "<path>",
+      usage = "Paths to cross-platform libraries in the .klib format.",
+      handler = CommandLineParser.MultiPathOptionHandler.class)
+  List<Path> friendKlibs = new ArrayList<>();
+
+  @Option(name = "-experimentalEnableKlibs", usage = "Enable using klibs for the kotlin frontend.")
+  boolean enableKlibs = false;
 
   @Option(name = "-objCNamePrefix", hidden = true)
   String objCNamePrefix = "J2kt";
@@ -162,7 +182,7 @@ final class BazelJ2clBuilder extends BazelWorker {
   @Override
   protected void run() {
     problems.abortIfCancelled();
-    try (Output out = OutputUtils.initOutput(workdir.resolve(output), problems)) {
+    try (Output out = OutputUtils.initOutputForBazel(output, problems)) {
       problems.abortIfCancelled();
       try {
         J2clTranspiler.transpile(createOptions(out), problems);
@@ -175,36 +195,11 @@ final class BazelJ2clBuilder extends BazelWorker {
   }
 
   private J2clTranspilerOptions createOptions(Output output) {
-
-    if (this.readableSourceMaps && this.generateKytheIndexingMetadata) {
-      problems.warning(
-          "Readable source maps are not available when generating Kythe indexing metadata.");
-      this.readableSourceMaps = false;
-    }
-
-    if (!javaFrontend.isJavaFrontend()) {
-      problems.fatal(FatalError.INVALID_JAVA_FRONTEND, javaFrontend);
-    }
-
-    Path sourceJarDir = SourceUtils.deriveDirectory(this.output, "_source_jars");
     ImmutableList<FileInfo> allSources =
-        SourceUtils.getAllSourcesFromPaths(
-                sources.stream().map(workdir::resolve), sourceJarDir, problems)
+        SourceUtils.getAllSources(
+                sources.stream(), output.createTempDirectory("_source_jars"), problems)
             .collect(toImmutableList());
     problems.abortIfCancelled();
-
-    ImmutableList<FileInfo> allJavaSources =
-        allSources.stream()
-            .filter(p -> p.sourcePath().endsWith(".java"))
-            .collect(toImmutableList());
-
-    ImmutableList<FileInfo> allKotlinSources =
-        allSources.stream().filter(p -> p.sourcePath().endsWith(".kt")).collect(toImmutableList());
-
-    if (!allJavaSources.isEmpty() && !allKotlinSources.isEmpty()) {
-      throw new AssertionError(
-          "Transpilation of Java and Kotlin files together is not supported yet.");
-    }
 
     ImmutableList<FileInfo> allNativeSources =
         allSources.stream()
@@ -213,24 +208,17 @@ final class BazelJ2clBuilder extends BazelWorker {
 
     // Directly put all supplied js sources into the zip file.
     allSources.stream()
-        .filter(p -> p.sourcePath().endsWith(".js") && !p.sourcePath().endsWith("native.js"))
+        .filter(p -> p.sourcePath().endsWith(".js") && !p.sourcePath().endsWith(".native.js"))
         .forEach(f -> output.copyFile(f.sourcePath(), f.targetPath()));
     problems.abortIfCancelled();
 
-    if (libraryInfoOutput != null) {
-      libraryInfoOutput = workdir.resolve(libraryInfoOutput);
-    }
-
-    return J2clTranspilerOptions.newBuilder()
-        .setSources(
-            ImmutableList.<FileInfo>builder()
-                .addAll(allJavaSources)
-                .addAll(allKotlinSources)
-                .build())
+    return J2clTranspilerOptions.builder()
+        .setSources(allSources)
         .setNativeSources(allNativeSources)
-        .setClasspaths(getPathEntries(this.classPath))
-        .setDirectDeps(getPathEntries(this.directDeps))
+        .setClasspaths(this.classpaths)
         .setSystem(this.system)
+        .setAnnotationProcessors(this.processors)
+        .setAnnotationProcessorPath(this.processorPath)
         .setOutput(output)
         .setTargetLabel(targetLabel)
         .setLibraryInfoOutput(libraryInfoOutput)
@@ -239,23 +227,20 @@ final class BazelJ2clBuilder extends BazelWorker {
         .setSourceMappingPathPrefix(this.sourceMappingPathPrefix)
         .setOptimizeAutoValue(this.optimizeAutoValue)
         .setGenerateKytheIndexingMetadata(this.generateKytheIndexingMetadata)
-        .setFrontend(allKotlinSources.isEmpty() ? javaFrontend : Frontend.KOTLIN)
+
         .setBackend(this.backend)
         .setWasmEntryPointStrings(this.wasmEntryPoints)
         .setEnableWasmCustomDescriptors(this.enableWasmCustomDescriptors)
-        .setDefinesForWasm(definesForWasm)
+        .setEnableWasmCustomDescriptorsJsInterop(this.enableWasmCustomDescriptorsJsInterop)
         .setNullMarkedSupported(this.enableJSpecifySupport)
         .setJavacOptions(javacOptions)
         .setKotlincOptions(kotlincOptions)
         .setForbiddenAnnotations(forbiddenAnnotations)
+        .setEnableKlibs(enableKlibs)
+        .setDependencyKlibs(dependencyKlibs)
+        .setFriendKlibs(friendKlibs)
         .setObjCNamePrefix(objCNamePrefix)
         .build(problems);
-  }
-
-  private List<String> getPathEntries(String path) {
-    return Lists.transform(
-        Splitter.on(File.pathSeparatorChar).omitEmptyStrings().splitToList(path),
-        s -> workdir.resolve(s).toString());
   }
 
   public static void main(String[] workerArgs) throws Exception {

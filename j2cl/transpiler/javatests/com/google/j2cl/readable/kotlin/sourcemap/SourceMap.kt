@@ -15,7 +15,9 @@
  */
 package sourcemap
 
+import java.util.function.Function
 import jsinterop.annotations.JsConstructor
+import jsinterop.annotations.JsEnum
 
 // TODO(b/325660274): Improve the test coverage for sourcemap.
 abstract class SourceMap<T : Number> @JsConstructor constructor(i: Int) : Comparator<T> {
@@ -130,5 +132,43 @@ abstract class SourceMap<T : Number> @JsConstructor constructor(i: Int) : Compar
         2 -> 10
         else -> 20
       }
+  }
+
+  private fun testInstanceOf(o: Any): Boolean {
+    return o is String
+  }
+
+  private fun testFunctionExpression(): Function<Any?, Any?> {
+    return Function { o: Any? -> o }
+  }
+
+  private fun testTypeLiteral(): Class<*> {
+    return String::class.java
+  }
+
+  abstract class SuperCalls : SourceMap<Int> {
+    @JsConstructor constructor(i: Int) : super(i)
+  }
+
+  inner class InnerClass constructor(i: Int) {
+    val field: Int
+
+    init {
+      field = i
+    }
+  }
+
+  @JsEnum
+  enum class FooJsEnum {
+    A,
+    B,
+    C,
+  }
+
+  @JsEnum(hasCustomValue = true)
+  enum class StringJsEnum(val value: String) {
+    A("FOO"),
+    B("BAR"),
+    C("BUZZ"),
   }
 }

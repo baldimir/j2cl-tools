@@ -1,12 +1,12 @@
 /*
  * Copyright 2009 Google Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -21,23 +21,30 @@
  * licenses this file to You under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- * 
+ *
  * INCLUDES MODIFICATIONS BY RICHARD ZSCHECH AS WELL AS GOOGLE.
  */
 package java.math;
 
 /**
- * The library implements some logical operations over {@code BigInteger}. The
- * operations provided are listed below. <ul type="circle"> <li>not</li> <li>and
- * </li> <li>andNot</li> <li>or</li> <li>xor</li> </ul>
+ * The library implements some logical operations over {@code BigInteger}. The operations provided
+ * are listed below.
+ *
+ * <ul type="circle">
+ *   <li>not
+ *   <li>and
+ *   <li>andNot
+ *   <li>or
+ *   <li>xor
+ * </ul>
  */
 class Logical {
 
@@ -77,6 +84,7 @@ class Logical {
 
   /**
    * Return sign = positive.magnitude & magnitude = -negative.magnitude.
+   *
    * @param positive
    * @param negative
    * @return
@@ -92,7 +100,7 @@ class Logical {
       return BigInteger.ZERO;
     }
     int resLength = positive.numberLength;
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
 
     // Must start from max(iPos, iNeg)
     int i = Math.max(iPos, iNeg);
@@ -119,6 +127,7 @@ class Logical {
 
   /**
    * Return sign = -1, magnitude = -(-longer.magnitude & -shorter.magnitude).
+   *
    * @param longer
    * @param shorter
    * @return
@@ -135,7 +144,7 @@ class Logical {
     }
 
     int resLength;
-    int resDigits[];
+    int[] resDigits;
     int i = Math.max(iShorter, iLonger);
     int digit;
     if (iShorter > iLonger) {
@@ -146,8 +155,9 @@ class Logical {
       digit = -shorter.digits[i] & -longer.digits[i];
     }
     if (digit == 0) {
-      for (i++; i < shorter.numberLength
-          && (digit = ~(longer.digits[i] | shorter.digits[i])) == 0; i++) {
+      for (i++;
+          i < shorter.numberLength && (digit = ~(longer.digits[i] | shorter.digits[i])) == 0;
+          i++) {
         // digit
       }
       // = ~longer.digits[i] & ~shorter.digits[i]
@@ -221,6 +231,7 @@ class Logical {
 
   /**
    * Return sign = 1, magnitude = -val.magnitude & ~(-that.magnitude).
+   *
    * @param val
    * @param that
    * @return
@@ -235,7 +246,7 @@ class Logical {
     }
 
     int resLength = that.numberLength;
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
     int limit;
     int i = iVal;
     if (iVal < iThat) {
@@ -282,15 +293,15 @@ class Logical {
 
   /**
    * Return sign = -1, magnitude = -(-negative.magnitude & ~positive.magnitude).
+   *
    * @param negative
    * @param positive
    * @return
    */
-  static BigInteger andNotNegativePositive(BigInteger negative,
-      BigInteger positive) {
+  static BigInteger andNotNegativePositive(BigInteger negative, BigInteger positive) {
     // PRE: negative < 0 && positive > 0
     int resLength;
-    int resDigits[];
+    int[] resDigits;
     int limit;
     int digit;
 
@@ -321,19 +332,16 @@ class Logical {
       digit = -negative.digits[i] & ~positive.digits[i];
       if (digit == 0) {
         limit = Math.min(positive.numberLength, negative.numberLength);
-        for (i++; i < limit
-            && (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) {
+        for (i++; i < limit && (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) {
           // digit
         }
         // = ~negative.digits[i] & ~positive.digits[i]
         if (digit == 0) {
           // the shorter has only the remaining virtual sign bits
-          for (; i < positive.numberLength
-              && (digit = ~positive.digits[i]) == 0; i++) {
+          for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) {
             // digit = -1 & ~positive.digits[i]
           }
-          for (; i < negative.numberLength
-              && (digit = ~negative.digits[i]) == 0; i++) {
+          for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) {
             // empty
           }
           // digit = ~negative.digits[i] & ~0
@@ -371,13 +379,14 @@ class Logical {
 
   /**
    * Return sign = 1, magnitude = val.magnitude & ~that.magnitude.
+   *
    * @param val
    * @param that
    * @return
    */
   static BigInteger andNotPositive(BigInteger val, BigInteger that) {
     // PRE: both arguments are positive
-    int resDigits[] = new int[val.numberLength];
+    int[] resDigits = new int[val.numberLength];
 
     int limit = Math.min(val.numberLength, that.numberLength);
     int i;
@@ -395,12 +404,12 @@ class Logical {
 
   /**
    * Return sign = 1, magnitude = positive.magnitude & ~(-negative.magnitude).
+   *
    * @param positive
    * @param negative
    * @return
    */
-  static BigInteger andNotPositiveNegative(BigInteger positive,
-      BigInteger negative) {
+  static BigInteger andNotPositiveNegative(BigInteger positive, BigInteger negative) {
     // PRE: positive > 0 && negative < 0
     int iNeg = negative.getFirstNonzeroDigit();
     int iPos = positive.getFirstNonzeroDigit();
@@ -410,7 +419,7 @@ class Logical {
     }
 
     int resLength = Math.min(positive.numberLength, negative.numberLength);
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
 
     // Always start from first non zero of positive
     int i = iPos;
@@ -434,6 +443,7 @@ class Logical {
 
   /**
    * Return sign = 1, magnitude = val.magnitude & that.magnitude.
+   *
    * @param val
    * @param that
    * @return
@@ -447,7 +457,7 @@ class Logical {
       return BigInteger.ZERO;
     }
 
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
     for (; i < resLength; i++) {
       resDigits[i] = val.digits[i] & that.digits[i];
     }
@@ -469,7 +479,7 @@ class Logical {
     if (val.equals(BigInteger.MINUS_ONE)) {
       return BigInteger.ZERO;
     }
-    int resDigits[] = new int[val.numberLength + 1];
+    int[] resDigits = new int[val.numberLength + 1];
     int i;
 
     if (val.sign > 0) {
@@ -545,6 +555,7 @@ class Logical {
 
   /**
    * Return sign = -1, magnitude = -(positive.magnitude | -negative.magnitude).
+   *
    * @param positive
    * @param negative
    * @return
@@ -562,7 +573,7 @@ class Logical {
       return negative;
     }
     int resLength = negative.numberLength;
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
 
     if (iNeg < iPos) {
       // We know for sure that this will
@@ -611,6 +622,7 @@ class Logical {
 
   /**
    * Return sign = -1, magnitude = -(-val.magnitude | -that.magnitude).
+   *
    * @param val
    * @param that
    * @return
@@ -629,7 +641,7 @@ class Logical {
     }
 
     int resLength = Math.min(val.numberLength, that.numberLength);
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
 
     // Looking for the first non-zero digit of the result
     if (iThat == iVal) {
@@ -653,6 +665,7 @@ class Logical {
 
   /**
    * Return sign = 1, magnitude = longer.magnitude | shorter.magnitude.
+   *
    * @param longer
    * @param shorter
    * @return
@@ -661,10 +674,9 @@ class Logical {
     // PRE: longer and shorter are positive;
     // PRE: longer has at least as many digits as shorter
     int resLength = longer.numberLength;
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
 
-    int i = Math.min(longer.getFirstNonzeroDigit(),
-        shorter.getFirstNonzeroDigit());
+    int i = Math.min(longer.getFirstNonzeroDigit(), shorter.getFirstNonzeroDigit());
     for (i = 0; i < shorter.numberLength; i++) {
       resDigits[i] = longer.digits[i] | shorter.digits[i];
     }
@@ -719,13 +731,14 @@ class Logical {
 
   /**
    * Return sign = 1, magnitude = -(positive.magnitude ^ -negative.magnitude).
+   *
    * @param positive
    * @param negative
    * @return
    */
   static BigInteger xorDiffSigns(BigInteger positive, BigInteger negative) {
     int resLength = Math.max(negative.numberLength, positive.numberLength);
-    int resDigits[];
+    int[] resDigits;
     int iNeg = negative.getFirstNonzeroDigit();
     int iPos = positive.getFirstNonzeroDigit();
     int i;
@@ -786,18 +799,15 @@ class Logical {
       digit = positive.digits[i] ^ -negative.digits[i];
       if (digit == 0) {
         limit = Math.min(positive.numberLength, negative.numberLength);
-        for (i++; i < limit
-            && (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) {
+        for (i++; i < limit && (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) {
           // empty
         }
         if (digit == 0) {
           // shorter has only the remaining virtual sign bits
-          for (; i < positive.numberLength
-              && (digit = ~positive.digits[i]) == 0; i++) {
+          for (; i < positive.numberLength && (digit = ~positive.digits[i]) == 0; i++) {
             // empty
           }
-          for (; i < negative.numberLength
-              && (digit = ~negative.digits[i]) == 0; i++) {
+          for (; i < negative.numberLength && (digit = ~negative.digits[i]) == 0; i++) {
             // empty
           }
           if (digit == 0) {
@@ -835,6 +845,7 @@ class Logical {
 
   /**
    * Return sign = 0, magnitude = -val.magnitude ^ -that.magnitude.
+   *
    * @param val
    * @param that
    * @return
@@ -843,7 +854,7 @@ class Logical {
     // PRE: val and that are negative
     // PRE: val has at least as many trailing zero digits as that
     int resLength = Math.max(val.numberLength, that.numberLength);
-    int resDigits[] = new int[resLength];
+    int[] resDigits = new int[resLength];
     int iVal = val.getFirstNonzeroDigit();
     int iThat = that.getFirstNonzeroDigit();
     int i = iThat;
@@ -894,7 +905,7 @@ class Logical {
 
   /**
    * Return sign = 0, magnitude = longer.magnitude | shorter.magnitude.
-   * 
+   *
    * @param longer
    * @param shorter
    * @return
@@ -903,9 +914,8 @@ class Logical {
     // PRE: longer and shorter are positive;
     // PRE: longer has at least as many digits as shorter
     int resLength = longer.numberLength;
-    int resDigits[] = new int[resLength];
-    int i = Math.min(longer.getFirstNonzeroDigit(),
-        shorter.getFirstNonzeroDigit());
+    int[] resDigits = new int[resLength];
+    int i = Math.min(longer.getFirstNonzeroDigit(), shorter.getFirstNonzeroDigit());
     for (; i < shorter.numberLength; i++) {
       resDigits[i] = longer.digits[i] ^ shorter.digits[i];
     }
@@ -918,9 +928,6 @@ class Logical {
     return result;
   }
 
-  /**
-   * Just to denote that this class can't be instantiated.
-   */
-  private Logical() {
-  }
+  /** Just to denote that this class can't be instantiated. */
+  private Logical() {}
 }

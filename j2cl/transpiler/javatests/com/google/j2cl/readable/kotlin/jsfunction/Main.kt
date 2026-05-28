@@ -36,6 +36,13 @@ fun interface JsFunctionInterface {
   fun overlayMethod(): Int {
     return foo(42)
   }
+
+  companion object {
+    @JsOverlay val constant = 42
+    @JsOverlay val field = Any()
+
+    @JsOverlay fun staticOverlayMethod() = 42
+  }
 }
 
 class JsFunctionImplementation : JsFunctionInterface {
@@ -59,7 +66,7 @@ class JsFunctionImplementation : JsFunctionInterface {
   }
 
   override fun foo(a: Int): Int {
-    return a + bar() + field
+    return a + bar() + field + overlayMethod()
   }
 }
 
@@ -383,4 +390,14 @@ private class RecursiveParametricJsFunctionImplementation<T : ParametricJsFuncti
 private class RecursiveJsFunctionImplementation :
   ParametricJsFunction<RecursiveJsFunctionImplementation?> {
   override fun call(t: RecursiveJsFunctionImplementation?) {}
+}
+
+@JsFunction
+fun interface InvokableFunction {
+  operator fun invoke(a: Int): Int
+}
+
+fun testInvokableFunction() {
+  val f: InvokableFunction = InvokableFunction { a: Int -> a + 1 }
+  f(1)
 }

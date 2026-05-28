@@ -18,13 +18,14 @@ package com.google.j2cl.transpiler.ast;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.collect.ImmutableList;
+import com.google.j2cl.common.HasSourcePosition;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.common.visitor.Processor;
 import com.google.j2cl.common.visitor.Visitable;
 
 /** Type literal node. */
 @Visitable
-public class TypeLiteral extends Literal implements HasSourcePosition {
+public final class TypeLiteral extends Literal implements HasSourcePosition {
 
   @Visitable TypeDescriptor referencedTypeDescriptor;
   private final SourcePosition sourcePosition;
@@ -49,6 +50,11 @@ public class TypeLiteral extends Literal implements HasSourcePosition {
   @Override
   public SourcePosition getSourcePosition() {
     return sourcePosition;
+  }
+
+  @Override
+  public boolean isCompileTimeConstant() {
+    return false;
   }
 
   @Override

@@ -1,0 +1,7 @@
+goog.module('recordclass.RecordClass.SimpleRecord');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const SimpleRecord = goog.require('recordclass.RecordClass.SimpleRecord$impl');
+exports = SimpleRecord;

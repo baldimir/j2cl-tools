@@ -4,6 +4,7 @@ load("@rules_java//java:defs.bzl", "java_common")
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load(":j2cl_js_common.bzl", "J2CL_JS_TOOLCHAIN_ATTRS", "j2cl_js_provider")
+load(":klib_common.bzl", "klib_common")
 load(":provider.bzl", "J2clInfo")
 
 def _get_jsinfo_provider(j2cl_info):
@@ -18,18 +19,21 @@ def _compile(
         plugins = [],
         exported_plugins = [],
         backend = "CLOSURE",
-        output_jar = None,
         javac_opts = [],
         kotlincopts = [],
         internal_transpiler_flags = {},
         artifact_suffix = "",
-        is_j2kt_web_experiment_enabled = False):
+        is_j2kt_web_enabled = False,
+        enforce_kt_strict_deps = True,
+        klib_friends = depset(),
+        exported_friend_klibs = depset()):
     name = ctx.label.name + artifact_suffix
-    java_toolchain = _get_java_toolchain(ctx)
+    java_toolchain = get_java_toolchain(ctx)
     jvm_srcs, js_srcs = split_srcs(srcs)
-
     has_srcs_to_transpile = (jvm_srcs or kt_common_srcs)
-    has_kotlin_srcs = any([src for src in jvm_srcs if src.extension == "kt"]) or kt_common_srcs
+
+    kt_srcs = []
+    has_kotlin_srcs = kt_srcs or kt_common_srcs
 
     # Validate the attributes.
     if not has_srcs_to_transpile:
@@ -41,14 +45,17 @@ def _compile(
         if kotlincopts:
             fail("kotlincopts not allowed without kotlin sources")
 
-    jvm_deps, js_deps = split_deps(deps)
-    jvm_exports, js_exports = split_deps(exports)
+    jvm_deps, klib_deps, js_deps = split_deps(deps)
+    jvm_exports, klib_exports, js_exports = split_deps(exports)
 
+    output_jar = ctx.actions.declare_file("lib%s.jar" % name)
+
+    javac_opts = DEFAULT_J2CL_JAVAC_OPTS + javac_opts
     kotlincopts = DEFAULT_J2CL_KOTLINCOPTS + kotlincopts
 
     if not has_kotlin_srcs:
-        # Avoid Kotlin toolchain for regular targets.
-        jvm_provider = _java_compile(
+        # Avoid Kotlin toolchain for java targets.
+        jvm_provider, stripped_java_srcs = _java_compile(
             ctx,
             name,
             java_toolchain,
@@ -61,6 +68,29 @@ def _compile(
             javac_opts,
         )
     else:
+        package_info_srcs = [f for f in jvm_srcs if f.basename == "package-info.java"]
+        if package_info_srcs:
+            package_info_java_info = java_common.compile(
+                ctx,
+                source_files = package_info_srcs,
+                # Filter out Kotlin deps; we only support Java references in package-info.java.
+                deps = [d for d in jvm_deps if "_j2cl_kt" not in java_common.get_constraints(d)],
+                output = ctx.actions.declare_file(name + "_package_info.jar"),
+                java_toolchain = java_toolchain,
+                javac_opts = javac_opts,
+                # J2KT already runs APTs so we don't want them to run again.
+                enable_annotation_processing = not is_j2kt_web_enabled,
+            )
+
+            # Remove package-info.java from the srcs since we handled it here separately.
+            jvm_srcs = [f for f in jvm_srcs if f.basename != "package-info.java"]
+            jvm_deps.append(package_info_java_info)
+            jvm_exports.append(package_info_java_info)
+
+            package_info_klib_info = klib_common.create_klib_info_for_import(package_info_java_info)
+            klib_deps.append(package_info_klib_info)
+            klib_exports.append(package_info_klib_info)
+
         jvm_provider = _kt_compile(
             ctx,
             name,
@@ -74,14 +104,38 @@ def _compile(
             output_jar,
             javac_opts,
             kotlincopts = kotlincopts,
-            is_j2kt_web_experiment_enabled = is_j2kt_web_experiment_enabled,
+            enforce_strict_deps = enforce_kt_strict_deps,
+            is_j2kt_web_enabled = is_j2kt_web_enabled,
         )
 
+        stripped_java_srcs = jvm_provider.source_jars
+
+    klib_provider = klib_common.compile_header_klibs(
+        ctx = ctx,
+        name = name,
+        kt_srcs = kt_srcs,
+        kt_common_srcs = kt_common_srcs,
+        klib_deps = klib_deps,
+        klib_exports = klib_exports,
+        klib_friends = klib_friends,
+        exported_friend_klibs = exported_friend_klibs,
+        kotlincopts = kotlincopts,
+        java_bootclasspath = get_bootclasspath(ctx),
+        jvm_provider = jvm_provider,
+    )
+
     if has_srcs_to_transpile:
-        output_js = ctx.actions.declare_directory("%s.js" % name)
+        # Apply an output suffix to the JS tree artifacts to ensure that J2KT transitioned libraries
+        # don't collide with the non-transitioned equivalent libraries.
+        # TODO(b/465827986): Rely upon artifact instead once j2cl_library can actually set that
+        #   param.
+        output_js_suffix = ""
+
+        output_js = ctx.actions.declare_directory("%s%s.js" % (name, output_js_suffix))
         output_library_info = ctx.actions.declare_file("%s_library_info" % name)
         _j2cl_transpile(
             ctx,
+            stripped_java_srcs,
             jvm_provider,
             jvm_deps,
             get_jdk_system(java_toolchain, javac_opts),
@@ -90,12 +144,12 @@ def _compile(
             output_library_info,
             backend,
             internal_transpiler_flags,
+            kt_srcs,
             kt_common_srcs,
             javac_opts,
-            # Forcefully enable IR serialization. J2CL only needs this to have
-            # Kotlinc deserialize IR from dependencies; we do not actually emit
-            # any serialized IR (that all happens on the JVM side).
-            kotlincopts + KOTLIN_SERIALIZE_IR_FLAGS,
+            kotlincopts,
+            klib_provider,
+            klib_friends,
         )
         library_info = [output_library_info]
     else:
@@ -119,6 +173,8 @@ def _compile(
             library_info = library_info,
             output_js = output_js,
             js_info = js_info,
+            j2kt_enabled = is_j2kt_web_enabled,
+            klib_info = klib_provider,
         ),
         _is_j2cl_provider = 1,
     )
@@ -134,6 +190,7 @@ def split_srcs(srcs):
 def split_deps(deps):
     """ Split the provider deps into Jvm and JS groups. """
     jvm_deps = []
+    klib_deps = []
     js_deps = []
     for d in deps:
         # There is no good way to test if a provider is of a particular type so here we are
@@ -142,11 +199,13 @@ def split_deps(deps):
             # This is a j2cl provider.
             jvm_deps.append(d._private_.java_info)
             js_deps.append(d._private_.js_info)
+            if hasattr(d._private_, "klib_info"):
+                klib_deps.append(d._private_.klib_info)
         else:
             # This is a js provider
             js_deps.append(d)
 
-    return (jvm_deps, js_deps)
+    return (jvm_deps, klib_deps, js_deps)
 
 def _java_compile(
         ctx,
@@ -163,26 +222,8 @@ def _java_compile(
         strip_annotations = ["GwtIncompatible"]):
     output_jar = output_jar or ctx.actions.declare_file("lib%s.jar" % name)
     stripped_java_srcs = [_strip_incompatible_annotation(ctx, name, srcs, mnemonic, strip_annotations)] if srcs else []
-    javac_opts = DEFAULT_J2CL_JAVAC_OPTS + javac_opts
 
-    if ctx.var.get("GROK_ELLIPSIS_BUILD", None):
-        # An unused JAR that is only generated so that we run javac with the non-stripped sources
-        # that kythe can index. Nothing should depend upon this output as it is not guaranteed
-        # to succeed; it is only best effort for indexing.
-        indexed_output_jar = ctx.actions.declare_file(name + "_j2cl_indexable.jar")
-        java_common.compile(
-            ctx,
-            source_files = srcs,
-            deps = deps,
-            exports = exports,
-            plugins = plugins,
-            exported_plugins = exported_plugins,
-            output = indexed_output_jar,
-            java_toolchain = java_toolchain,
-            javac_opts = javac_opts,
-        )
-
-    return java_common.compile(
+    java_info = java_common.compile(
         ctx,
         source_jars = stripped_java_srcs,
         deps = deps,
@@ -193,6 +234,7 @@ def _java_compile(
         java_toolchain = java_toolchain,
         javac_opts = javac_opts,
     )
+    return java_info, stripped_java_srcs
 
 def _kt_compile(
         ctx,
@@ -207,20 +249,17 @@ def _kt_compile(
         output_jar = None,
         javac_opts = [],
         kotlincopts = [],
-        is_j2kt_web_experiment_enabled = False):
+        enforce_strict_deps = True,
+        is_j2kt_web_enabled = False):
     fail("Kotlin frontend is disabled")
 
 def get_bootclasspath(ctx):
     """Returns a depset containing the Java bootclasspath entries."""
 
-    return _get_java_toolchain(ctx).bootclasspath
+    toolchain = get_java_toolchain(ctx)
+    return depset(transitive = [toolchain.bootclasspath, toolchain._bootclasspath_info._auxiliary])
 
-def get_bootclasspath_deps(ctx):
-    """Returns a depset containing deps needed by the Java bootclasspath."""
-
-    return _get_java_toolchain(ctx)._bootclasspath_info._auxiliary
-
-def _get_java_toolchain(ctx):
+def get_java_toolchain(ctx):
     return ctx.attr._j2cl_java_toolchain[java_common.JavaToolchainInfo]
 
 def get_jdk_system(java_toolchain, javac_opts):
@@ -235,13 +274,24 @@ def get_jdk_system(java_toolchain, javac_opts):
     # TODO(b/197211878): Switch to a public API when available.
     return java_toolchain._bootclasspath_info._system_inputs.to_list() if not jdk_system_already_set else []
 
+def _add_profiling_support(ctx, mnemonic, outputs, args):
+    if ctx.attr._profiling_filter[BuildSettingInfo].value in str(ctx.label):
+        profile_output = ctx.actions.declare_file(ctx.label.name + "_" + mnemonic + ".profile")
+        outputs.append(profile_output)
+        args.add("-profileOutput", profile_output)
+        print("Profiling %s %s" % (ctx.label, mnemonic))  # buildifier: disable=print
+        print("pprof --flame %s" % profile_output.path)  # buildifier: disable=print
+
 def _strip_incompatible_annotation(ctx, name, java_srcs, mnemonic, strip_annotations):
     # Paths are matched by Kythe to identify generated J2CL sources.
     output_file = ctx.actions.declare_file(name + "_j2cl_stripped-src.jar")
 
+    mnemonic = mnemonic + "Strip"
+    outputs = [output_file]
     args = ctx.actions.args()
     args.use_param_file("@%s", use_always = True)
     args.set_param_file_format("multiline")
+    _add_profiling_support(ctx, mnemonic, outputs, args)
     args.add("-d", output_file)
     args.add_all(strip_annotations, format_each = "-annotation=%s")
     args.add_all(java_srcs)
@@ -250,7 +300,7 @@ def _strip_incompatible_annotation(ctx, name, java_srcs, mnemonic, strip_annotat
     ctx.actions.run(
         progress_message = "Stripping %s from %s" % (formatted_annotations, name),
         inputs = java_srcs,
-        outputs = [output_file],
+        outputs = outputs,
         executable = ctx.executable._j2cl_stripper,
         arguments = [args],
         env = dict(LANG = "en_US.UTF-8"),
@@ -258,13 +308,58 @@ def _strip_incompatible_annotation(ctx, name, java_srcs, mnemonic, strip_annotat
             "supports-multiplex-workers": "1",
             "supports-multiplex-sandboxing": "1",
         },
-        mnemonic = mnemonic + "Strip",
+        mnemonic = mnemonic,
     )
 
     return output_file
 
+def _package_kt_stdlib(ctx, kt_common_srcs, kt_srcs):
+    srcjar = ctx.actions.declare_file(ctx.label.name + "-src.jar")
+
+    args = ctx.actions.args()
+    args.add_joined(kt_common_srcs, join_with = ",")
+    args.add_joined(kt_srcs, join_with = ",")
+
+    ctx.actions.run_shell(
+        inputs = kt_srcs + kt_common_srcs,
+        outputs = [srcjar],
+        arguments = [args],
+        command = """
+set -e -o pipefail
+
+IFS="," read -ra common_srcs <<< "$1"
+IFS="," read -ra srcs <<< "$2"
+
+# A collection of strings of the form: "jarFilePath=inputFilePath"
+declare -a mapping
+
+for src in "${{common_srcs[@]}}"; do
+  # Important: ensure the jar file path always starts with common-srcs/ so that
+  # the Kotlin frontend appropriately marks them as common sources.
+  mapping+=("common-srcs/${{src#*/commonMain/}}=${{src}}")
+done
+
+for src in "${{srcs[@]}}"; do
+  # Normalize the file paths a bit to try to make them relative to stdlib src
+  # directory. This isn't mandatory.
+  normalized_src="${{src#*/j2cl/ktstdlib/src/}}"
+  normalized_src="${{normalized_src#*/jvmMain/}}"
+  mapping+=("$normalized_src=$src")
+done
+
+{zip} c {output_srcjar} "${{mapping[@]}}"
+        """.format(
+            output_srcjar = srcjar.path,
+            zip = ctx.executable._zip.path,
+        ),
+        tools = [ctx.executable._zip],
+        mnemonic = "J2clKtStdlibSrcs",
+    )
+    return srcjar
+
 def _j2cl_transpile(
         ctx,
+        java_srcs,
         jvm_provider,
         jvm_deps,
         jdk_system,
@@ -273,45 +368,57 @@ def _j2cl_transpile(
         library_info_output,
         backend,
         internal_transpiler_flags,
+        kt_srcs,
         kt_common_srcs,
         javac_opts,
-        kotlincopts):
+        kotlincopts,
+        klib_provider,
+        klib_friends):
     """ Takes Java provider and translates it into Closure style JS in a zip bundle."""
+    mnemonic = "J2cl" if backend == "CLOSURE" else "J2wasm"
+    is_klibs_enabled = klib_common.is_klibs_experiment_enabled(ctx) and (kt_srcs or kt_common_srcs)
 
-    # Using source_jars from the jvm compilation since that includes APT generated src.
-    # In the Kotlin case, source_jars also include the common sources.
-    srcs = jvm_provider.source_jars + js_srcs
+    # Annotation processors to be run by J2CL's Java frontend.
+    annotation_processor_classnames = []
+    annotation_processor_classpath = depset()
+    if "-Xstdlib-compilation" in kotlincopts:
+        # The stdlib compilation is sensitive to the naming of inputs so we
+        # avoid using the srcjar emitted by the Kotlin/JVM compilation and
+        # instead just package it ourselves.
+        srcs = [_package_kt_stdlib(ctx, kt_common_srcs, kt_srcs)] + js_srcs
+    elif is_klibs_enabled:
+        srcs = []
 
-    bootclasspath = get_bootclasspath(ctx)
-    direct_deps = depset(transitive = [bootclasspath] + [d.compile_jars for d in jvm_deps])
+    else:
+        # Source files are passed directly to the transpiler.
+        srcs = java_srcs + js_srcs
 
-    if jvm_provider.compilation_info:
+        # Collect annotation processors and classpaths from the Java frontend so that they can
+        # be passed to the J2CL Transpiler.
+        if jvm_provider.annotation_processing:
+            annotation_processor_classnames = jvm_provider.annotation_processing.processor_classnames
+            annotation_processor_classpath = jvm_provider.annotation_processing.processor_classpath
+
+    if is_klibs_enabled:
+        compilation_classpath = [klib_provider.compilation_classpath]
+    elif jvm_provider.compilation_info:
         compilation_classpath = [jvm_provider.compilation_info.compilation_classpath]
     else:
         # TODO(b/214609427): JavaInfo created through Starlark does not have compilation_info set.
         # We will compute the classpath manually using transitive_compile_time_jars.
         compilation_classpath = [d.transitive_compile_time_jars for d in jvm_deps]
 
-    bootclasspath_deps = get_bootclasspath_deps(ctx)
-    classpath = depset(transitive = [bootclasspath, bootclasspath_deps] + compilation_classpath)
-
+    classpath = depset(transitive = [get_bootclasspath(ctx)] + compilation_classpath)
+    tokenized_javac_opts = [token for opt in javac_opts for token in ctx.tokenize(opt)]
     outputs = [output_dir, library_info_output]
 
     args = ctx.actions.args()
     args.use_param_file("@%s", use_always = True)
     args.set_param_file_format("multiline")
+    _add_profiling_support(ctx, mnemonic, outputs, args)
     args.add_joined("-classpath", classpath, join_with = ctx.configuration.host_path_separator)
-    args.add_joined("-directdeps", direct_deps, join_with = ctx.configuration.host_path_separator)
     args.add_all("-system", jdk_system, expand_directories = False)
-
-    # TODO(b/416084067): Support Javac options with an allowlist.
-    # Forward necessary options to invoke javac in the transpiler.
-    for i in range(len(javac_opts)):
-        # We currently only support separated ["-opt", "val"]. We do not support ["-opt=val"] or
-        # ["-opt val"].
-        if javac_opts[i] == "--patch-module":
-            args.add("-javacOptions", javac_opts[i])
-            args.add("-javacOptions", javac_opts[i + 1])
+    args.add_all(tokenized_javac_opts, format_each = "-javacOptions=%s")
 
     # Explicitly format this as Bazel target labels can start with a @, which
     # can be misinterpreted as a flag file to load.
@@ -319,41 +426,55 @@ def _j2cl_transpile(
     args.add("-output", output_dir.path)
     args.add("-libraryinfooutput", library_info_output)
 
-    java_frontend = ctx.attr.experimental_java_frontend or ctx.attr._java_frontend[BuildSettingInfo].value
-    if java_frontend:
-        args.add("-experimentalJavaFrontend", java_frontend)
-
     args.add("-experimentalBackend", backend)
 
-    if ctx.attr._profiling_filter[BuildSettingInfo].value in str(ctx.label):
-        profile_output = ctx.actions.declare_file(ctx.label.name + ".profile")
-        outputs.append(profile_output)
-        args.add("-profileOutput", profile_output)
-
-    if backend == "WASM_MODULAR":
+    if backend == "WASM":
         # Add a prefix to where the Java source files will be located relative to the source map.
         args.add(output_dir.short_path, format = "-sourceMappingPathPrefix=%s/")
 
     for flag, value in internal_transpiler_flags.items():
         if value:
             args.add("-" + flag.replace("_", ""))
-    if ctx.var.get("GROK_ELLIPSIS_BUILD", None) or (
-        # Support Kythe integration testing that required metadata as part
-        # of regular test run that can't use GROK_ELLIPSIS_BUILD.
-        hasattr(ctx.attr, "tags") and "generate_kythe_metadata" in ctx.attr.tags
-    ):
-        args.add("-generatekytheindexingmetadata")
+
+    if not is_klibs_enabled:
+        # Forcefully enable IR serialization. J2CL only needs this to have Kotlinc deserialize IR
+        # from dependencies; we do not actually emit any serialized IR (that all happens on the JVM
+        # side).
+        kotlincopts = kotlincopts + KOTLIN_SERIALIZE_IR_FLAGS
     args.add_all(kotlincopts, format_each = "-kotlincOptions=%s")
     args.add("-forbiddenAnnotation", "GwtIncompatible")
+
+    transitive_inputs = [classpath]
+
+    if annotation_processor_classnames:
+        # Pass the necessary options for J2CL to run annotation processing.
+        args.add_joined("-processor", annotation_processor_classnames, join_with = ",")
+        args.add_joined("-processorpath", annotation_processor_classpath, join_with = ctx.configuration.host_path_separator)
+        transitive_inputs.append(annotation_processor_classpath)
+
+    if is_klibs_enabled:
+        args.add("-experimentalEnableKlibs")
+        args.add_joined(
+            "-klibs",
+            klib_provider.compilation_klibs,
+            join_with = ctx.configuration.host_path_separator,
+        )
+        transitive_inputs.append(klib_provider.compilation_klibs)
+
+        # Friend modules are passed via a separate flag, not kotlincopts. This is necessary for
+        # correct path resolution when J2clTranspiler runs as a Blaze worker.
+        args.add_joined(
+            "-friendKlibs",
+            klib_friends,
+            join_with = ctx.configuration.host_path_separator,
+        )
+
     args.add_all(srcs)
 
     output_type = "JavaScript" if backend == "CLOSURE" else "Wasm (Modular)"
     ctx.actions.run(
         progress_message = "Transpiling to %s %s" % (output_type, ctx.label),
-        # kt_common_srcs are not read by the transpiler as they are already
-        # included in the srcjars of srcs. However, params.add_all requires them
-        # to be inputs in order to be properly expanded out into params.
-        inputs = depset(srcs + kt_common_srcs + jdk_system, transitive = [classpath]),
+        inputs = depset(srcs + jdk_system, transitive = transitive_inputs),
         outputs = outputs,
         executable = ctx.executable._j2cl_transpiler,
         arguments = [args],
@@ -363,21 +484,23 @@ def _j2cl_transpile(
             "supports-multiplex-sandboxing": "1",
             "supports-worker-cancellation": "1",
         },
-        mnemonic = "J2cl" if backend == "CLOSURE" else "J2wasm",
+        mnemonic = mnemonic,
     )
 
 def _create_js_lib_struct(j2cl_info, extra_providers = []):
     return [j2cl_info, j2cl_info._private_.js_info] + extra_providers
 
 DEFAULT_J2CL_JAVAC_OPTS = [
+    # Until emitPrivateFieldsInRecords is available in OSS, use emitPrivateFields to make record
+    # fields visible to downstream targets.
+    "-XDturbine.emitPrivateFields",
     # Avoid log site injection which introduces calls to unsupported APIs.
     "-XDinjectLogSites=false",
     # Avoid optimized JVM String concat which introduces calls to unsupported APIs.
     "-XDstringConcat=inline",
-    # Explicitly limit to Java 11 inputs as that is the max currently supported.
-    # TODO(b/286447025): Bump to Java 21.
-    "-source 11",
-    "-target 11",
+    # Explicitly limit to Java 21 inputs as that is the max currently supported.
+    "-source 21",
+    "-target 21",
 ]
 
 DEFAULT_J2CL_KOTLINCOPTS = [
@@ -389,6 +512,12 @@ DEFAULT_J2CL_KOTLINCOPTS = [
     "-Xsam-conversions=class",
     # TODO(b/347052390): Remove once the const evaluation optimization crash is fixed (KT-70391).
     "-Xignore-const-optimization-errors",
+    # Ensure annotations are persisted in the metadata to workaround KT-84773. The flag will become
+    # enabled by default in Kotlin 2.3.20.
+    # TODO(b/496407053): Remove after the 2.3.20 upgrade.
+    "-Xannotations-in-metadata",
+    # Set the Kotlin language version to isolate J2CL from Google3 language version updates.
+    "-language-version=2.3",
 ]
 
 KOTLIN_SERIALIZE_IR_FLAGS = [
@@ -408,6 +537,9 @@ J2CL_JAVA_TOOLCHAIN_ATTRS = {
         cfg = "exec",
         executable = True,
     ),
+    "_profiling_filter": attr.label(
+        default = Label("//:profiling_filter"),
+    ),
 }
 
 J2CL_TOOLCHAIN_ATTRS = {
@@ -418,9 +550,6 @@ J2CL_TOOLCHAIN_ATTRS = {
     ),
     "_java_frontend": attr.label(
         default = Label("//:experimental_java_frontend"),
-    ),
-    "_profiling_filter": attr.label(
-        default = Label("//:profiling_filter"),
     ),
     "_zip": attr.label(
         executable = True,

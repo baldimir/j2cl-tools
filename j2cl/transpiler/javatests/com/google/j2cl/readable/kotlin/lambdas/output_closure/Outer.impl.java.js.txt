@@ -30,6 +30,7 @@ class Outer extends j_l_Object {
  m_n__void() {
   let r = Runnable.$adapt(() =>{
    this.m_m__void();
+   return;
   });
  }
  /** @nodts */

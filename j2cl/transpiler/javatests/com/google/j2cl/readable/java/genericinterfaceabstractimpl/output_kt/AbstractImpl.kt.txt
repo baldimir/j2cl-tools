@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package genericinterfaceabstractimpl
 
@@ -23,7 +24,7 @@ import kotlin.Suppress
 
 interface MyInterface<T> {
  fun `fun`(t: T): T
-
+ 
  fun <T_1> g(t: T_1)
 }
 

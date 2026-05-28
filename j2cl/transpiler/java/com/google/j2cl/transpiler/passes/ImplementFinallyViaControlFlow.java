@@ -22,7 +22,6 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
-import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.Block;
 import com.google.j2cl.transpiler.ast.BreakOrContinueStatement;
 import com.google.j2cl.transpiler.ast.BreakStatement;
@@ -39,7 +38,7 @@ import com.google.j2cl.transpiler.ast.PrimitiveTypes;
 import com.google.j2cl.transpiler.ast.ReturnStatement;
 import com.google.j2cl.transpiler.ast.RuntimeMethods;
 import com.google.j2cl.transpiler.ast.Statement;
-import com.google.j2cl.transpiler.ast.SwitchCase;
+import com.google.j2cl.transpiler.ast.SwitchCaseExpressions;
 import com.google.j2cl.transpiler.ast.SwitchStatement;
 import com.google.j2cl.transpiler.ast.ThrowStatement;
 import com.google.j2cl.transpiler.ast.TryStatement;
@@ -161,9 +160,9 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
             // The new control flow makes it difficult for the wasm verifier to determine that the
             // method is guaranteed to return. Throwing an exception at the end ensures Wasm
             // invariants are is kept.
-            return Method.Builder.from(method)
+            return method.toBuilder()
                 .addStatements(
-                    ThrowStatement.newBuilder()
+                    ThrowStatement.builder()
                         .setExpression(TypeDescriptors.get().javaLangThrowable.getNullValue())
                         .setSourcePosition(method.getSourcePosition())
                         .build())
@@ -205,13 +204,13 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
 
       // Create the variables to save the all the state needed to exit the finally block.
       this.exitSelectorVariable =
-          Variable.newBuilder()
+          Variable.builder()
               .setName("exitSelector." + finallyBlockNumber)
               .setTypeDescriptor(PrimitiveTypes.INT)
               .build();
 
       this.savedThrownVariable =
-          Variable.newBuilder()
+          Variable.builder()
               .setName("savedThrown." + finallyBlockNumber)
               .setTypeDescriptor(TypeDescriptors.get().javaLangThrowable)
               .build();
@@ -221,12 +220,12 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
           TypeDescriptors.isPrimitiveVoid(returnTypeDescriptor)
                   || enclosingMethodDescriptor.isConstructor()
               ? null
-              : Variable.newBuilder()
+              : Variable.builder()
                   .setName("savedReturnValue." + finallyBlockNumber)
                   .setTypeDescriptor(returnTypeDescriptor)
                   .build();
 
-      this.finallyLabel = Label.newBuilder().setName("FINALLY." + finallyBlockNumber).build();
+      this.finallyLabel = Label.builder().setName("FINALLY." + finallyBlockNumber).build();
     }
 
     /** Performs the control flow transformation of the try-catch-finally. */
@@ -235,20 +234,20 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
 
       // Remove the finally block. It will be moved out to the end.
       TryStatement tryWithoutFinally =
-          TryStatement.Builder.from(originalTryStatement).setFinallyBlock(null).build();
+          originalTryStatement.toBuilder().setFinallyBlock(null).build();
 
       TryStatement tryWithRewrittenExits = rewriteControlFlow(tryWithoutFinally);
 
       Statement tryWrappedWithExceptionHandling =
           wrapTryToHandleExitsViaThrow(tryWithRewrittenExits);
 
-      return Block.newBuilder()
+      return Block.builder()
           .setStatements(
               // Declare introduced tracking variables.
               variableDeclarations,
               // Wrap the try-catch block with a finally exit labelled block, that
               // goes straight to execute the finally block.
-              LabeledStatement.newBuilder()
+              LabeledStatement.builder()
                   .setLabel(finallyLabel)
                   .setStatement(tryWrappedWithExceptionHandling)
                   .setSourcePosition(originalTryStatement.getSourcePosition())
@@ -280,12 +279,11 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
                   // Save the return expression value. Since this assignment will be executed at
                   // the location where the return was, it preserves the evaluation order by
                   // keeping the evaluation of the return expression in the original place.
-                  BinaryExpression.Builder.asAssignmentTo(savedReturnValueVariable)
-                      .setRightOperand(returnStatement.getExpression())
-                      .build()
+                  savedReturnValueVariable
+                      .infixAssign(returnStatement.getExpression())
                       .makeStatement(returnStatement.getSourcePosition()),
                   // At the finally exit, the saved value will be returned.
-                  ReturnStatement.Builder.from(returnStatement)
+                  returnStatement.toBuilder()
                       .setExpression(savedReturnValueVariable.createReference())
                       .build());
             }
@@ -313,30 +311,29 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
 
       // Exception variable declared in the catch clause of the wrapping try-catch.
       var throwableVariable =
-          Variable.newBuilder()
+          Variable.builder()
               .setName("t")
               .setTypeDescriptor(TypeDescriptors.get().javaLangThrowable)
               .build();
 
       // Create the catchClause to handle the exceptional exits via throw.
       CatchClause exceptionExitCatchClause =
-          CatchClause.newBuilder()
+          CatchClause.builder()
               .setExceptionVariable(throwableVariable)
               .setBody(
                   rewriteExit(
                       // Code to save the thrown exception to rethrow after finally.
-                      BinaryExpression.Builder.asAssignmentTo(savedThrownVariable)
-                          .setRightOperand(throwableVariable.createReference())
-                          .build()
+                      savedThrownVariable
+                          .infixAssign(throwableVariable.createReference())
                           .makeStatement(sourcePosition),
                       // Code to execute after finally: throw the saved exception.
-                      ThrowStatement.newBuilder()
+                      ThrowStatement.builder()
                           .setSourcePosition(sourcePosition)
                           .setExpression(savedThrownVariable.createReference())
                           .build()))
               .build();
 
-      return TryStatement.newBuilder()
+      return TryStatement.builder()
           .setBody(rewrittenTryStatement)
           .setCatchClauses(exceptionExitCatchClause)
           .setSourcePosition(sourcePosition)
@@ -358,14 +355,13 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
 
       // Emit the caching of values and which exit to dispatch and break out of the try-finally
       // into the finally clause.
-      return Block.newBuilder()
+      return Block.builder()
           .setStatements(
               saveValueStatement,
-              BinaryExpression.Builder.asAssignmentTo(exitSelectorVariable)
-                  .setRightOperand(NumberLiteral.fromInt(exitSelector))
-                  .build()
+              exitSelectorVariable
+                  .infixAssign(NumberLiteral.fromInt(exitSelector))
                   .makeStatement(exitStatement.getSourcePosition()),
-              BreakStatement.newBuilder()
+              BreakStatement.builder()
                   .setLabelReference(finallyLabel.createReference())
                   .setSourcePosition(originalTryStatement.getSourcePosition())
                   .build())
@@ -386,7 +382,7 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
         // So if there is only one exit statement, it should be a throw. The selector does not need
         // to be tracked.
         ThrowStatement exitStatement = (ThrowStatement) Iterables.getOnlyElement(exitStatements);
-        return IfStatement.newBuilder()
+        return IfStatement.builder()
             .setSourcePosition(originalTryStatement.getSourcePosition())
             .setConditionExpression(
                 RuntimeMethods.createPlatformIsNullCall(savedThrownVariable.createReference())
@@ -395,7 +391,7 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
             .build();
       }
       SwitchStatement.Builder dispatchStatementBuilder =
-          SwitchStatement.newBuilder()
+          SwitchStatement.builder()
               .setExpression(exitSelectorVariable.createReference())
               .setSourcePosition(originalTryStatement.getSourcePosition());
       // The normal control flow path has an exit selector of 0; returns, breaks, continues and
@@ -403,7 +399,7 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
       int exitSelectorValue = 1;
       for (Statement exitStatement : exitStatements) {
         dispatchStatementBuilder.addCases(
-            SwitchCase.newBuilder()
+            SwitchCaseExpressions.builder()
                 .setCaseExpressions(ImmutableList.of(NumberLiteral.fromInt(exitSelectorValue)))
                 .setStatements(exitStatement)
                 .build());
@@ -417,7 +413,7 @@ public class ImplementFinallyViaControlFlow extends NormalizationPass {
      * the finally block.
      */
     private Statement createVariableDeclarations() {
-      return VariableDeclarationExpression.newBuilder()
+      return VariableDeclarationExpression.builder()
           .addVariableDeclarations(
               Stream.of(exitSelectorVariable, savedReturnValueVariable, savedThrownVariable)
                   .filter(Predicates.notNull())

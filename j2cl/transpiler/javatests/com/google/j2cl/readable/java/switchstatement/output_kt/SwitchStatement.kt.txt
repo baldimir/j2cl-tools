@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package switchstatement
 
@@ -63,50 +64,50 @@ open class SwitchStatement {
   }
   var s: Short = 1.toShort()
   when (s) {
-   1.toShort() -> {
+   1L.toShort() -> {
     s = (s.toInt() + 1).toShort()
    }
-   3.toShort() -> {
+   SwitchStatement.CONST_pp_switchstatement -> {
     s = (s.toInt() + 1).toShort()
    }
-   12.toShort() -> {
+   (SwitchStatement.CONST_pp_switchstatement.toInt() * 4).toShort() -> {
     s = (s.toInt() + 1).toShort()
    }
    else -> {}
   }
  }
-
+ 
  private fun testCaseExpressionTypes(ch: Char, i: Int, b: Byte, s: Short) {
   when (ch) {
    'a' -> {}
    '\u0001' -> {}
-   '\u0002' -> {}
-   '\u0003' -> {}
+   2.toByte().toInt().toChar() -> {}
+   3.toShort().toInt().toChar() -> {}
    else -> {}
   }
   when (i) {
    97 -> {}
    1 -> {}
-   2 -> {}
-   3 -> {}
+   2.toByte().toInt() -> {}
+   3.toShort().toInt() -> {}
    else -> {}
   }
   when (b) {
    97.toByte() -> {}
    1.toByte() -> {}
    2.toByte() -> {}
-   3.toByte() -> {}
+   3.toShort().toByte() -> {}
    else -> {}
   }
   when (s) {
    97.toShort() -> {}
    1.toShort() -> {}
-   2.toShort() -> {}
+   2.toByte().toShort() -> {}
    3.toShort() -> {}
    else -> {}
   }
  }
-
+ 
  private fun testBlocksInSwitchCase(i: Int) {
   when (i) {
    1 -> {
@@ -119,7 +120,7 @@ open class SwitchStatement {
    else -> {}
   }
  }
-
+ 
  private fun testLabelInSwitchCase(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -140,7 +141,7 @@ open class SwitchStatement {
    } while (false)
   } while (false)
  }
-
+ 
  private fun testNonFallThroughBreakCase(i: Int) {
   when (i) {
    1 -> {
@@ -151,7 +152,7 @@ open class SwitchStatement {
    }
   }
  }
-
+ 
  private fun testNonFallThroughBreakOuterCase(i: Int) {
   do {
    when (i) {
@@ -165,7 +166,7 @@ open class SwitchStatement {
    }
   } while (false)
  }
-
+ 
  private fun testNonFallThroughContinueCase(i: Int) {
   do {
    when (i) {
@@ -179,7 +180,7 @@ open class SwitchStatement {
    }
   } while (false)
  }
-
+ 
  private fun testNonFallThroughReturnCase(i: Int) {
   when (i) {
    4 -> {
@@ -191,7 +192,7 @@ open class SwitchStatement {
    }
   }
  }
-
+ 
  private fun testNonFallThroughThrowCase(i: Int) {
   when (i) {
    5 -> {
@@ -203,7 +204,7 @@ open class SwitchStatement {
    }
   }
  }
-
+ 
  private fun testNonFallThroughIfCase(i: Int) {
   when (i) {
    1 -> {
@@ -215,7 +216,7 @@ open class SwitchStatement {
    }
   }
  }
-
+ 
  private fun testNonFallThroughBlockCase(i: Int) {
   when (i) {
    1 -> {
@@ -226,7 +227,7 @@ open class SwitchStatement {
    }
   }
  }
-
+ 
  private fun testNonFallThrough_defaultIsNotLast(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -261,7 +262,7 @@ open class SwitchStatement {
    this.foo(4)
   } while (false)
  }
-
+ 
  private fun testFallThroughCase(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -281,7 +282,7 @@ open class SwitchStatement {
    this.foo(2)
   } while (false)
  }
-
+ 
  private fun testFallThroughBreakInnerCase(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -301,7 +302,7 @@ open class SwitchStatement {
    this.foo(2)
   } while (false)
  }
-
+ 
  private fun testFallThroughContinueInnerCase(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -321,7 +322,7 @@ open class SwitchStatement {
    this.foo(2)
   } while (false)
  }
-
+ 
  private fun testFallThroughLabeledStatement(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -346,7 +347,7 @@ open class SwitchStatement {
    this.foo(2)
   } while (false)
  }
-
+ 
  private fun testFallThroughIfCase(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -369,7 +370,7 @@ open class SwitchStatement {
    this.foo(2)
   } while (false)
  }
-
+ 
  private fun testFallThroughIfElseCase(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -394,7 +395,7 @@ open class SwitchStatement {
    this.foo(2)
   } while (false)
  }
-
+ 
  private fun testFallThoughLastCase(i: Int) {
   when (i) {
    1 -> {
@@ -405,7 +406,7 @@ open class SwitchStatement {
    }
   }
  }
-
+ 
  private fun testDefaultIsNotLast_fallThrough(i: Int) {
   SWITCH@ do {
    CASE@ do {
@@ -437,7 +438,7 @@ open class SwitchStatement {
    this.foo(4)
   } while (false)
  }
-
+ 
  private fun testDefaultNotLast_fallThroughCase(i: Int): Int {
   var result: Int = 0
   SWITCH@ do {
@@ -460,7 +461,7 @@ open class SwitchStatement {
   } while (false)
   return result
  }
-
+ 
  private fun testDefaultNotLast_fallThroughDefault(i: Int): Int {
   var result: Int = 0
   when (i) {
@@ -473,7 +474,7 @@ open class SwitchStatement {
   }
   return result
  }
-
+ 
  private fun testNonExhaustive(numbers: Numbers?): Int {
   when (numbers!!) {
    Numbers.ONE -> {
@@ -486,7 +487,7 @@ open class SwitchStatement {
   }
   return 3
  }
-
+ 
  private fun testNonExhaustive_fallThrough(numbers: Numbers?) {
   SWITCH@ do {
    CASE@ do {
@@ -512,19 +513,19 @@ open class SwitchStatement {
    } while (false)
   } while (false)
  }
-
+ 
  private fun testNonExhaustive_foldableFallThrough(i: Int) {
   when (i) {
    1, 2, 3 -> {}
    else -> {}
   }
  }
-
+ 
  private fun foo(i: Int) {}
-
+ 
  companion object {
   internal const val CONST_pp_switchstatement: Short = 3.toShort()
-
+  
   @JvmStatic
   private fun testSwitchVariableDeclarations() {
    var i: Int = 0
@@ -551,7 +552,7 @@ open class SwitchStatement {
    }
    assert(false)
   }
-
+  
   @JvmStatic
   private fun testSwitchStatement_withRules() {
    val o: Int = 0
@@ -572,7 +573,32 @@ open class SwitchStatement {
     } while (false)
    } while (false)
   }
-
+  
+  @JvmStatic
+  private fun testReturnFromAllCases_withRules(i: Int): Int {
+   SWITCH@ do {
+    CASE@ do {
+     do {
+      when (i) {
+       1 -> {
+        break@CASE
+       }
+       else -> {
+        break
+       }
+      }
+      break@SWITCH
+     } while (false)
+     if (true) {
+      return 1
+     } else {
+      return 2
+     }
+    } while (false)
+    return 3
+   } while (false)
+  }
+  
   @JvmStatic
   private fun testDefaultNotLast_withRules(i: Int, doBreak: Boolean): Int {
    var result: Int = 0
@@ -619,7 +645,7 @@ open class SwitchStatement {
    } while (false)
    return result
   }
-
+  
   @JvmStatic
   private fun foo(): Int {
    return 1

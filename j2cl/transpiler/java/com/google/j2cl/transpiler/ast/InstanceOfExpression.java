@@ -15,35 +15,26 @@
  */
 package com.google.j2cl.transpiler.ast;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.j2cl.common.HasSourcePosition;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.common.visitor.Processor;
 import com.google.j2cl.common.visitor.Visitable;
-import javax.annotation.Nullable;
 
 /** Class for instanceof Expression. */
 @Visitable
 public class InstanceOfExpression extends Expression implements HasSourcePosition {
   @Visitable Expression expression;
   @Visitable TypeDescriptor testTypeDescriptor;
-  @Visitable @Nullable Variable patternVariable;
   private final SourcePosition sourcePosition;
 
   private InstanceOfExpression(
-      SourcePosition sourcePosition,
-      Expression expression,
-      TypeDescriptor testTypeDescriptor,
-      Variable patternVariable) {
+      SourcePosition sourcePosition, Expression expression, TypeDescriptor testTypeDescriptor) {
+    this.sourcePosition = sourcePosition;
     this.expression = checkNotNull(expression);
     this.testTypeDescriptor = checkNotNull(testTypeDescriptor);
-    this.sourcePosition = sourcePosition;
-    this.patternVariable = patternVariable;
-    checkArgument(
-        testTypeDescriptor instanceof DeclaredTypeDescriptor
-            || testTypeDescriptor instanceof ArrayTypeDescriptor);
   }
 
   public Expression getExpression() {
@@ -59,10 +50,6 @@ public class InstanceOfExpression extends Expression implements HasSourcePositio
     return PrimitiveTypes.BOOLEAN;
   }
 
-  public Variable getPatternVariable() {
-    return patternVariable;
-  }
-
   @Override
   public boolean isIdempotent() {
     return expression.isIdempotent();
@@ -76,8 +63,7 @@ public class InstanceOfExpression extends Expression implements HasSourcePositio
 
   @Override
   public InstanceOfExpression clone() {
-    return new InstanceOfExpression(
-        sourcePosition, expression.clone(), testTypeDescriptor, patternVariable);
+    return new InstanceOfExpression(sourcePosition, expression.clone(), testTypeDescriptor);
   }
 
   @Override
@@ -90,7 +76,14 @@ public class InstanceOfExpression extends Expression implements HasSourcePositio
     return sourcePosition;
   }
 
-  public static Builder newBuilder() {
+  public Builder toBuilder() {
+    return new Builder()
+        .setExpression(this.getExpression())
+        .setTestTypeDescriptor(this.getTestTypeDescriptor())
+        .setSourcePosition(this.getSourcePosition());
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
@@ -98,16 +91,7 @@ public class InstanceOfExpression extends Expression implements HasSourcePositio
   public static class Builder {
     private Expression expression;
     private TypeDescriptor testTypeDescriptor;
-    private Variable patternVariable;
     private SourcePosition sourcePosition;
-
-    public static Builder from(InstanceOfExpression instanceOfExpression) {
-      return new Builder()
-          .setExpression(instanceOfExpression.getExpression())
-          .setTestTypeDescriptor(instanceOfExpression.getTestTypeDescriptor())
-          .setPatternVariable(instanceOfExpression.getPatternVariable())
-          .setSourcePosition(instanceOfExpression.getSourcePosition());
-    }
 
     @CanIgnoreReturnValue
     public Builder setSourcePosition(SourcePosition sourcePosition) {
@@ -127,15 +111,8 @@ public class InstanceOfExpression extends Expression implements HasSourcePositio
       return this;
     }
 
-    @CanIgnoreReturnValue
-    public Builder setPatternVariable(Variable patternVariable) {
-      this.patternVariable = patternVariable;
-      return this;
-    }
-
     public InstanceOfExpression build() {
-      return new InstanceOfExpression(
-          sourcePosition, expression, testTypeDescriptor, patternVariable);
+      return new InstanceOfExpression(sourcePosition, expression, testTypeDescriptor);
     }
   }
 }

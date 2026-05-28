@@ -27,7 +27,6 @@ import com.google.j2cl.transpiler.ast.Field;
 import com.google.j2cl.transpiler.ast.FieldAccess;
 import com.google.j2cl.transpiler.ast.FieldDescriptor;
 import com.google.j2cl.transpiler.ast.InitializerBlock;
-import com.google.j2cl.transpiler.ast.JsInfo;
 import com.google.j2cl.transpiler.ast.Member;
 import com.google.j2cl.transpiler.ast.MemberDescriptor;
 import com.google.j2cl.transpiler.ast.Method;
@@ -79,7 +78,7 @@ public class NormalizeOverlayMembers extends NormalizationPass {
         Field field = (Field) member;
         checkState(field.getDescriptor().isStatic());
         overlayClass.addMember(
-            Field.Builder.from(field)
+            field.toBuilder()
                 .setInitializer(AstUtils.clone(field.getInitializer()))
                 .setEnclosingClass(overlayTypeDescriptor)
                 .build());
@@ -99,7 +98,7 @@ public class NormalizeOverlayMembers extends NormalizationPass {
   private static Method createOverlayMethod(
       Method method, DeclaredTypeDescriptor overlayImplTypeDescriptor) {
     return method.getDescriptor().isStatic()
-        ? AstUtils.createStaticOverlayMethod(method, overlayImplTypeDescriptor)
+        ? AstUtils.createStaticOverlayMethod(method, overlayImplTypeDescriptor.getTypeDeclaration())
         : AstUtils.devirtualizeMethod(method, overlayImplTypeDescriptor, OVERLAY_METHOD_SUFFIX);
   }
 
@@ -131,10 +130,8 @@ public class NormalizeOverlayMembers extends NormalizationPass {
               checkArgument(target.isStatic());
               DeclaredTypeDescriptor overlayTypeDescriptor =
                   target.getEnclosingTypeDescriptor().getOverlayImplementationTypeDescriptor();
-              return FieldAccess.Builder.from(
-                      FieldDescriptor.Builder.from(target)
-                          .setEnclosingTypeDescriptor(overlayTypeDescriptor)
-                          .build())
+              return FieldAccess.builderFrom(
+                      target.toBuilder().setEnclosingTypeDescriptor(overlayTypeDescriptor).build())
                   .build();
             }
             return fieldAccess;
@@ -145,14 +142,10 @@ public class NormalizeOverlayMembers extends NormalizationPass {
   private static MethodCall redirectCall(MethodCall methodCall, DeclaredTypeDescriptor targetType) {
     MethodDescriptor methodDescriptor = methodCall.getTarget();
     if (methodDescriptor.isStatic()) {
-      return MethodCall.Builder.from(methodCall)
+      return methodCall.toBuilder()
           .setTarget(
-              methodDescriptor.transform(
-                  builder ->
-                      builder
-                          .setEnclosingTypeDescriptor(targetType)
-                          .setOriginalJsInfo(JsInfo.NONE)))
-          .setQualifier(null)
+              AstUtils.createStaticOverlayMethodDescriptor(
+                  methodDescriptor, targetType.getTypeDeclaration()))
           .build();
     }
     return AstUtils.devirtualizeMethodCall(methodCall, targetType, OVERLAY_METHOD_SUFFIX);

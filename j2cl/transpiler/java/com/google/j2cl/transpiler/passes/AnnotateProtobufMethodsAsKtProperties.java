@@ -39,9 +39,8 @@ public class AnnotateProtobufMethodsAsKtProperties extends NormalizationPass {
             KtInfo rewrittenKtInfo =
                 methodDescriptor.getOriginalKtInfo().toBuilder().setProperty(true).build();
 
-            return MethodDescriptor.Builder.from(methodDescriptor)
-                .setOriginalKtInfo(rewrittenKtInfo)
-                .build();
+            return methodDescriptor.transform(
+                builder -> builder.setOriginalKtInfo(rewrittenKtInfo));
           }
         });
   }
@@ -60,10 +59,6 @@ public class AnnotateProtobufMethodsAsKtProperties extends NormalizationPass {
     }
 
     String name = methodDescriptor.getName();
-    if (!name.startsWith("get")) {
-      return false;
-    }
-
-    return true;
+    return name.startsWith("get");
   }
 }

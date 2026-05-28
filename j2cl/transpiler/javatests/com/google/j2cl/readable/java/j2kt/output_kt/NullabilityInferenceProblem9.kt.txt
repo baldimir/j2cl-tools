@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -28,12 +29,12 @@ open class NullabilityInferenceProblem9 {
   internal fun <V> future_pp_j2kt(v: V): Future<V> {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   internal fun <I, O> transformFuture_pp_j2kt(future: Future<I>, fn: FutureFunction<in I, out O>): Future<O> {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   internal fun test_pp_j2kt(nullableFooFuture: Future<Foo?>, fooFuture: Future<Foo>): Future<Foo> {
    return NullabilityInferenceProblem9.transformFuture_pp_j2kt<Foo?, Foo?>(
@@ -47,12 +48,12 @@ open class NullabilityInferenceProblem9 {
    ) as Future<Foo>
   }
  }
-
- interface Foo
-
- interface Future<V>
-
- fun interface FutureFunction<I, O> {
+ 
+ internal interface Foo
+ 
+ internal interface Future<V>
+ 
+ internal fun interface FutureFunction<I, O> {
   fun apply(i: I): Future<O>
  }
 }

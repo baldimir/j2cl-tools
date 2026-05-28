@@ -18,12 +18,10 @@ package com.google.j2cl.transpiler.backend.wasm;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.lang.String.format;
 import static java.util.Comparator.comparingInt;
 
-import com.google.common.base.Predicates;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -42,8 +40,6 @@ import com.google.j2cl.transpiler.ast.Method;
 import com.google.j2cl.transpiler.ast.MethodDescriptor;
 import com.google.j2cl.transpiler.ast.PrimitiveTypeDescriptor;
 import com.google.j2cl.transpiler.ast.PrimitiveTypes;
-import com.google.j2cl.transpiler.ast.StringLiteral;
-import com.google.j2cl.transpiler.ast.Type;
 import com.google.j2cl.transpiler.ast.TypeDeclaration;
 import com.google.j2cl.transpiler.ast.TypeDescriptor;
 import com.google.j2cl.transpiler.ast.TypeDescriptors;
@@ -174,10 +170,7 @@ public class WasmGenerationEnvironment {
   @Nullable
   static String getWasmInfo(HasAnnotations node) {
     Annotation wasm = node.getAnnotation("javaemul.internal.annotations.Wasm");
-    if (wasm == null) {
-      return null;
-    }
-    return ((StringLiteral) wasm.getValues().get("value")).getValue();
+    return wasm == null ? null : wasm.getStringValue("value");
   }
 
   public String getTypeSignature(TypeDeclaration typeDeclaration) {
@@ -205,11 +198,6 @@ public class WasmGenerationEnvironment {
       return "$itable.empty";
     }
     return getTypeSignature(typeDescriptor) + ".itable";
-  }
-
-  /** Returns the name of the global that stores the itable for a Java type. */
-  public String getWasmItableGlobalName(TypeDeclaration typeDeclaration) {
-    return getWasmItableGlobalName(typeDeclaration.toDescriptor());
   }
 
   /** Returns the name of the wasm type of the vtable for a Java type. */
@@ -329,7 +317,7 @@ public class WasmGenerationEnvironment {
         .filter(MethodDescriptor::isSideEffectFree)
         .collect(
             toImmutableMap(
-                this::getNoSideEffectWrapperFunctionName, Function.identity(), (a, b) -> a));
+                this::getNoSideEffectWrapperFunctionName, Function.identity(), (a, unused) -> a));
   }
 
   /** Returns methods that need a wasm function type declaration indexed by the name of the type. */
@@ -339,7 +327,7 @@ public class WasmGenerationEnvironment {
         .flatMap(t -> t.getMethods().stream())
         .map(Method::getDescriptor)
         .filter(MethodDescriptor::isPolymorphic)
-        .collect(toImmutableMap(this::getFunctionTypeName, Function.identity(), (a, b) -> a));
+        .collect(toImmutableMap(this::getFunctionTypeName, Function.identity(), (a, unused) -> a));
   }
 
   /** The data index for the array literals that can be emitted as data. */
@@ -372,21 +360,6 @@ public class WasmGenerationEnvironment {
     return dataNameByLiteral.get(arrayLiteral);
   }
 
-  int getItableIndexForInterface(TypeDeclaration typeDeclaration) {
-    return itableAllocator.getItableFieldIndex(typeDeclaration);
-  }
-
-  int getItableSize() {
-    if (isModular) {
-      throw new UnsupportedOperationException();
-    }
-    return itableAllocator.getItableSize();
-  }
-
-  public JsImportsGenerator.Imports getJsImports() {
-    return jsImports;
-  }
-
   public JsMethodImport getJsMethodImport(MethodDescriptor methodDescriptor) {
     return jsImports.getMethodImports().get(methodDescriptor);
   }
@@ -401,15 +374,18 @@ public class WasmGenerationEnvironment {
   }
 
   boolean isCustomDescriptorsEnabled() {
-    return enableCustomDescriptors;
+    return enableCustomDescriptors || enableCustomDescriptorsJsInterop;
   }
 
-  private final boolean isModular;
+  boolean isCustomDescriptorsJsInteropEnabled() {
+    return enableCustomDescriptorsJsInterop;
+  }
+
   private final Library library;
   private final JsImportsGenerator.Imports jsImports;
-  private final ItableAllocator<TypeDeclaration> itableAllocator;
   private final String sourceMappingPathPrefix;
   private final boolean enableCustomDescriptors;
+  private final boolean enableCustomDescriptorsJsInterop;
 
   WasmGenerationEnvironment(Library library, Imports jsImports) {
     this(
@@ -417,7 +393,7 @@ public class WasmGenerationEnvironment {
         jsImports,
         /* sourceMappingPathPrefix= */ null,
         /* enableCustomDescriptors= */ false,
-        /* isModular= */ false);
+        /* enableCustomDescriptorsJsInterop= */ false);
   }
 
   WasmGenerationEnvironment(
@@ -425,11 +401,11 @@ public class WasmGenerationEnvironment {
       Imports jsImports,
       String sourceMappingPathPrefix,
       boolean enableCustomDescriptors,
-      boolean isModular) {
-    this.isModular = isModular;
+      boolean enableCustomDescriptorsJsInterop) {
     this.library = library;
     this.sourceMappingPathPrefix = sourceMappingPathPrefix;
     this.enableCustomDescriptors = enableCustomDescriptors;
+    this.enableCustomDescriptorsJsInterop = enableCustomDescriptorsJsInterop;
 
     // Resolve variable names into unique wasm identifiers.
     library
@@ -462,25 +438,7 @@ public class WasmGenerationEnvironment {
               checkState(previous == null);
             });
 
-    this.itableAllocator = createItableAllocator(library);
-
     this.jsImports = jsImports;
-  }
-
-  @Nullable
-  private ItableAllocator<TypeDeclaration> createItableAllocator(Library library) {
-    if (isModular) {
-      // Itable allocation happens in the bundler for modular compilation.
-      return null;
-    }
-    return new ItableAllocator<>(
-        library
-            .streamTypes()
-            .filter(Predicates.not(Type::isInterface))
-            .map(Type::getDeclaration)
-            .collect(toImmutableList()),
-        TypeDeclaration::getAllSuperInterfaces,
-        WasmGenerationEnvironment::getTypeLayoutSuperTypeDeclaration);
   }
 
   /** Returns a wasm layout creating it from a type declaration if it wasn't created before. */
@@ -523,5 +481,20 @@ public class WasmGenerationEnvironment {
     }
 
     return typeDeclaration.getSuperTypeDeclaration();
+  }
+
+  /** Returns the name of the global that stores the JS prototype for JsTypes. */
+  public String getJsPrototypeGlobalName(DeclaredTypeDescriptor typeDescriptor) {
+    return getJsPrototypeGlobalName(typeDescriptor.getTypeDeclaration());
+  }
+
+  /** Returns the name of the global that stores the JS prototype for JsTypes. */
+  public String getJsPrototypeGlobalName(TypeDeclaration typeDeclaration) {
+    return getJsPrototypeGlobalName(typeDeclaration.getQualifiedJsName());
+  }
+
+  /** Returns the name of the global that stores the JS prototype for JsTypes. */
+  public String getJsPrototypeGlobalName(String qualifiedJsName) {
+    return format("$%s.proto", qualifiedJsName);
   }
 }

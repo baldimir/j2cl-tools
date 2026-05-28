@@ -207,13 +207,23 @@ class Strings {
     s1 = (1 + 2).toString() + "s"
     s1 = "s" + 1 + 2
   }
+
+  fun testMultiDollarInterpolation() {
+    val name = "world"
+    val s1 = $$$"Hello $$$name, $$name, $name"
+    val s2 =
+      $$"""Hello $$name
+      $name literal
+      """
+  }
 }
 
 private class Foo {
   override fun toString() = "bar"
 }
 
-private fun intToStringHelper(i: Int) = i.toString()
+// Also tests return statement in function expression body, does not remove the return.
+private fun intToStringHelper(i: Int): String = return i.toString()
 
 private fun nullableIntToStringHelper(i: Int?) = i.toString()
 

@@ -6,12 +6,18 @@ const $Util = goog.require('nativebootstrap.Util$impl');
 let Error = goog.forwardDeclare('java.lang.Error$impl');
 let Integer = goog.forwardDeclare('java.lang.Integer$impl');
 let Iterator = goog.forwardDeclare('java.util.Iterator$impl');
+let Objects = goog.forwardDeclare('java.util.Objects$impl');
+let Exceptions = goog.forwardDeclare('javaemul.internal.Exceptions$impl');
 let NothingStub = goog.forwardDeclare('kotlin.Nothing$impl');
 let Unit = goog.forwardDeclare('kotlin.Unit$impl');
+let Function0 = goog.forwardDeclare('kotlin.jvm.functions.Function0$impl');
+let MutableKProperty0Impl = goog.forwardDeclare('kotlin.jvm.internal.MutableKProperty0Impl$impl');
+let $Equality = goog.forwardDeclare('nativebootstrap.Equality$impl');
 let $Casts = goog.forwardDeclare('vmbootstrap.Casts$impl');
-let $Exceptions = goog.forwardDeclare('vmbootstrap.Exceptions$impl');
 let NothingIterator = goog.forwardDeclare('voidtypes.NothingIterator$impl');
 let NullableNothingIterator = goog.forwardDeclare('voidtypes.NullableNothingIterator$impl');
+let UnitConsumer = goog.forwardDeclare('voidtypes.UnitConsumer$impl');
+let UnitProducer = goog.forwardDeclare('voidtypes.UnitProducer$impl');
 
 /**
  * @final
@@ -39,7 +45,7 @@ class VoidTypesKt extends j_l_Object {
  /** @nodts @return {!Unit} */
  static m_getW__kotlin_Unit() {
   VoidTypesKt.$clinit();
-  return VoidTypesKt.f_w__voidtypes_VoidTypesKt_;
+  return Unit.f_INSTANCE__kotlin_Unit;
  }
  /** @nodts */
  static m_g__void() {
@@ -49,7 +55,7 @@ class VoidTypesKt extends j_l_Object {
  /** @nodts @return {!Unit} */
  static m_getX__kotlin_Unit() {
   VoidTypesKt.$clinit();
-  return VoidTypesKt.f_x__voidtypes_VoidTypesKt_;
+  return Unit.f_INSTANCE__kotlin_Unit;
  }
  /** @nodts @return {!*} */
  static m_h__java_lang_Object__java_lang_Object(/** !* */ x) {
@@ -64,7 +70,7 @@ class VoidTypesKt extends j_l_Object {
  /** @nodts @return {?} */
  static m_i__kotlin_jvm_internal_NothingStub() {
   VoidTypesKt.$clinit();
-  throw $Exceptions.toJs(Error.$create__());
+  throw Exceptions.m_toJs__java_lang_Throwable__javaemul_internal_ThrowableUtils_JsObject(Error.$create__());
  }
  /** @nodts @return {number} */
  static m_getZ__int() {
@@ -74,7 +80,10 @@ class VoidTypesKt extends j_l_Object {
  /** @nodts */
  static m_boxing__void() {
   VoidTypesKt.$clinit();
-  VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub();
+  Objects.m_equals__java_lang_Object__java_lang_Object__boolean(1, VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub());
+  Objects.m_equals__java_lang_Object__java_lang_Object__boolean(VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub(), 1);
+  $Equality.$same(VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub(), null);
+  $Equality.$same(null, VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub());
  }
  /** @nodts */
  static m_assignmentToLocal__void() {
@@ -93,7 +102,9 @@ class VoidTypesKt extends j_l_Object {
  /** @nodts */
  static m_returnNothingForUnit__void() {
   VoidTypesKt.$clinit();
-  VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub();
+  {
+   return VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub();
+  }
  }
  /** @nodts @return {!*} */
  static m_returnNothingForAny__java_lang_Object() {
@@ -109,6 +120,84 @@ class VoidTypesKt extends j_l_Object {
   } else {
    VoidTypesKt.m_g__void();
   }
+  return;
+ }
+ /** @nodts */
+ static m_unitLambdas__void() {
+  VoidTypesKt.$clinit();
+  let a = Function0.$adapt(/**  @return {!Unit}*/ (() =>{
+   VoidTypesKt.m_f__void();
+   return Unit.f_INSTANCE__kotlin_Unit;
+  }));
+  let b = Function0.$adapt(/**  @return {!Unit}*/ (() =>{
+   VoidTypesKt.m_f__void();
+   return Unit.f_INSTANCE__kotlin_Unit;
+  }));
+  let c = /**@type {!MutableKProperty0Impl<!Unit>}*/ (MutableKProperty0Impl.$create__kotlin_jvm_functions_Function0__kotlin_jvm_functions_Function1(Function0.$adapt(/**  @return {!Unit}*/ (() =>{
+   VoidTypesKt.m_getW__kotlin_Unit();
+   return Unit.f_INSTANCE__kotlin_Unit;
+  })), null));
+  VoidTypesKt.m_consumeGenericJsFunction__voidtypes_GenericJsFunction__void(/**  @return {!Unit}*/ (() =>{
+   VoidTypesKt.m_f__void();
+   return Unit.f_INSTANCE__kotlin_Unit;
+  }));
+  VoidTypesKt.m_consumeGenericJsFunction__voidtypes_GenericJsFunction__void(/**  @return {!Unit}*/ (() =>{
+   VoidTypesKt.m_f__void();
+   return Unit.f_INSTANCE__kotlin_Unit;
+  }));
+  VoidTypesKt.m_consumeGenericJsFunction__voidtypes_GenericJsFunction__void(/**  @return {!Unit}*/ (() =>{
+   VoidTypesKt.m_getW__kotlin_Unit();
+   return Unit.f_INSTANCE__kotlin_Unit;
+  }));
+  VoidTypesKt.m_consumeGenericJsFunction__voidtypes_GenericJsFunction__void(/**  @return {!Unit}*/ (() =>{
+   if (Objects.m_equals__java_lang_Object__java_lang_Object__boolean(a, b)) {
+    return Unit.f_INSTANCE__kotlin_Unit;
+   }
+   return Unit.f_INSTANCE__kotlin_Unit;
+  }));
+  VoidTypesKt.m_consumeGenericJsFunction__voidtypes_GenericJsFunction__void(/**  @return {!Unit}*/ (() =>{
+   a.m_invoke__java_lang_Object();
+   return Unit.f_INSTANCE__kotlin_Unit;
+  }));
+  VoidTypesKt.m_consumeUnitJsFunction__voidtypes_UnitJsFunction__void(() =>{
+   VoidTypesKt.m_f__void();
+   return;
+  });
+  VoidTypesKt.m_consumeUnitJsFunction__voidtypes_UnitJsFunction__void(() =>{
+   VoidTypesKt.m_f__void();
+   return;
+  });
+  VoidTypesKt.m_consumeUnitJsFunction__voidtypes_UnitJsFunction__void(() =>{
+   VoidTypesKt.m_getW__kotlin_Unit();
+   return;
+  });
+  VoidTypesKt.m_consumeUnitJsFunction__voidtypes_UnitJsFunction__void(() =>{
+   if (Objects.m_equals__java_lang_Object__java_lang_Object__boolean(a, b)) {
+    return;
+   }
+   return;
+  });
+  VoidTypesKt.m_consumeUnitJsFunction__voidtypes_UnitJsFunction__void(() =>{
+   a.m_invoke__java_lang_Object();
+   return;
+  });
+ }
+ /** @nodts */
+ static m_unitSpecialization__void() {
+  VoidTypesKt.$clinit();
+  let unitProducer = UnitProducer.$create__();
+  let unitConsumer = UnitConsumer.$create__();
+  unitProducer.m_provide__java_lang_Object();
+  unitConsumer.m_consume__java_lang_Object__void(Unit.f_INSTANCE__kotlin_Unit);
+ }
+ /** @nodts @template T */
+ static m_consumeGenericJsFunction__voidtypes_GenericJsFunction__void(/** function():T */ f) {
+  VoidTypesKt.$clinit();
+ }
+ /** @nodts */
+ static m_consumeUnitJsFunction__voidtypes_UnitJsFunction__void(/** function():void */ f) {
+  VoidTypesKt.$clinit();
+  VoidTypesKt.m_f__void();
   return;
  }
  /** @nodts */
@@ -143,7 +232,7 @@ class VoidTypesKt extends j_l_Object {
   VoidTypesKt.m_g__void();
   VoidTypesKt.f_x__voidtypes_VoidTypesKt_ = Unit.f_INSTANCE__kotlin_Unit;
   VoidTypesKt.f_y__voidtypes_VoidTypesKt_ = VoidTypesKt.m_h__java_lang_Object__java_lang_Object(Unit.f_INSTANCE__kotlin_Unit);
-  VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub();
+  VoidTypesKt.f_z__voidtypes_VoidTypesKt_ = VoidTypesKt.m_i__kotlin_jvm_internal_NothingStub();
  }
  /** @nodts @return {boolean} */
  static $isInstance(/** ? */ instance) {
@@ -154,12 +243,18 @@ class VoidTypesKt extends j_l_Object {
  static $loadModules() {
   Error = goog.module.get('java.lang.Error$impl');
   Integer = goog.module.get('java.lang.Integer$impl');
+  Objects = goog.module.get('java.util.Objects$impl');
+  Exceptions = goog.module.get('javaemul.internal.Exceptions$impl');
   NothingStub = goog.module.get('kotlin.Nothing$impl');
   Unit = goog.module.get('kotlin.Unit$impl');
+  Function0 = goog.module.get('kotlin.jvm.functions.Function0$impl');
+  MutableKProperty0Impl = goog.module.get('kotlin.jvm.internal.MutableKProperty0Impl$impl');
+  $Equality = goog.module.get('nativebootstrap.Equality$impl');
   $Casts = goog.module.get('vmbootstrap.Casts$impl');
-  $Exceptions = goog.module.get('vmbootstrap.Exceptions$impl');
   NothingIterator = goog.module.get('voidtypes.NothingIterator$impl');
   NullableNothingIterator = goog.module.get('voidtypes.NullableNothingIterator$impl');
+  UnitConsumer = goog.module.get('voidtypes.UnitConsumer$impl');
+  UnitProducer = goog.module.get('voidtypes.UnitProducer$impl');
  }
 }
 /**@type {!Unit} @nodts*/

@@ -51,8 +51,25 @@ data class IntValueHolder(override val backingValue: Int) : ValueHolder<Int>
 
 data class ArrayMembers(private val a: IntArray, private val b: Array<String>)
 
+interface DataClassInterface {
+  val f: Int
+
+  fun component2(): String
+}
+
+@kotlin.jvm.JvmRecord
+data class JvmRecordDataClass(override val f: Int, val z: String) : DataClassInterface
+
+@kotlin.jvm.JvmRecord
+data class JvmRecordDataClassOverridingEquals(val s: String) {
+  override fun equals(other: Any?): Boolean {
+    return false
+  }
+}
+
 fun main() {
   val (foo) = BasicDataClass(1)
   val (a, b, c) = PolymorphicDataType(1, 2, 3)
   IntValueHolder(10).backingValue
+  val (f, z) = JvmRecordDataClass(1, "a")
 }

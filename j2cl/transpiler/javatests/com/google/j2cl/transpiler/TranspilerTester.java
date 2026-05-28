@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.io.MoreFiles;
 import com.google.common.truth.Correspondence;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.j2cl.common.Problems;
@@ -41,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -60,21 +62,21 @@ public class TranspilerTester {
    */
   public static TranspilerTester newTesterWithDefaults() {
     return newTester()
-        .setClassPathArg("transpiler/javatests/com/google/j2cl/transpiler/jre_bundle_deploy.jar");
+        .setClassPathArg("transpiler/javatests/com/google/j2cl/transpiler/jre_bundle_deploy.jar")
+        .setSystemPathArg("transpiler/javatests/com/google/j2cl/transpiler/jre_bundle_system");
   }
 
   /** Creates a new transpiler tester initialized with Kotlin (frontend) defaults. */
   public static TranspilerTester newTesterWithKotlinDefaults() {
     return newTester()
-        .addArgs("-frontend", "KOTLIN")
         .addArgs("-kotlincOptions", "-Xmulti-platform")
         // J2CL Koltin frontend is based on Koltin/JVM compiler that requires that deps and the
         // current compilation use the same JVM target in order to inline bytecode. Even we don't
         // use the bytecode inliner, kotlinc fails in the early stage if we do not specify the right
         // JVM target.
         // Note: For Bazel compilation, this is provided through toolchain defaults.
-        .addArgs("-kotlincOptions", "-jvm-target=11")
-        .addArgs("-kotlincOptions", "-language-version=2.1")
+        .addArgs("-kotlincOptions", "-jvm-target=21")
+        .addArgs("-kotlincOptions", "-language-version=2.3")
         .setClassPathArg(
             "transpiler/javatests/com/google/j2cl/transpiler/ktstdlib_bundle_deploy.jar");
   }
@@ -84,31 +86,36 @@ public class TranspilerTester {
     return newTester()
         .addArgs("-backend", "KOTLIN")
         .setClassPathArg(
-            "transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2kt_deploy.jar");
+            "transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2kt_deploy.jar")
+        .setSystemPathArg("transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2kt_system");
   }
 
   /** Creates a new transpiler tester initialized with WASM defaults. */
   public static TranspilerTester newTesterWithWasmDefaults() {
     return newTester()
-        // TODO(b/395921769): Remove this after the test are ported to modular WASM.
         .noAssertDelayedCancelChecks()
         .addArgs("-backend", "WASM")
         .setClassPathArg(
             "transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2wasm_deploy.jar")
-        .addArgs("-defineForWasm", "J2WASM_DEBUG=TRUE")
-        .addArgs("-defineForWasm", "jre.strictFpToString=DISABLED")
-        .addArgs("-defineForWasm", "jre.checkedMode=ENABLED")
-        .addArgs("-defineForWasm", "jre.checks.checkLevel=NORMAL")
-        .addArgs("-defineForWasm", "jre.checks.bounds=AUTO")
-        .addArgs("-defineForWasm", "jre.checks.api=AUTO")
-        .addArgs("-defineForWasm", "jre.checks.numeric=AUTO")
-        .addArgs("-defineForWasm", "jre.checks.type=AUTO")
-        .addArgs("-defineForWasm", "jre.logging.logLevel=ALL")
-        .addArgs("-defineForWasm", "jre.logging.simpleConsoleHandler=ENABLED")
-        .addArgs("-defineForWasm", "jre.classMetadata=SIMPLE")
-        .addArgs("-defineForWasm", "jre.assertions=ENABLED")
-        .addSourcePathArg(
-            "transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2wasm_deploy-src.jar");
+        .setSystemPathArg(
+            "transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2wasm_system");
+  }
+
+  /**
+   * Creates a new transpiler tester initialized with WASM custom descriptors JS interop enabled.
+   */
+  public static TranspilerTester newTesterWithWasmCustomDescriptorsJsInteropEnabled() {
+    return newTesterWithWasmDefaults().addArgs("-experimentalEnableWasmCustomDescriptorsJsInterop");
+  }
+
+  public static TranspilerTester newTesterWithEntryPointValidatorDefaults() {
+    return newTester()
+        .noAssertDelayedCancelChecks()
+        .addArgs("-backend", "WASM_ENTRY_POINT_VALIDATOR")
+        .setClassPathArg(
+            "transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2wasm_deploy.jar")
+        .setSystemPathArg(
+            "transpiler/javatests/com/google/j2cl/transpiler/jre_bundle-j2wasm_system");
   }
 
   private abstract static class File {
@@ -288,6 +295,10 @@ public class TranspilerTester {
     return this.addArgs("-cp", toTestPath(path));
   }
 
+  public TranspilerTester setSystemPathArg(String path) {
+    return this.addArgs("-system", toTestPath(path));
+  }
+
   public TranspilerTester setNativeSourcePathArg(String path) {
     return this.addArgs("-nativesourcepath", toTestPath(path));
   }
@@ -325,6 +336,15 @@ public class TranspilerTester {
 
   public TranspilerTester addArgs(Collection<String> args) {
     this.args.addAll(args);
+    return this;
+  }
+
+  @CanIgnoreReturnValue
+  public TranspilerTester addJavacOptions(String... javacOptions) {
+    for (String javacOption : javacOptions) {
+      args.add("-javacOptions");
+      args.add(javacOption);
+    }
     return this;
   }
 
@@ -368,6 +388,68 @@ public class TranspilerTester {
 
   public TranspileResult assertTranspileFails() {
     return transpile().assertHasErrors();
+  }
+
+  public void assertWithInlineMessages(String... compilationUnitsAndSources) {
+    List<String> expectedErrors = new ArrayList<>();
+    List<String> expectedWarnings = new ArrayList<>();
+    TranspilerTester tester = this;
+
+    for (int i = 0; i < compilationUnitsAndSources.length; i += 2) {
+      String compilationUnit = compilationUnitsAndSources[i];
+      String source = compilationUnitsAndSources[i + 1];
+      String code = parseCompilationUnit(compilationUnit, source, expectedErrors, expectedWarnings);
+      tester = tester.addCompilationUnit(compilationUnit, code);
+    }
+
+    var result =
+        expectedErrors.isEmpty() ? tester.assertTranspileSucceeds() : tester.assertTranspileFails();
+    result
+        .assertErrorsWithSourcePosition(expectedErrors.toArray(new String[0]))
+        .assertWarningsWithSourcePosition(expectedWarnings.toArray(new String[0]));
+  }
+
+  private static String parseCompilationUnit(
+      String compilationUnit,
+      String source,
+      List<String> expectedErrors,
+      List<String> expectedWarnings) {
+    String fileName = compilationUnit.substring(compilationUnit.lastIndexOf(".") + 1) + ".java";
+
+    int currentLine = 1;
+    if (compilationUnit.contains(".")) {
+      currentLine++; // Has package declaration.
+    }
+
+    StringBuilder codeBuilder = new StringBuilder();
+    List<String> lastMessageList = null;
+    for (String line : source.split("\n", -1)) {
+      String trimmedLine = line.trim();
+      if (trimmedLine.startsWith("> Error:")) {
+        expectedErrors.add(formatMessage("Error", fileName, currentLine - 1, trimmedLine));
+        lastMessageList = expectedErrors;
+      } else if (trimmedLine.startsWith("> Warning:")) {
+        expectedWarnings.add(formatMessage("Warning", fileName, currentLine - 1, trimmedLine));
+        lastMessageList = expectedWarnings;
+      } else if (trimmedLine.startsWith("> ")) {
+        if (lastMessageList == null || lastMessageList.isEmpty()) {
+          throw new IllegalArgumentException("Unexpected continuation line: " + trimmedLine);
+        }
+        int lastIndex = lastMessageList.size() - 1;
+        String lastMessage = lastMessageList.get(lastIndex);
+        lastMessageList.set(lastIndex, lastMessage + "\n" + trimmedLine.substring("> ".length()));
+      } else {
+        codeBuilder.append(line).append("\n");
+        currentLine++;
+        lastMessageList = null;
+      }
+    }
+    return codeBuilder.toString();
+  }
+
+  private static String formatMessage(String type, String fileName, int lineNumber, String line) {
+    String trimmedLine = line.substring(("> " + type + ": ").length());
+    return type + ":" + fileName + ":" + lineNumber + ": " + trimmedLine;
   }
 
   public void assertTranspileWithCancellation(int cancelDelayMs) throws IOException {
@@ -461,6 +543,11 @@ public class TranspilerTester {
     }
 
     @CanIgnoreReturnValue
+    public TranspileResult assertErrorsContainsMatchingSnippet(String regex) {
+      return assertContainsMatchingSnippet(getProblems().getErrors(), regex);
+    }
+
+    @CanIgnoreReturnValue
     public TranspileResult assertInfoMessagesContainsSnippets(String... snippets) {
       return assertContainsSnippets(getProblems().getInfoMessages(), snippets);
     }
@@ -474,9 +561,21 @@ public class TranspilerTester {
     }
 
     @CanIgnoreReturnValue
+    private TranspileResult assertContainsMatchingSnippet(List<String> problems, String regex) {
+      assertThat(problems)
+          .comparingElementsUsing(Correspondence.from(String::matches, "matched regex"))
+          .containsAtLeastElementsIn(Arrays.asList(regex));
+      return this;
+    }
+
+    @CanIgnoreReturnValue
     public TranspileResult assertOutputFilesExist(String... fileNames) {
       Arrays.stream(fileNames)
-          .forEach(fileName -> Assert.assertTrue(Files.exists(outputPath.resolve(fileName))));
+          .forEach(
+              fileName ->
+                  Assert.assertTrue(
+                      "File " + fileName + " not found",
+                      Files.exists(outputPath.resolve(fileName))));
       return this;
     }
 
@@ -577,19 +676,25 @@ public class TranspilerTester {
     // J2clCommandLineRunner.run for the details.
     ScheduledExecutorService executorService = Executors.newScheduledThreadPool(2);
     try {
-      executorService.execute(() -> runner.executeForTesting(args));
+      var compilation = executorService.submit(() -> runner.executeForTesting(args));
       if (cancelDelayMs != NO_CANCEL) {
         executorService.schedule(problems::requestCancellation, cancelDelayMs, MILLISECONDS);
       }
+      waitCompilation(compilation);
     } finally {
       MoreExecutors.shutdownAndAwaitTermination(executorService, 60, SECONDS);
     }
     assertThat(Thread.currentThread().isInterrupted()).isFalse();
 
     final String[] knownDelayedCalls = {
-      "com.google.j2cl.transpiler.frontend.javac.JavacParser.parseFiles",
       // Kotlin frontend is currently missing a lot of checks in between large chunks of works.
       "com.google.j2cl.transpiler.frontend.kotlin.KotlinParser.parseFiles",
+      // TODO(b/510525116): Consider wheter to instrument the type checking more aggressively to
+      // reducethe delay in larger compilations.
+      // Javac analysis exceeds the delay especially for larger files.
+      "com.sun.tools.javac.main.JavaCompiler.enterTrees",
+      // Javac analysis exceeds the delay especially for larger files.
+      "com.sun.tools.javac.main.JavaCompiler.attribute",
     };
     for (String knownDelayedCall : knownDelayedCalls) {
       delayedCalls.removeIf(t -> t.contains(knownDelayedCall));
@@ -599,8 +704,8 @@ public class TranspilerTester {
     assertThat(delayedCalls).isEmpty();
 
     final String[] knownSlightlyDelayedCalls = {
-      // Jdt is slow to do the check and we can't do much about it.
-      "org.eclipse.core.runtime.SubMonitor.isCanceled",
+      // Javac parsing occasionally exceeds the delay.
+      "com.sun.tools.javac.main.JavaCompiler.parseFiles",
     };
     for (String knownSlightlyDelayedCall : knownSlightlyDelayedCalls) {
       slightlyDelayedCalls.removeIf(t -> t.contains(knownSlightlyDelayedCall));
@@ -665,6 +770,17 @@ public class TranspilerTester {
           outputPath);
     } catch (IOException e) {
       throw new AssertionError(e);
+    }
+  }
+
+  /** Wait for compilation and propagate potential exceptions. */
+  private static void waitCompilation(Future<?> future) {
+    try {
+      Futures.getUnchecked(future);
+    } catch (RuntimeException | Error e) {
+      if (!Problems.Exit.isRootCause(e)) {
+        throw e;
+      }
     }
   }
 

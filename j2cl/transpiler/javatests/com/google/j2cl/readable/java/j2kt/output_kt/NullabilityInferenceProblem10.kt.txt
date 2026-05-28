@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -24,30 +25,36 @@ import kotlin.Suppress
 import kotlin.jvm.JvmStatic
 
 open class NullabilityInferenceProblem10 {
- fun interface Lazy<V> {
+ internal fun interface Lazy<V> {
   fun get(): V
  }
-
- open class InNullMarked internal constructor() {
+ 
+ internal open class InNullMarked internal constructor() {
   companion object {
    @JvmStatic
    internal fun observeNullable_pp_j2kt(foo: Foo?): Future<Void?> {
     throw RuntimeException()
    }
-
+   
    @JvmStatic
-   internal fun test_pp_j2kt(lazyObservable: Lazy<Observable<Foo>>) {}
+   internal fun test_pp_j2kt(lazyObservable: Lazy<Observable<Foo>>) {
+    lazyObservable.get()!!.addObserver(
+     Observer { arg0: Foo? ->
+      return@Observer InNullMarked.observeNullable_pp_j2kt(arg0)
+     },
+    )
+   }
   }
-
-  interface Foo
-
-  interface Future<V>
-
-  fun interface Observable<V> {
+  
+  internal interface Foo
+  
+  internal interface Future<V>
+  
+  internal fun interface Observable<V> {
    fun addObserver(observer: Observer<V>)
   }
-
-  fun interface Observer<V> {
+  
+  internal fun interface Observer<V> {
    fun observe(v: V): Future<Void?>
   }
  }

@@ -1,0 +1,51 @@
+goog.module('recordclass.RecordClass.$1RecursiveRecord$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class $1RecursiveRecord extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {$1RecursiveRecord} @nodts*/
+  this.f_r__recordclass_RecordClass_1RecursiveRecord_;
+ }
+ /** @nodts @return {!$1RecursiveRecord} */
+ static $create__recordclass_RecordClass_1RecursiveRecord(/** $1RecursiveRecord */ r) {
+  $1RecursiveRecord.$clinit();
+  let $instance = new $1RecursiveRecord();
+  $instance.$ctor__recordclass_RecordClass_1RecursiveRecord__recordclass_RecordClass_1RecursiveRecord__void(r);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_1RecursiveRecord__recordclass_RecordClass_1RecursiveRecord__void(/** $1RecursiveRecord */ r) {
+  this.$ctor__java_lang_Record__void();
+  this.f_r__recordclass_RecordClass_1RecursiveRecord_ = r;
+  $J2CL_PRESERVE$(this.f_r__recordclass_RecordClass_1RecursiveRecord_);
+ }
+ /** @nodts @return {$1RecursiveRecord} */
+ m_r__recordclass_RecordClass_1RecursiveRecord() {
+  return this.f_r__recordclass_RecordClass_1RecursiveRecord_;
+ }
+ /** @nodts */
+ static $clinit() {
+  $1RecursiveRecord.$clinit = () =>{};
+  $1RecursiveRecord.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof $1RecursiveRecord;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata($1RecursiveRecord, 'recordclass.RecordClass$1RecursiveRecord');
+
+exports = $1RecursiveRecord;
+
+//# sourceMappingURL=RecordClass$1RecursiveRecord.js.map

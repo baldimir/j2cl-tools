@@ -31,6 +31,10 @@ private constructor(
   /** Returns string with a content of this source. */
   fun buildString(): String = SourceBuilder().also { it.append(this) }.build()
 
+  /** Returns string with a content of this source and source map. */
+  fun buildStringWithMappings(): Pair<String, Map<SourcePosition, SourcePosition>> =
+    SourceBuilder().also { it.append(this) }.let { it.build() to it.mappings }
+
   /** Returns whether this source is empty. */
   fun isEmpty(): Boolean = nonEmptyAppendFn == null
 
@@ -58,20 +62,25 @@ private constructor(
    */
   inline fun ifNotEmpty(fn: (Source) -> Source) = if (isEmpty()) this else fn(this)
 
-  /** Returns source with additional source position information. */
+  /**
+   * Returns source containing mapping from the given source position to the position of this
+   * source.
+   */
   fun withMapping(sourcePosition: SourcePosition): Source = withMapping { emitter ->
     emitWithMapping(sourcePosition, emitter)
   }
 
-  /** Returns source with additional source position information for the given member. */
-  fun withMapping(memberDescriptor: MemberDescriptor): Source = withMapping { emmiter ->
-    emitWithMemberMapping(memberDescriptor, emmiter)
+  /** Returns source containing mapping from the given member to the position of this source. */
+  fun withMapping(memberDescriptor: MemberDescriptor): Source = withMapping { emitter ->
+    emitWithMemberMapping(memberDescriptor, emitter)
   }
 
-  private fun withMapping(emitFn: SourceBuilder.(() -> Unit) -> Unit): Source =
-    nonEmptyAppendFn?.let { appendFn ->
-      Source { sourceBuilder -> emitFn(sourceBuilder) { appendFn(sourceBuilder) } }
-    } ?: Source(null)
+  private fun withMapping(emitter: SourceBuilder.(() -> Unit) -> Unit): Source =
+    nonEmptyAppendFn
+      ?.let { appendFn ->
+        Source { sourceBuilder -> sourceBuilder.emitter { appendFn(sourceBuilder) } }
+      }
+      .orEmpty()
 
   companion object {
     val EMPTY = Source(null)
@@ -81,6 +90,7 @@ private constructor(
     val NEW_LINE = source("\n")
     val SEMICOLON = source(";")
     val SPACE = source(" ")
+    val STAR = source("*")
     val DOUBLE_QUOTE = source("\"")
     val LEFT_PARENTHESIS = source("(")
     val RIGHT_PARENTHESIS = source(")")
@@ -132,7 +142,7 @@ private constructor(
 
     fun inNewLine(source: Source) = NEW_LINE + source
 
-    fun inParenthesesIfNotEmpty(source: Source) = source.ifNotEmpty { inParentheses(it) }
+    fun inOptionalParentheses(source: Source) = source.ifNotEmpty { inParentheses(it) }
 
     fun inParentheses(source: Source) = join(LEFT_PARENTHESIS, source, RIGHT_PARENTHESIS)
 
@@ -160,6 +170,8 @@ private constructor(
         }
       }
 
+    fun indentedMultiLine(source: Source) = source.ifNotEmpty { indented(source).plus(NEW_LINE) }
+
     fun indentedIf(condition: Boolean, source: Source) = if (condition) indented(source) else source
 
     fun spaceSeparated(sources: Iterable<Source>) = join(sources, separator = " ")
@@ -167,6 +179,9 @@ private constructor(
     fun commaSeparated(sources: Iterable<Source>) = join(sources, separator = ", ")
 
     fun commaAndNewLineSeparated(sources: Iterable<Source>) = join(sources, separator = ",\n")
+
+    fun inNewLinesWithCommas(sources: Iterable<Source>) =
+      join(sources.map { inNewLine(it).plus(COMMA) })
 
     fun dotSeparated(sources: Iterable<Source>) = join(sources, separator = ".")
 
@@ -197,6 +212,9 @@ private constructor(
 
     fun emptyLineSeparated(source: Source, vararg sources: Source) =
       emptyLineSeparated(listOf(source, *sources))
+
+    fun inNewLinesPlusCommas(sources: Iterable<Source>) =
+      join(sources.map { inNewLine(it).plus(COMMA) })
 
     fun infix(lhs: Source, operator: String, rhs: Source) = infix(lhs, source(operator), rhs)
 

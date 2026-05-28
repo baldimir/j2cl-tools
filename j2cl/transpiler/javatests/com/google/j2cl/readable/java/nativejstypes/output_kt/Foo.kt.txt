@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package nativejstypes
 
@@ -27,9 +28,9 @@ import kotlin.jvm.JvmField
 open class Foo {
  @JvmField
  var x: Int = 0
-
+ 
  @JvmField
  var y: Int = 0
-
+ 
  external open fun sum(): Int
 }

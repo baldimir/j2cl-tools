@@ -43,16 +43,29 @@ public abstract class MemberDescriptor
   /** Return JsInfo from the member's annotation. */
   public abstract JsInfo getOriginalJsInfo();
 
+  /**
+   * Return JsInfo from the member's declaration.
+   *
+   * <p>For record component accessors, it's the original JsInfo from the corresponding field. For
+   * record component fields, it's JsInfo.NONE. For all other members it's the same as the original
+   * JsInfo.
+   */
+  public abstract JsInfo getDeclarationJsInfo();
+
   public abstract JsInfo getJsInfo();
 
+  @Nullable
+  abstract KtInfo getOriginalKtInfoInternal();
+
   /** Return KtInfo from the member's annotation. */
-  public abstract KtInfo getOriginalKtInfo();
+  public KtInfo getOriginalKtInfo() {
+    KtInfo info = getOriginalKtInfoInternal();
+    return info != null ? info : J2ktAstUtils.getKtInfo(getAnnotations());
+  }
 
   abstract KtInfo getKtInfo();
 
-  public boolean isKtProperty() {
-    return isField() || getKtInfo().isProperty() || getEnclosingTypeDescriptor().isAnnotation();
-  }
+  public abstract boolean isKtProperty();
 
   @Nullable
   public String getExplicitKtName() {
@@ -66,6 +79,8 @@ public abstract class MemberDescriptor
   public abstract DeclaredTypeDescriptor getEnclosingTypeDescriptor();
 
   public abstract MemberDescriptor getDeclarationDescriptor();
+
+  public abstract MemberDescriptor toRawMemberDescriptor();
 
   /** Returns true if {@code typeDescriptor} is the enclosing class of this member. */
   public boolean isMemberOf(DeclaredTypeDescriptor typeDescriptor) {
@@ -108,6 +123,12 @@ public abstract class MemberDescriptor
 
   public abstract boolean isInstanceMember();
 
+  /**
+   * Returns true if this member is synthetic (JLS 4.7.8).
+   *
+   * <p>Returns true only for members that are considered implementation artifacts, like bridges,
+   * but not for implicit members like default constructor or record accessors.
+   */
   public abstract boolean isSynthetic();
 
   public abstract Origin getOrigin();

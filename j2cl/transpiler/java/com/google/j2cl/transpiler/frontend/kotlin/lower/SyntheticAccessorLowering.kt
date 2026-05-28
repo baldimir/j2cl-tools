@@ -20,10 +20,10 @@ import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.util.DeepCopyIrTreeWithSymbols
 import org.jetbrains.kotlin.ir.util.DeepCopySymbolRemapper
 import org.jetbrains.kotlin.ir.util.SimpleTypeRemapper
+import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.ir.util.withinScope
 import org.jetbrains.kotlin.ir.visitors.*
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.name.NameUtils
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
 /**
@@ -31,11 +31,14 @@ import org.jetbrains.kotlin.utils.memoryOptimizedMap
  *
  * Copied and modified from
  * org.jetbrains.kotlin.ir.backend.js.lower.inline.LegacySyntheticAccessorLowering.kt
+ *
+ * TODO(b/449153897): This file has been removed in Koltin 2.2.20. Take a look at the new pass and
+ *   try to reuse it.
  */
 class SyntheticAccessorLowering(private val context: LoweringContext) : BodyLoweringPass {
 
   private class CandidatesCollector(val candidates: MutableCollection<IrSimpleFunction>) :
-    IrElementVisitorVoid {
+    IrVisitorVoid() {
 
     private fun IrSimpleFunction.isTopLevelPrivate(): Boolean {
       if (visibility != DescriptorVisibilities.PRIVATE) return false
@@ -85,8 +88,7 @@ class SyntheticAccessorLowering(private val context: LoweringContext) : BodyLowe
         override fun visitSimpleFunction(declaration: IrSimpleFunction) {
           remapSymbol(functions, declaration) { IrSimpleFunctionSymbolImpl() }
           declaration.typeParameters.forEach { it.acceptVoid(this) }
-          declaration.extensionReceiverParameter?.acceptVoid(this)
-          declaration.valueParameters.forEach { it.acceptVoid(this) }
+          declaration.nonDispatchParameters.forEach { it.acceptVoid(this) }
         }
       }
 
@@ -95,18 +97,7 @@ class SyntheticAccessorLowering(private val context: LoweringContext) : BodyLowe
     private val copier =
       object : DeepCopyIrTreeWithSymbols(symbolRemapper, typeRemapper) {
         override fun visitSimpleFunction(declaration: IrSimpleFunction): IrSimpleFunction {
-          // MODIFIED BY GOOGLE.
-          // Use function's sanitized name when building the name of the new function. The name of
-          // property's getter and setter in  Kotlin AST are invalid in javascript.
-          // Original code:
-          // val newName = Name.identifier("${declaration.name.asString()}\$accessor\$$fileHash")
-          // TODO(b/228454104): Remove this code and use the original one when we fully sanitize
-          //  name
-          val newName =
-            Name.identifier(
-              "${NameUtils.sanitizeAsJavaIdentifier(declaration.name.asStringStripSpecialMarkers())}\$accessor\$$fileHash"
-            )
-          // END OF MODIFICATION.
+          val newName = Name.identifier("${declaration.name.asString()}\$accessor\$$fileHash")
           return declaration.factory
             .createSimpleFunction(
               startOffset = declaration.startOffset,
@@ -141,11 +132,10 @@ class SyntheticAccessorLowering(private val context: LoweringContext) : BodyLowe
             assert(declaration.dispatchReceiverParameter == null) {
               "Top level functions do not have dispatch receiver"
             }
-            extensionReceiverParameter =
-              declaration.extensionReceiverParameter?.transform()?.also { it.parent = this }
+
+            parameters = parameters.memoryOptimizedMap { it.transform() }
+            parameters.forEach { it.parent = this }
             returnType = typeRemapper.remapType(declaration.returnType)
-            valueParameters = declaration.valueParameters.memoryOptimizedMap { it.transform() }
-            valueParameters.forEach { it.parent = this }
             typeParameters.forEach { it.parent = this }
           }
         }
@@ -161,14 +151,13 @@ class SyntheticAccessorLowering(private val context: LoweringContext) : BodyLowe
 
     newFunction.typeParameters.forEachIndexed { i, tp -> irCall.typeArguments[i] = tp.defaultType }
 
-    newFunction.valueParameters.forEachIndexed { i, vp ->
-      irCall.putValueArgument(i, IrGetValueImpl(startOffset, endOffset, vp.type, vp.symbol))
+    assert(newFunction.dispatchReceiverParameter == null) {
+      "Top level functions do not have dispatch receiver"
     }
 
-    irCall.extensionReceiver =
-      newFunction.extensionReceiverParameter?.let {
-        IrGetValueImpl(startOffset, endOffset, it.type, it.symbol)
-      }
+    for (p in newFunction.parameters) {
+      irCall.arguments[p] = IrGetValueImpl(startOffset, endOffset, p.type, p.symbol)
+    }
 
     val irReturn =
       IrReturnImpl(
@@ -198,10 +187,7 @@ class SyntheticAccessorLowering(private val context: LoweringContext) : BodyLowe
           }
 
         newExpression.copyTypeArgumentsFrom(expression)
-        newExpression.extensionReceiver = expression.extensionReceiver
-        for (i in 0 until expression.valueArgumentsCount) {
-          newExpression.putValueArgument(i, expression.getValueArgument(i))
-        }
+        expression.arguments.forEachIndexed { i, argument -> newExpression.arguments[i] = argument }
 
         return newExpression
       }
@@ -228,10 +214,7 @@ class SyntheticAccessorLowering(private val context: LoweringContext) : BodyLowe
           }
 
         newExpression.copyTypeArgumentsFrom(expression)
-        newExpression.extensionReceiver = expression.extensionReceiver
-        for (i in 0 until expression.valueArgumentsCount) {
-          newExpression.putValueArgument(i, expression.getValueArgument(i))
-        }
+        expression.arguments.forEachIndexed { i, argument -> newExpression.arguments[i] = argument }
 
         return newExpression
       }

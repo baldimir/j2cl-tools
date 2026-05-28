@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package mixednestings
 
@@ -27,18 +28,18 @@ fun interface MyInterface {
 
 open class MixedNestings {
  open fun mm() {}
-
+ 
  open fun test() {
   A().a()
  }
-
+ 
  open inner class A internal constructor() {
   open fun aa() {}
-
+  
   open fun a() {
    open class B internal constructor() {
     open fun bb() {}
-
+    
     open fun b(): Int {
      val i: MyInterface = object : MyInterface {
       override fun `fun`(a: Int): Int {

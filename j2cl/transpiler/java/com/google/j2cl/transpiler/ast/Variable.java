@@ -30,6 +30,7 @@ public class Variable extends NameDeclaration implements Cloneable<Variable>, Ha
   @Visitable TypeDescriptor typeDescriptor;
   private boolean isFinal;
   private boolean isParameter;
+  private final boolean isExplicitlyTyped;
   private final SourcePosition sourcePosition;
   private final ImmutableList<Annotation> annotations;
 
@@ -39,11 +40,13 @@ public class Variable extends NameDeclaration implements Cloneable<Variable>, Ha
       TypeDescriptor typeDescriptor,
       boolean isFinal,
       boolean isParameter,
+      boolean isExplicitlyTyped,
       ImmutableList<Annotation> annotations) {
     super(name);
     setTypeDescriptor(typeDescriptor);
     this.isFinal = isFinal;
     this.isParameter = isParameter;
+    this.isExplicitlyTyped = isExplicitlyTyped;
     this.sourcePosition = checkNotNull(sourcePosition);
     this.annotations = annotations;
   }
@@ -72,23 +75,8 @@ public class Variable extends NameDeclaration implements Cloneable<Variable>, Ha
     return isParameter;
   }
 
-  @Override
-  Node acceptInternal(Processor processor) {
-    return Visitor_Variable.visit(processor, this);
-  }
-
-  @Override
-  public VariableReference createReference() {
-    return new VariableReference(this);
-  }
-
-  @Override
-  public Variable clone() {
-    return Variable.Builder.from(this).build();
-  }
-
-  public static Builder newBuilder() {
-    return new Builder();
+  public boolean isExplicitlyTyped() {
+    return isExplicitlyTyped;
   }
 
   public SourcePosition getSourcePosition() {
@@ -100,26 +88,49 @@ public class Variable extends NameDeclaration implements Cloneable<Variable>, Ha
     return annotations;
   }
 
+  @Override
+  public VariableReference createReference() {
+    return new VariableReference(this);
+  }
+
+  public BinaryExpression infixAssign(Expression value) {
+    return createReference().infixAssign(value);
+  }
+
+  @Override
+  Node acceptInternal(Processor processor) {
+    return Visitor_Variable.visit(processor, this);
+  }
+
+  @Override
+  public Variable clone() {
+    return toBuilder().build();
+  }
+
+  public Builder toBuilder() {
+    return builder()
+        .setName(this.getName())
+        .setTypeDescriptor(this.getTypeDescriptor())
+        .setFinal(this.isFinal())
+        .setParameter(this.isParameter)
+        .setExplicitlyTyped(this.isExplicitlyTyped)
+        .setSourcePosition(this.sourcePosition)
+        .setAnnotations(this.annotations);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** Builder for Variable. */
   public static class Builder {
-
     private String name;
     private TypeDescriptor typeDescriptor;
     private boolean isFinal;
     private boolean isParameter;
+    private boolean isExplicitlyTyped = true;
     private SourcePosition sourcePosition = SourcePosition.NONE;
     private ImmutableList<Annotation> annotations = ImmutableList.of();
-
-    public static Builder from(Variable variable) {
-      Builder builder = new Builder();
-      builder.name = variable.getName();
-      builder.typeDescriptor = variable.getTypeDescriptor();
-      builder.isFinal = variable.isFinal();
-      builder.isParameter = variable.isParameter;
-      builder.sourcePosition = variable.sourcePosition;
-      builder.annotations = variable.annotations;
-      return builder;
-    }
 
     @CanIgnoreReturnValue
     public Builder setName(String name) {
@@ -157,10 +168,23 @@ public class Variable extends NameDeclaration implements Cloneable<Variable>, Ha
       return this;
     }
 
+    @CanIgnoreReturnValue
+    public Builder setExplicitlyTyped(boolean isExplicitlyTyped) {
+      this.isExplicitlyTyped = isExplicitlyTyped;
+      return this;
+    }
+
     public Variable build() {
       checkState(name != null);
       checkState(typeDescriptor != null);
-      return new Variable(sourcePosition, name, typeDescriptor, isFinal, isParameter, annotations);
+      return new Variable(
+          sourcePosition,
+          name,
+          typeDescriptor,
+          isFinal,
+          isParameter,
+          isExplicitlyTyped,
+          annotations);
     }
   }
 }

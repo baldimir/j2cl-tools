@@ -15,7 +15,10 @@
  */
 package com.google.j2cl.transpiler.frontend.javac;
 
-import static java.util.stream.Collectors.toList;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.j2cl.common.SourceUtils.getJavaPath;
+import static java.util.stream.Collectors.toMap;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -30,21 +33,29 @@ import com.google.j2cl.transpiler.ast.TypeDescriptors;
 import com.google.j2cl.transpiler.frontend.common.FrontendOptions;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
+import com.sun.source.util.TaskEvent;
+import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTaskImpl;
+import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Context;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.tools.Diagnostic;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.DiagnosticCollector;
-import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
@@ -67,69 +78,247 @@ public class JavacParser {
     // our output would be unstable
     final Map<String, String> targetPathBySourcePath =
         options.getSources().stream()
-            .collect(Collectors.toMap(FileInfo::sourcePath, FileInfo::targetPath));
+            .collect(
+                toMap(
+                    FileInfo::sourcePath,
+                    FileInfo::targetPath,
+                    (u, v) -> {
+                      throw new IllegalStateException("Duplicate source path: " + u);
+                    },
+                    LinkedHashMap::new));
 
+    problems.abortIfCancelled();
     try {
-      JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
       DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
-      JavacFileManager fileManager =
-          (JavacFileManager)
-              compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8);
-      List<File> searchpath = options.getClasspaths().stream().map(File::new).collect(toList());
-      fileManager.setLocation(StandardLocation.PLATFORM_CLASS_PATH, searchpath);
-      fileManager.setLocation(StandardLocation.CLASS_PATH, searchpath);
+      Context context = new Context();
+      // Register the cancellation-aware compiler components to ensure that cancellation is checked
+      // during parsing and type checking.
+      CancellationChecker.register(context, problems);
+
+      Path sourceGenPath = options.getSourceGenPath();
       JavacTaskImpl task =
-          (JavacTaskImpl)
-              compiler.getTask(
-                  null,
-                  fileManager,
-                  diagnostics,
-                  getJavacOptions(options),
-                  null,
-                  fileManager.getJavaFileObjectsFromFiles(
-                      targetPathBySourcePath.keySet().stream().map(File::new).collect(toList())));
-      List<CompilationUnitTree> javacCompilationUnits = Lists.newArrayList(task.parse());
+          createCompilationTask(
+              options.getClasspaths(),
+              options.getSystem(),
+              options.getAnnotationProcessorPath(),
+              getJavacOptions(options),
+              targetPathBySourcePath.keySet().stream().map(Path::of).collect(toImmutableList()),
+              diagnostics,
+              sourceGenPath,
+              problems,
+              context);
+
+      List<CompilationUnitTree> javacCompilationUnits = Lists.newArrayList();
+      task.addTaskListener(
+          new TaskListener() {
+            @Override
+            public void started(TaskEvent taskEvent) {
+              problems.abortIfCancelled();
+            }
+
+            @Override
+            public void finished(TaskEvent taskEvent) {
+              problems.abortIfCancelled();
+              if (taskEvent.getKind() == TaskEvent.Kind.PARSE) {
+                var compilationUnit = checkNotNull(taskEvent.getCompilationUnit());
+                var sourcePath = compilationUnit.getSourceFile().getName();
+
+                // Only collect compilation units from explicitly provided sources or generated
+                // sources (regular files on disk). Skip .java files found inside classpath jars
+                // whose paths cannot be used for file operations.
+                if (targetPathBySourcePath.containsKey(sourcePath) || isRegularFile(sourcePath)) {
+                  javacCompilationUnits.add(compilationUnit);
+                  targetPathBySourcePath.computeIfAbsent(sourcePath, s -> getJavaPath(s));
+                }
+              }
+            }
+          });
+
+      problems.abortIfCancelled();
+      task.parse();
       task.analyze();
-      reportErrors(diagnostics, javacCompilationUnits, options.getForbiddenAnnotations());
+
+      checkForbiddenAnnotations(javacCompilationUnits, options.getForbiddenAnnotations(), problems);
+      reportDiagnosticErrors(diagnostics, problems);
       problems.abortIfHasErrors();
 
       JavaEnvironment javaEnvironment =
-          new JavaEnvironment(task.getContext(), TypeDescriptors.getWellKnownTypeNames());
-      CompilationUnitBuilder compilationUnitBuilder = new CompilationUnitBuilder(javaEnvironment);
+          new JavaEnvironment(task.getContext(), TypeDescriptors.getWellKnownTypeNames(), problems);
+      CompilationUnitBuilder compilationUnitBuilder =
+          new CompilationUnitBuilder(javaEnvironment, problems);
 
       ImmutableList.Builder<CompilationUnit> compilationUnits = ImmutableList.builder();
       for (var cu : javacCompilationUnits) {
-        compilationUnits.add(compilationUnitBuilder.buildCompilationUnit(cu));
+        String sourcePath = cu.getSourceFile().getName();
+        if (options.getGenerateKytheIndexingMetadata()) {
+          // If Kythe metadata is being requested, use the target path.
+          sourcePath = targetPathBySourcePath.get(sourcePath);
+        }
+        compilationUnits.add(
+            compilationUnitBuilder.buildCompilationUnit(
+                sourcePath, cu, options.getGenerateKytheIndexingMetadata()));
         problems.abortIfCancelled();
       }
-      return Library.newBuilder().setCompilationUnits(compilationUnits.build()).build();
+      return Library.builder().setCompilationUnits(compilationUnits.build()).build();
     } catch (IOException e) {
       problems.fatal(FatalError.CANNOT_OPEN_FILE, e.getMessage());
       return null;
     }
   }
 
+  public static JavaEnvironment createEnvironment(
+      List<Path> classpaths, Path system, Problems problems) {
+    try {
+      var diagnostics = new DiagnosticCollector<JavaFileObject>();
+      var task =
+          createCompilationTask(
+              classpaths.stream()
+                  .flatMap(p -> Arrays.stream(p.toString().split(File.pathSeparator)))
+                  .map(Path::of)
+                  .collect(toImmutableList()),
+              system,
+              /* processorPath= */ ImmutableList.of(),
+              getJavacOptionsBuilder().build(),
+              /* sources= */ ImmutableList.of(),
+              diagnostics,
+              /* sourceGenPath= */ null,
+              problems,
+              new Context());
+      reportDiagnosticErrors(diagnostics, problems);
+      return new JavaEnvironment(
+          task.getContext(), TypeDescriptors.getWellKnownTypeNames(), problems);
+    } catch (IOException e) {
+      problems.fatal(FatalError.CANNOT_OPEN_FILE, e.getMessage());
+      return null;
+    }
+  }
+
+  private static JavacTaskImpl createCompilationTask(
+      List<Path> classPath,
+      Path system,
+      List<Path> processorPath,
+      List<String> javacOptions,
+      Collection<Path> sources,
+      DiagnosticCollector<JavaFileObject> diagnostics,
+      Path sourceGenPath,
+      Problems problems,
+      Context context)
+      throws IOException {
+    JavacTool compiler = (JavacTool) ToolProvider.getSystemJavaCompiler();
+    problems.abortIfCancelled();
+
+    JavacFileManager fileManager =
+        (JavacFileManager)
+            compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8);
+    if (system != null) {
+      fileManager.setLocationFromPaths(StandardLocation.SYSTEM_MODULES, ImmutableList.of(system));
+    } else {
+      fileManager.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, classPath);
+    }
+    fileManager.setLocationFromPaths(StandardLocation.CLASS_PATH, classPath);
+    if (!processorPath.isEmpty()) {
+      fileManager.setLocationFromPaths(StandardLocation.ANNOTATION_PROCESSOR_PATH, processorPath);
+    }
+    if (sourceGenPath != null) {
+      fileManager.setLocationFromPaths(
+          StandardLocation.SOURCE_OUTPUT, ImmutableList.of(sourceGenPath));
+    }
+    return (JavacTaskImpl)
+        compiler.getTask(
+            null,
+            fileManager,
+            diagnostics,
+            javacOptions,
+            null,
+            fileManager.getJavaFileObjectsFromPaths(sources),
+            context);
+  }
+
+  private static final ImmutableSet<String> ALLOWED_JAVAC_OPTIONS =
+      ImmutableSet.of("--source", "--patch-module", "--add-reads");
+
   private static ImmutableList<String> getJavacOptions(FrontendOptions options) {
-    var javacOptions = ImmutableList.<String>builder();
-    if (!options.getSystem().isEmpty()) {
-      // getSystem is provided which specifies the location of our JRE.
-      javacOptions.add("--system").add(options.getSystem());
+    ImmutableList.Builder<String> builder = getJavacOptionsBuilder();
+
+    if (!options.getAnnotationProcessors().isEmpty()) {
+      builder.add("-processor");
+      builder.add(String.join(",", options.getAnnotationProcessors()));
     }
 
-    return javacOptions
+    ImmutableList<String> javacOptions = options.getJavacOptions();
+    for (int i = 0; i < javacOptions.size(); i++) {
+      String javacOption = javacOptions.get(i);
+      if (javacOption.startsWith("-A")) {
+        // Directly forward APT options; these are owned by processors (not javac or J2CL).
+        builder.add(javacOption);
+        continue;
+      }
+
+      JavacOption parsedOption = parseJavacOption(javacOption);
+      if (ALLOWED_JAVAC_OPTIONS.contains(parsedOption.key())) {
+        builder.add(parsedOption.key());
+        if (parsedOption.value() != null) {
+          // Option was in key=value format
+          builder.add(parsedOption.value());
+        } else if (i + 1 < javacOptions.size() && !javacOptions.get(i + 1).startsWith("-")) {
+          // Option value is the next element
+          builder.add(javacOptions.get(i + 1));
+          i++; // Skip next element as it's the value
+        }
+      }
+    }
+    return builder.build();
+  }
+
+  private static ImmutableList.Builder<String> getJavacOptionsBuilder() {
+    return ImmutableList.<String>builder()
         // Allow JRE classes to depend on internal annotations (in the unnamed module). This is
         // needed for both JRE and non-JRE compilation; some JRE methods are annotated with
         // internal annotations which are then read by some backends.
         .add("--add-reads")
-        .add("java.base=ALL-UNNAMED")
-        .addAll(options.getJavacOptions())
-        .build();
+        .add("java.base=ALL-UNNAMED");
   }
 
-  private void reportErrors(
-      DiagnosticCollector<JavaFileObject> diagnosticCollector,
+  private static JavacOption parseJavacOption(String opt) {
+    int equalsIndex = opt.indexOf('=');
+    if (equalsIndex > 0) {
+      return new JavacOption(opt.substring(0, equalsIndex), opt.substring(equalsIndex + 1));
+    }
+    return new JavacOption(opt, null);
+  }
+
+  private static record JavacOption(String key, @Nullable String value) {}
+
+  private static void reportDiagnosticErrors(
+      DiagnosticCollector<JavaFileObject> diagnosticCollector, Problems problems) {
+    for (Diagnostic<? extends JavaFileObject> diagnostic : diagnosticCollector.getDiagnostics()) {
+      if (diagnostic.getKind() == Kind.ERROR) {
+        String errorMessage = diagnostic.getMessage(Locale.US);
+        if (diagnostic.getSource() != null) {
+          problems.error(
+              (int) diagnostic.getLineNumber(),
+              diagnostic.getSource().getName(),
+              "%s",
+              errorMessage);
+        } else {
+          problems.error("%s", errorMessage);
+        }
+      }
+    }
+  }
+
+  private static boolean isRegularFile(String path) {
+    try {
+      return Files.isRegularFile(Path.of(path));
+    } catch (InvalidPathException e) {
+      return false;
+    }
+  }
+
+  private static void checkForbiddenAnnotations(
       List<CompilationUnitTree> javacCompilationUnits,
-      ImmutableList<String> forbiddenAnnotations) {
+      ImmutableList<String> forbiddenAnnotations,
+      Problems problems) {
     // Here we check for instances of forbidden annotations in the ast. If that is the case, we
     // throw an error since these should have been stripped by the build system already.
     for (var compilationUnit : javacCompilationUnits) {
@@ -146,21 +335,6 @@ public class JavacParser {
               compilationUnit.getSourceFile().getName(),
               FatalError.INCOMPATIBLE_ANNOTATION_FOUND_IN_COMPILE,
               forbiddenAnnotation);
-        }
-      }
-    }
-
-    for (Diagnostic<? extends JavaFileObject> diagnostic : diagnosticCollector.getDiagnostics()) {
-      if (diagnostic.getKind() == Kind.ERROR) {
-        String errorMessage = diagnostic.getMessage(Locale.US);
-        if (diagnostic.getSource() != null) {
-          problems.error(
-              (int) diagnostic.getLineNumber(),
-              diagnostic.getSource().getName(),
-              "%s",
-              errorMessage);
-        } else {
-          problems.error("%s", errorMessage);
         }
       }
     }

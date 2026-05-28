@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package nativeinjection
 
@@ -26,17 +27,17 @@ import kotlin.jvm.JvmStatic
 open class NativeClass {
  @JsMethod
  external open fun nativeInstanceMethod(): String?
-
+ 
  companion object {
   @JvmStatic
   @JsMethod
   external fun nativeStaticMethod(): NativeClass?
-
+  
   @JvmStatic
   @JsMethod(name = "notPublicNativeStaticMethod")
   internal external fun notPublicNativeStaticMethod_pp_nativeinjection(): NativeClass?
  }
-
+ 
  open class InnerClass {
   @JsMethod
   external open fun nativeInstanceMethod(): String?

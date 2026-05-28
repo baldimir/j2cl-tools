@@ -35,14 +35,16 @@
 /** author Elena Semukhina */
 package com.google.j2cl.jre.java.math;
 
+import static org.junit.Assert.assertThrows;
+
 import com.google.j2cl.jre.java.util.EmulTestBase;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 
 /**
- * Class: java.math.BigDecimal Methods: movePointLeft, movePointRight, scale,
- * setScale, unscaledValue *.
+ * Class: java.math.BigDecimal Methods: movePointLeft, movePointRight, scale, setScale,
+ * unscaledValue *.
  */
 public class BigDecimalScaleOperationsTest extends EmulTestBase {
 
@@ -51,9 +53,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertEquals(10, val.intValue());
   }
 
-  /**
-   * Check the default scale.
-   */
+  /** Check the default scale. */
   public void testScaleDefault() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int cScale = 0;
@@ -61,9 +61,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect scale", aNumber.scale() == cScale);
   }
 
-  /**
-   * Check a negative scale.
-   */
+  /** Check a negative scale. */
   public void testScaleNeg() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = -10;
@@ -72,9 +70,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect scale", aNumber.scale() == cScale);
   }
 
-  /**
-   * Check a positive scale.
-   */
+  /** Check a positive scale. */
   public void testScalePos() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 10;
@@ -83,9 +79,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect scale", aNumber.scale() == cScale);
   }
 
-  /**
-   * Check the zero scale.
-   */
+  /** Check the zero scale. */
   public void testScaleZero() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 0;
@@ -94,21 +88,16 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect scale", aNumber.scale() == cScale);
   }
 
-  /**
-   * Check the unscaled value.
-   */
+  /** Check the unscaled value. */
   public void testUnscaledValue() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 100;
     BigInteger bNumber = new BigInteger(a);
     BigDecimal aNumber = new BigDecimal(bNumber, aScale);
-    assertTrue("incorrect unscaled value", aNumber.unscaledValue().equals(
-        bNumber));
+    assertTrue("incorrect unscaled value", aNumber.unscaledValue().equals(bNumber));
   }
 
-  /**
-   * Set a greater new scale.
-   */
+  /** Set a greater new scale. */
   public void testSetScaleGreater() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 18;
@@ -119,9 +108,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertEquals("incorrect value", 0, bNumber.compareTo(aNumber));
   }
 
-  /**
-   * Set a less new scale; this.scale == 8; newScale == 5.
-   */
+  /** Set a less new scale; this.scale == 8; newScale == 5. */
   public void testSetScaleLess() {
     String a = "2.345726458768760000E+10";
     int newScale = 5;
@@ -131,26 +118,18 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertEquals("incorrect value", 0, bNumber.compareTo(aNumber));
   }
 
-  /**
-   * Verify an exception when setting a new scale.
-   */
+  /** Verify an exception when setting a new scale. */
   public void testSetScaleException() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 28;
     int newScale = 18;
     BigDecimal aNumber = new BigDecimal(new BigInteger(a), aScale);
-    try {
-      aNumber = aNumber.setScale(newScale);
-      fail("ArithmeticException has not been caught");
-    } catch (ArithmeticException e) {
-      assertEquals("Improper exception message", "Rounding necessary",
-          e.getMessage());
-    }
+    ArithmeticException e =
+        assertThrows(ArithmeticException.class, () -> aNumber.setScale(newScale));
+    assertEquals("Improper exception message", "Rounding necessary", e.getMessage());
   }
 
-  /**
-   * Set the same new scale.
-   */
+  /** Set the same new scale. */
   public void testSetScaleSame() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 18;
@@ -161,9 +140,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.equals(aNumber));
   }
 
-  /**
-   * Set a new scale.
-   */
+  /** Set a new scale. */
   public void testSetScaleRoundUp() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478139";
@@ -175,9 +152,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * Set a new scale.
-   */
+  /** Set a new scale. */
   public void testSetScaleRoundDown() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478138";
@@ -189,9 +164,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * Set a new scale.
-   */
+  /** Set a new scale. */
   public void testSetScaleRoundCeiling() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478139";
@@ -203,9 +176,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * Set a new scale.
-   */
+  /** Set a new scale. */
   public void testSetScaleRoundFloor() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478138";
@@ -217,9 +188,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * Set a new scale.
-   */
+  /** Set a new scale. */
   public void testSetScaleRoundHalfUp() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478138";
@@ -231,9 +200,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * Set a new scale.
-   */
+  /** Set a new scale. */
   public void testSetScaleRoundHalfDown() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478138";
@@ -245,9 +212,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * Set a new scale.
-   */
+  /** Set a new scale. */
   public void testSetScaleRoundHalfEven() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478138";
@@ -259,9 +224,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * SetScale(int, RoundingMode).
-   */
+  /** SetScale(int, RoundingMode). */
   public void testSetScaleIntRoundingMode() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 28;
@@ -274,9 +237,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertEquals("incorrect scale", resScale, result.scale());
   }
 
-  /**
-   * Move the decimal point to the left; the shift value is positive.
-   */
+  /** Move the decimal point to the left; the shift value is positive. */
   public void testMovePointLeftPos() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 28;
@@ -288,9 +249,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(a));
   }
 
-  /**
-   * Move the decimal point to the left; the shift value is positive.
-   */
+  /** Move the decimal point to the left; the shift value is positive. */
   public void testMovePointLeftNeg() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 28;
@@ -302,9 +261,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(a));
   }
 
-  /**
-   * Move the decimal point to the right; the shift value is positive.
-   */
+  /** Move the decimal point to the right; the shift value is positive. */
   public void testMovePointRightPosGreater() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 28;
@@ -316,9 +273,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(a));
   }
 
-  /**
-   * Move the decimal point to the right; the shift value is positive.
-   */
+  /** Move the decimal point to the right; the shift value is positive. */
   public void testMovePointRightPosLess() {
     String a = "1231212478987482988429808779810457634781384756794987";
     String b = "123121247898748298842980877981045763478138475679498700";
@@ -331,9 +286,7 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(b));
   }
 
-  /**
-   * Move the decimal point to the right; the shift value is positive.
-   */
+  /** Move the decimal point to the right; the shift value is positive. */
   public void testMovePointRightNeg() {
     String a = "1231212478987482988429808779810457634781384756794987";
     int aScale = 28;
@@ -345,25 +298,18 @@ public class BigDecimalScaleOperationsTest extends EmulTestBase {
     assertTrue("incorrect value", bNumber.unscaledValue().toString().equals(a));
   }
 
-  /**
-   * Move the decimal point to the right when the scale overflows.
-   */
+  /** Move the decimal point to the right when the scale overflows. */
   public void testMovePointRightException() {
     String a = "12312124789874829887348723648726347429808779810457634781384756794987";
     int aScale = Integer.MAX_VALUE; // 2147483647
     int shift = -18;
     BigDecimal aNumber = new BigDecimal(new BigInteger(a), aScale);
-    try {
-      aNumber = aNumber.movePointRight(shift);
-      fail("ArithmeticException has not been caught");
-    } catch (ArithmeticException e) {
-      assertEquals("Improper exception message", "Underflow", e.getMessage());
-    }
+    ArithmeticException e =
+        assertThrows(ArithmeticException.class, () -> aNumber.movePointRight(shift));
+    assertEquals("Improper exception message", "Underflow", e.getMessage());
   }
 
-  /**
-   * precision().
-   */
+  /** precision(). */
   public void testPrecision() {
     String a = "12312124789874829887348723648726347429808779810457634781384756794987";
     int aScale = 14;

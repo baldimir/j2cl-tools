@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package exception
 
@@ -24,6 +25,6 @@ import kotlin.Throwable
 
 class MyException: Exception {
  internal constructor()
-
+ 
  internal constructor(cause: Throwable?): super(cause)
 }

@@ -15,11 +15,13 @@
  */
 package j2kt;
 
+import java.util.Map;
+import java.util.function.Function;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public class LambdaParameterTypeInference {
+public abstract class LambdaParameterTypeInference {
   public interface Supplier<T extends @Nullable Object> {
     T get();
   }
@@ -43,5 +45,34 @@ public class LambdaParameterTypeInference {
   // unnecessary cast was inserted for "wrap()" call.
   public static <T extends @Nullable Object> void test(Supplier<? extends T> supplier) {
     add(supplier, wrap(x -> {}));
+  }
+
+  // Repro for b/454662844)
+  public static void testInference(Map<String, Integer> map) {
+    map.compute("", (key, value) -> (value == null) ? 1 : value + 1);
+    LambdaParameterTypeInference.<Integer>applyToNull(value -> (value == null) ? 1 : value + 1);
+  }
+
+  private static <T> int applyToNull(Function<? super @Nullable T, Integer> function) {
+    return function.apply(null);
+  }
+
+  public void testInferenceFromReturnType(Supplier<@Nullable Void> supplier) {
+    transform(supplier, p -> p);
+  }
+
+  abstract <I extends @Nullable Object, O extends @Nullable Object> Supplier<O> transform(
+      Supplier<I> supplier, Function<? super I, ? extends O> function);
+
+  public static <T extends @Nullable Object> Consumer<Consumer<Consumer<T>>> processTripleConsumer(
+      Consumer<Consumer<Consumer<T>>> tripleConsumer) {
+    return tripleConsumer;
+  }
+
+  public static void testNullableTripleConsumer(
+      Consumer<Consumer<Consumer<@Nullable String>>> nullableTripleConsumer,
+      @Nullable String nullableString) {
+    processTripleConsumer(nullableTripleConsumer)
+        .accept(nullableConsumer -> nullableConsumer.accept(nullableString));
   }
 }

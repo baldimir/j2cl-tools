@@ -44,6 +44,20 @@ class WhenStatement {
     return value
   }
 
+  private fun whenStatementWithStringWithNull(stringValue: String?): Int {
+    val value: Int
+    when (stringValue) {
+      "minus_one",
+      "zero",
+      "one" -> value = 1
+      "two" -> value = 2
+      null -> value = 4
+      else -> value = 3
+    }
+
+    return value
+  }
+
   fun whenExpressionWithChar(charValue: Char): Int {
     return when (charValue) {
       '0',
@@ -115,11 +129,12 @@ class WhenStatement {
     }
   }
 
-  fun whenStatementWithEnumValue(number: Numbers): Int {
+  fun whenStatementWithEnumValue(number: Numbers?): Int {
     when (number) {
       Numbers.ONE -> return 1
       Numbers.TWO -> return 2
       Numbers.THREE -> return 3
+      else -> return 4
     }
   }
 
@@ -216,6 +231,19 @@ class WhenStatement {
       a -> 1
       v -> 2
       else -> 3
+    }
+  }
+
+  fun whenWithValVariable() {
+    var o: Any? = Any()
+    var value: Int
+    // Repro for b/463372260
+    return when (val v = o) {
+      "minus_one",
+      "zero",
+      "one" -> value = 1
+      "two" -> value = 2
+      else -> value = 3
     }
   }
 }

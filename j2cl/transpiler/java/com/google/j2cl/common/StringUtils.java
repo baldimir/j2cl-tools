@@ -30,6 +30,13 @@ public final class StringUtils {
     return string.substring(0, 1).toUpperCase() + string.substring(1);
   }
 
+  /** Returns true if the string starts with {@code prefix} followed by a capital letter. */
+  public static boolean startsWithCamelCase(String string, String prefix) {
+    return string.length() > prefix.length()
+        && string.startsWith(prefix)
+        && Character.isUpperCase(string.charAt(prefix.length()));
+  }
+
   /**
    * Unescapes properly escaped Wtf16 strings.
    *
@@ -110,6 +117,10 @@ public final class StringUtils {
               }
             });
     return escaped.toString();
+  }
+
+  public static String escapeAsUtf8(byte b) {
+    return escape(b & 0xFF, /* forUtf8= */ true);
   }
 
   public static String escapeAsUtf8(int c) {

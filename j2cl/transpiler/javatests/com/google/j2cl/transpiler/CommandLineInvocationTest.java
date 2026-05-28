@@ -46,19 +46,6 @@ public class CommandLineInvocationTest extends TestCase {
                 + "use -help for a list of possible options");
   }
 
-  public void testFrontendFlag() throws IOException {
-    newTesterWithDefaults()
-        .addArgs("-frontend", "llama")
-        .addCompilationUnit("Foo", "public class Foo {}")
-        .assertTranspileFails()
-        .assertErrorsContainsSnippets("\"llama\" is not a valid value for \"-frontend");
-
-    newTesterWithDefaults()
-        .addArgs("-frontend", "jdt")
-        .setOutputPath(Files.createTempFile("output", ".zip"))
-        .addCompilationUnit("Foo", "public class Foo {}")
-        .assertTranspileSucceeds();
-  }
 
   public void testSyntaxError() {
     newTesterWithDefaults()
@@ -70,7 +57,8 @@ public class CommandLineInvocationTest extends TestCase {
             }
             """)
         .assertTranspileFails()
-        .assertErrorsContainsSnippets("Syntax error on token \"=\"");
+        .assertErrorsContainsMatchingSnippet(
+            ".*((Syntax error on token \"=\")|(illegal start of type)).*");
   }
 
   public void testInvalidOutputLocation() throws IOException {
@@ -84,7 +72,8 @@ public class CommandLineInvocationTest extends TestCase {
             "Output location '" + outputLocation + "' must be a directory or .zip file.");
   }
 
-  public void testMissingJreDependency() {
+  // TODO(b/459774514): Figure out how to make javac not pickup any jre.
+  public void disabled_testMissingJreDependency() {
     // Create a clean tester so that the JRE dependency is not automatically added.
     newTester()
         .addCompilationUnit("EmptyClass", "public class EmptyClass {}")
@@ -365,16 +354,25 @@ public class CommandLineInvocationTest extends TestCase {
         .addCompilationUnit(
             "test.Bar",
             """
+            import jsinterop.annotations.JsMethod;
+
             public class Bar {
               public class InnerBar {}
+
+              @JsMethod
+              public native void nativeInstanceMethod();
             }
             """)
+        .addFile("java/test/Bar.native.js", "Bar.prototype.nativeInstanceMethod = function () {}")
         .assertTranspileSucceeds()
         .assertOutputFilesExist(
             "test/Foo.java.js",
             "test/Foo.impl.java.js",
             "test/Bar.java.js",
-            "test/Bar.impl.java.js")
+            "test/Bar.impl.java.js",
+            "test/Foo.java",
+            "test/Bar.java",
+            "test/Bar.native_js")
         .assertOutputFilesDoNotExist("some/thing/Bogus.js");
 
     // Test transpilation of java file without java package
@@ -382,7 +380,7 @@ public class CommandLineInvocationTest extends TestCase {
         .setOutputPath(Files.createTempDirectory("outputdir"))
         .addCompilationUnit("Foo", "public class Foo {}")
         .assertTranspileSucceeds()
-        .assertOutputFilesExist("Foo.java.js", "Foo.impl.java.js");
+        .assertOutputFilesExist("Foo.java.js", "Foo.impl.java.js", "Foo.java");
   }
 
   public void testOutputsToZipFile() throws IOException {
@@ -399,10 +397,16 @@ public class CommandLineInvocationTest extends TestCase {
         .addCompilationUnit(
             "test.Bar",
             """
+            import jsinterop.annotations.JsMethod;
+
             public class Bar {
               public class InnerBar {}
+
+              @JsMethod
+              public native void nativeInstanceMethod();
             }
             """)
+        .addFile("java/test/Bar.native.js", "Bar.prototype.nativeInstanceMethod = function () {}")
         .assertTranspileSucceeds();
 
     try (ZipFile zipFile = new ZipFile(outputLocation.toFile())) {
@@ -410,6 +414,9 @@ public class CommandLineInvocationTest extends TestCase {
       assertNotNull(zipFile.getEntry("test/Foo.impl.java.js"));
       assertNotNull(zipFile.getEntry("test/Bar.java.js"));
       assertNotNull(zipFile.getEntry("test/Bar.impl.java.js"));
+      assertNotNull(zipFile.getEntry("test/Foo.java"));
+      assertNotNull(zipFile.getEntry("test/Bar.java"));
+      assertNotNull(zipFile.getEntry("test/Bar.native_js"));
       assertNull(zipFile.getEntry("some/thing/Bogus.js"));
     }
   }

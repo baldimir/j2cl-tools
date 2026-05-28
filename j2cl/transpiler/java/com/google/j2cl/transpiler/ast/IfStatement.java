@@ -54,6 +54,13 @@ public class IfStatement extends Statement {
   }
 
   @Override
+  public boolean terminatesAbruptly() {
+    return elseStatement != null
+        && thenStatement.terminatesAbruptly()
+        && elseStatement.terminatesAbruptly();
+  }
+
+  @Override
   public IfStatement clone() {
     return new IfStatement(
         getSourcePosition(),
@@ -67,7 +74,15 @@ public class IfStatement extends Statement {
     return Visitor_IfStatement.visit(processor, this);
   }
 
-  public static Builder newBuilder() {
+  public Builder toBuilder() {
+    return builder()
+        .setSourcePosition(this.getSourcePosition())
+        .setConditionExpression(this.getConditionExpression())
+        .setThenStatement(this.getThenStatement())
+        .setElseStatement(this.getElseStatement());
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
@@ -77,14 +92,6 @@ public class IfStatement extends Statement {
     private Statement thenStatement;
     private Statement elseStatement;
     private SourcePosition sourcePosition;
-
-    public static Builder from(IfStatement ifStatement) {
-      return new Builder()
-          .setSourcePosition(ifStatement.getSourcePosition())
-          .setConditionExpression(ifStatement.getConditionExpression())
-          .setThenStatement(ifStatement.getThenStatement())
-          .setElseStatement(ifStatement.getElseStatement());
-    }
 
     public Builder setSourcePosition(SourcePosition sourcePosition) {
       this.sourcePosition = sourcePosition;

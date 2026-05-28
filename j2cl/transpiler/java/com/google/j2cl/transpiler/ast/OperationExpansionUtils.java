@@ -102,7 +102,7 @@ public class OperationExpansionUtils {
     Variable qualifierVariable =
         createTemporaryVariableDeclaration(
             qualifier.getTypeDescriptor(), "$qualifier", qualifier, temporaryVariableDeclarations);
-    return FieldAccess.Builder.from(lhs).setQualifier(qualifierVariable.createReference()).build();
+    return lhs.toBuilder().setQualifier(qualifierVariable.createReference()).build();
   }
 
   /** Creates a variable that holds the value of {@code expression} to avoid evaluating it twice. */
@@ -113,13 +113,13 @@ public class OperationExpansionUtils {
       List<VariableDeclarationFragment> temporaryVariableDeclarations) {
 
     Variable qualifierVariable =
-        Variable.newBuilder()
+        Variable.builder()
             .setFinal(true)
             .setName(variableName)
             .setTypeDescriptor(variableType)
             .build();
     temporaryVariableDeclarations.add(
-        VariableDeclarationFragment.newBuilder()
+        VariableDeclarationFragment.builder()
             .setVariable(qualifierVariable)
             .setInitializer(expression)
             .build());
@@ -138,7 +138,7 @@ public class OperationExpansionUtils {
     Variable indexExpressionVariable =
         createTemporaryVariableDeclaration(
             PrimitiveTypes.INT, "$index", lhs.getIndexExpression(), temporaryVariableDeclarations);
-    return ArrayAccess.newBuilder()
+    return ArrayAccess.builder()
         .setArrayExpression(arrayExpressionVariable.createReference())
         .setIndexExpression(indexExpressionVariable.createReference())
         .build();
@@ -151,10 +151,10 @@ public class OperationExpansionUtils {
   private static Expression constructReturnedExpression(
       List<VariableDeclarationFragment> temporaryVariableDeclarations, Expression... expressions) {
 
-    MultiExpression.Builder builder = MultiExpression.newBuilder();
+    MultiExpression.Builder builder = MultiExpression.builder();
     if (!temporaryVariableDeclarations.isEmpty()) {
       builder.addExpressions(
-          VariableDeclarationExpression.newBuilder()
+          VariableDeclarationExpression.builder()
               .addVariableDeclarationFragments(temporaryVariableDeclarations)
               .build());
     }
@@ -221,9 +221,7 @@ public class OperationExpansionUtils {
       newRhs = returnedVariable.createReference();
     }
     return constructReturnedExpression(
-        temporaryVariables,
-        BinaryExpression.Builder.asAssignmentTo(newLhs).setRightOperand(newRhs).build(),
-        returnedVariable.createReference());
+        temporaryVariables, newLhs.infixAssign(newRhs), returnedVariable.createReference());
   }
 
   /** Returns number literal with value 1. */
@@ -236,16 +234,14 @@ public class OperationExpansionUtils {
       Expression leftOperand, BinaryOperator operator, Expression rightOperand) {
 
     checkArgument(leftOperand.isIdempotent());
-    return BinaryExpression.Builder.asAssignmentTo(leftOperand)
-        .setRightOperand(
-            maybeCast(
-                leftOperand.getTypeDescriptor(),
-                BinaryExpression.newBuilder()
-                    .setLeftOperand(leftOperand.clone())
-                    .setOperator(operator)
-                    .setRightOperand(rightOperand)
-                    .build()))
-        .build();
+    return leftOperand.infixAssign(
+        maybeCast(
+            leftOperand.getTypeDescriptor(),
+            BinaryExpression.builder()
+                .setLeftOperand(leftOperand.clone())
+                .setOperator(operator)
+                .setRightOperand(rightOperand)
+                .build()));
   }
 
   // When expanding compound assignments (and prefix/postfix operations) there is an implicit
@@ -270,7 +266,7 @@ public class OperationExpansionUtils {
       return expression;
     }
 
-    return CastExpression.newBuilder()
+    return CastExpression.builder()
         .setCastTypeDescriptor(typeDescriptor)
         .setExpression(expression)
         .build();

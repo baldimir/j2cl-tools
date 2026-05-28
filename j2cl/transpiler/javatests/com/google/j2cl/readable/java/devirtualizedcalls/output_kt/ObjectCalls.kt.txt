@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package devirtualizedcalls
 
@@ -37,7 +38,7 @@ open class ObjectCalls {
   objectCalls.toString()
   objectCalls.getClass()
  }
-
+ 
  open fun test() {
   this.equals(
    Any(),
@@ -52,7 +53,7 @@ open class ObjectCalls {
   this.toString()
   this.getClass()
  }
-
+ 
  open fun testNotEquals(): Boolean {
   return !this.equals(
    Any(),

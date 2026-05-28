@@ -17,6 +17,7 @@
 package com.google.j2cl.jre.java.lang;
 
 import static com.google.j2cl.jre.testing.TestUtils.isWasm;
+import static org.junit.Assert.assertThrows;
 
 import junit.framework.TestCase;
 
@@ -24,54 +25,19 @@ import junit.framework.TestCase;
 public class DoubleTest extends TestCase {
 
   public void testBadStrings() {
-    try {
-      new Double("0.0e");
-      fail("constructor");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> new Double("0.0e"));
 
-    try {
-      Double.parseDouble("0.0e");
-      fail("parse");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("0.0e"));
 
-    try {
-      Double.parseDouble(".");
-      fail("parse");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("."));
 
-    try {
-      Double.parseDouble(".e");
-      fail("parse");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble(".e"));
 
-    try {
-      Double.parseDouble("e5");
-      fail("parse");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("e5"));
 
-    try {
-      Double.parseDouble(".e5");
-      fail("parse");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble(".e5"));
 
-    try {
-      Double.valueOf("0x0e");
-      fail("valueOf");
-    } catch (NumberFormatException e) {
-      // Expected behavior
-    }
+    assertThrows(NumberFormatException.class, () -> Double.valueOf("0x0e"));
   }
 
   public void testCompare() {
@@ -89,24 +55,20 @@ public class DoubleTest extends TestCase {
     assertTrue(Double.compare(-0.0, -0.0) == 0);
   }
 
-  public static void testNPE() {
+  public void testNPE() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
     Double d = Math.random() < 0 ? 42.0 : null;
-    try {
-      assertEquals(null, d.doubleValue());
-      fail("Should have thrown exception");
-    } catch (Exception e) {
-    }
+    assertThrows(Exception.class, () -> assertEquals(null, d.doubleValue()));
 
-    try {
-      double dd = d;
-      fail("Should have thrown exception" + dd);
-    } catch (Exception e) {
-    }
+    assertThrows(
+        Exception.class,
+        () -> {
+          double unused = d;
+        });
   }
 
   public void testEqualityNormalizer() {
@@ -158,6 +120,32 @@ public class DoubleTest extends TestCase {
     assertFalse(Double.isInfinite(Double.NaN));
   }
 
+  public void testIsFinite() {
+    final double[] nonfiniteNumbers = {
+      Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NaN,
+    };
+    for (double value : nonfiniteNumbers) {
+      assertFalse(Double.isFinite(value));
+    }
+
+    final double[] finiteNumbers = {
+      -Double.MAX_VALUE,
+      Double.MAX_VALUE,
+      Double.MIN_VALUE,
+      -1.0,
+      -0.5,
+      -0.1,
+      -0.0,
+      0.0,
+      0.1,
+      0.5,
+      1.0,
+    };
+    for (double value : finiteNumbers) {
+      assertTrue(Double.isFinite(value));
+    }
+  }
+
   public void testIsInfinite() {
     assertTrue(Double.isInfinite(Double.NEGATIVE_INFINITY));
     assertTrue(Double.isInfinite(Double.POSITIVE_INFINITY));
@@ -165,8 +153,17 @@ public class DoubleTest extends TestCase {
     assertFalse(Double.isInfinite(Double.NaN));
 
     final double[] finiteNumbers = {
-        -Double.MAX_VALUE, Double.MAX_VALUE, Double.MIN_VALUE,
-        -1.0, -0.5, -0.1, -0.0, 0.0, 0.1, 0.5, 1.0,
+      -Double.MAX_VALUE,
+      Double.MAX_VALUE,
+      Double.MIN_VALUE,
+      -1.0,
+      -0.5,
+      -0.1,
+      -0.0,
+      0.0,
+      0.1,
+      0.5,
+      1.0,
     };
     for (double value : finiteNumbers) {
       assertFalse(Double.isInfinite(value));
@@ -220,31 +217,11 @@ public class DoubleTest extends TestCase {
     assertEquals(Double.NEGATIVE_INFINITY, Double.parseDouble("-Infinity"));
 
     // check for parsing some invalid values
-    try {
-      Double.parseDouble("nan");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Double.parseDouble("infinity");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Double.parseDouble("1.2.3");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Double.parseDouble("+-1.2");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
-    try {
-      Double.parseDouble("1e");
-      fail("Expected NumberFormatException");
-    } catch (NumberFormatException expected) {
-    }
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("nan"));
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("infinity"));
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("1.2.3"));
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("+-1.2"));
+    assertThrows(NumberFormatException.class, () -> Double.parseDouble("1e"));
   }
 
   public void testDoubleBits() {
@@ -263,7 +240,7 @@ public class DoubleTest extends TestCase {
     compareDoubleBits(0x3ffffffffffffffbL, 1.999999999999999);
     compareDoubleBits(0x4000000000000000L, 2.0);
     compareDoubleBits(0x4000000000000002L, 2.000000000000001);
-    
+
     // basic tests
     compareDoubleBits(0x3fb999999999999aL, 0.1);
     compareDoubleBits(0xbfb999999999999aL, -0.1);
@@ -282,7 +259,7 @@ public class DoubleTest extends TestCase {
     // min normalized value
     compareDoubleBits(0x0010000000000000L, 2.2250738585072014E-308);
     compareDoubleBits(0x8010000000000000L, -2.2250738585072014E-308);
-    
+
     // denormalized values
     compareDoubleBits(0x000ff6a8ebe79958L, 2.22E-308);
     compareDoubleBits(0x000199999999999aL, 2.2250738585072014E-309);
@@ -304,7 +281,7 @@ public class DoubleTest extends TestCase {
     compareDoubleBits(0x0000000000000002L, 1.234567E-323);
     compareDoubleBits(0x0000000000000001L, 4.9E-324);
     compareDoubleBits(0x8000000000000001L, -4.9E-324);
-    
+
     // random values between 0 and 1
     compareDoubleBits(0x3fe9b9bcd3c39dabL, 0.8039230476396616);
     compareDoubleBits(0x3fe669d4a374efc4L, 0.700418776752024);

@@ -15,7 +15,7 @@
  */
 package com.google.j2cl.tools.gwtincompatible;
 
-import com.google.j2cl.common.SourceUtils;
+import com.google.j2cl.common.OutputUtils;
 import com.google.j2cl.common.bazel.BazelWorker;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -26,7 +26,7 @@ import org.kohsuke.args4j.Option;
 /** Runs The @GwtIncompatible stripper as a worker. */
 final class BazelGwtIncompatibleStripper extends BazelWorker {
   @Argument(metaVar = "<source files .java|.srcjar>", usage = "source files")
-  List<String> files = new ArrayList<>();
+  List<Path> files = new ArrayList<>();
 
   @Option(
       name = "-d",
@@ -46,13 +46,8 @@ final class BazelGwtIncompatibleStripper extends BazelWorker {
     if (annotations.isEmpty()) {
       annotations.add("GwtIncompatible");
     }
-    Path sourceJarDir = SourceUtils.deriveDirectory(this.outputPath, "_source_jars");
-    GwtIncompatibleStripper.strip(
-        files.stream().map(workdir::resolve).map(Path::toString),
-        workdir.resolve(outputPath),
-        sourceJarDir,
-        problems,
-        annotations);
+    var output = OutputUtils.initOutputForBazel(outputPath, problems);
+    GwtIncompatibleStripper.strip(files.stream(), output, problems, annotations);
   }
 
   public static void main(String[] workerArgs) throws Exception {

@@ -30,6 +30,7 @@ public final class ArrayHelper {
 
   public static final int ARRAY_PROCESS_BATCH_SIZE = 10000;
 
+
   public static <T> T clone(T array) {
     Object[] result = asNativeArray(array).slice();
     return (T) ArrayStamper.stampJavaTypeInfo(result, array);
@@ -88,6 +89,10 @@ public final class ArrayHelper {
 
   public static void push(Object[] array, Object o) {
     asNativeArray(array).push(o);
+  }
+
+  public static String join(Object[] array, Object separator) {
+    return asNativeArray(array).join(separator);
   }
 
   public static void fill(Object array, @DoNotAutobox Object value, int fromIndex, int toIndex) {
@@ -294,6 +299,8 @@ public final class ArrayHelper {
     NativeArray(int length) {}
 
     native void push(Object item);
+
+    native String join(Object separator);
 
     native Object[] slice();
 

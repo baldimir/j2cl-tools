@@ -20,17 +20,19 @@ package com.google.j2cl.transpiler.frontend.kotlin.ir
 
 import com.google.j2cl.transpiler.ast.BinaryOperator
 import com.google.j2cl.transpiler.ast.PrefixOperator
+import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.jvm.functionByName
 import org.jetbrains.kotlin.builtins.PrimitiveType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.ir.InternalSymbolFinderAPI
-import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrPackageFragment
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
@@ -39,12 +41,16 @@ import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.hasShape
 import org.jetbrains.kotlin.ir.util.isEnumClass
 import org.jetbrains.kotlin.ir.util.isFileClass
 import org.jetbrains.kotlin.ir.util.kotlinFqName
 import org.jetbrains.kotlin.ir.util.parentClassOrNull
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.StandardClassIds
+import org.jetbrains.kotlin.util.OperatorNameConventions
 
 /**
  * KotlinC uses intrinsics methods for representing some specific operations. The implementations of
@@ -56,7 +62,8 @@ import org.jetbrains.kotlin.name.Name
  *
  * <p> The list on intrinsic methods in KoltinC can be found in http://shortn/_7YGQ0Kch3v
  */
-class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
+class IntrinsicMethods(private val pluginContext: IrPluginContext) {
+  private val irBuiltIns = pluginContext.irBuiltIns
   private val kotlinFqn = StandardNames.BUILT_INS_PACKAGE_FQ_NAME
   private val intFqn = StandardNames.FqNames._int.toSafe()
   private val arrayFqn = StandardNames.FqNames.array.toSafe()
@@ -100,7 +107,15 @@ class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
   }
 
   fun isArrayOf(irCall: IrCall): Boolean {
-    return irCall.symbol.toKey() in arrayOfSymbolKeys
+    return isArrayOf(irCall.symbol)
+  }
+
+  fun isArrayOf(symbol: IrFunctionSymbol): Boolean {
+    return symbol.toKey() in arrayOfSymbolKeys
+  }
+
+  fun isEmptyArray(symbol: IrFunctionSymbol): Boolean {
+    return symbol.toKey() == Key(FqName("kotlin"), "emptyArray", emptyList())
   }
 
   fun isIsArrayOf(irCall: IrCall): Boolean {
@@ -115,7 +130,27 @@ class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
   fun isDataClassArrayMemberHashCode(irCall: IrCall): Boolean =
     irCall.symbol.toKey() == irBuiltIns.dataClassArrayMemberHashCodeSymbol.toKey()
 
-  fun isAnyToString(irCall: IrCall) = irCall.symbol.toKey() == irBuiltIns.extensionToString.toKey()
+  // TODO(b/448872338): replace with irBuiltIns.extensionToString when bug is fixed.
+  val extensionToStringSymbol: IrSimpleFunctionSymbol by lazy {
+    irBuiltIns.symbolFinder
+      .topLevelFunctions(
+        StandardClassIds.BASE_KOTLIN_PACKAGE,
+        OperatorNameConventions.TO_STRING.asString(),
+      )
+      .single { !it.owner.isExpect }
+  }
+
+  // TODO(b/448872338): replace with irBuiltIns.extensionStringPlus when bug is fixed.
+  val extensionStringPlus: IrSimpleFunctionSymbol by lazy {
+    irBuiltIns.symbolFinder
+      .topLevelFunctions(
+        StandardClassIds.BASE_KOTLIN_PACKAGE,
+        OperatorNameConventions.PLUS.asString(),
+      )
+      .single { !it.owner.isExpect }
+  }
+
+  fun isAnyToString(irCall: IrCall) = irCall.symbol.toKey() == extensionToStringSymbol.toKey()
 
   fun isEqualsOperator(irCall: IrCall): Boolean =
     irCall.symbol.toKey() == irBuiltIns.eqeqSymbol.toKey()
@@ -139,25 +174,21 @@ class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
 
   fun isCompareTo(irCall: IrCall): Boolean = irCall.symbol.toKey() in compareToSymbolKeys
 
-  val jsUndefinedSymbol: IrSimpleFunctionSymbol by lazy {
-    irBuiltIns.symbolFinder
-      .findClass(Name.identifier("JsUtils"), FqName("javaemul.internal"))!!
-      .functionByName("undefined")
+  private val jsUtilsClass: IrClassSymbol by lazy {
+    pluginContext.referenceClass(ClassId(FqName("javaemul.internal"), Name.identifier("JsUtils")))!!
   }
+
+  val jsUndefinedSymbol: IrSimpleFunctionSymbol by lazy { jsUtilsClass.functionByName("undefined") }
 
   fun isGetJsUndefinedCall(irCall: IrCall): Boolean =
     irCall.symbol.toKey() == jsUndefinedSymbol.toKey()
 
   val jsIsUndefinedFunctionSymbol: IrSimpleFunctionSymbol by lazy {
-    irBuiltIns.symbolFinder
-      .findClass(Name.identifier("JsUtils"), FqName("javaemul.internal"))!!
-      .functionByName("isUndefined")
+    jsUtilsClass.functionByName("isUndefined")
   }
 
   val jsCoerceToNullSymbol: IrSimpleFunctionSymbol by lazy {
-    irBuiltIns.symbolFinder
-      .findClass(Name.identifier("JsUtils"), FqName("javaemul.internal"))!!
-      .functionByName("coerceToNull")
+    jsUtilsClass.functionByName("coerceToNull")
   }
 
   fun getPrefixOperator(symbol: IrFunctionSymbol): PrefixOperator? =
@@ -176,7 +207,7 @@ class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
   fun getRangeToConstructor(irCall: IrCall): IrConstructorSymbol {
     val fqName = irCall.type.classFqName!!
     val classSymbol = irBuiltIns.symbolFinder.findClass(fqName.shortName(), fqName.parent())!!
-    return classSymbol.constructors.single { it.owner.valueParameters.size == 2 }
+    return classSymbol.constructors.single { it.owner.hasShape(regularParameters = 2) }
   }
 
   fun isRangeTo(irCall: IrCall): Boolean = irCall.symbol.toKey() in rangeToCallByIntrinsicSymbolKey
@@ -194,10 +225,25 @@ class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
     with(irCall.symbol.owner) {
       name == enumGetEntriesName &&
         parentClassOrNull?.isEnumClass == true &&
-        dispatchReceiverParameter == null &&
-        extensionReceiverParameter == null &&
-        valueParameters.isEmpty()
+        hasShape(dispatchReceiver = false, extensionReceiver = false, regularParameters = 0)
     }
+
+  private val coroutineContextGetterSymbol: IrSimpleFunctionSymbol by lazy {
+    irBuiltIns.symbolFinder.findTopLevelPropertyGetter(
+      StandardClassIds.BASE_COROUTINES_PACKAGE,
+      "coroutineContext",
+    )
+  }
+
+  fun isCoroutineContextGetterCall(symbol: IrFunctionSymbol): Boolean =
+    symbol.toKey() == coroutineContextGetterSymbol.toKey()
+
+  val getContinuationSymbol: IrSimpleFunctionSymbol by lazy {
+    irBuiltIns.symbolFinder.topLevelFunction(
+      StandardClassIds.BASE_COROUTINES_INTRINSICS_PACKAGE,
+      "getContinuation",
+    )
+  }
 
   private val prefixOperatorByIntrinsicSymbolKey =
     (mapPrefixOperation("not", PrefixOperator.COMPLEMENT) +
@@ -232,7 +278,7 @@ class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
           BinaryOperator.GREATER_EQUALS,
         ) +
         listOf(
-          irBuiltIns.extensionStringPlus.toKey() to BinaryOperator.PLUS,
+          extensionStringPlus.toKey() to BinaryOperator.PLUS,
           irBuiltIns.memberStringPlus.toKey() to BinaryOperator.PLUS,
         ))
       .toMap()
@@ -372,7 +418,11 @@ class IntrinsicMethods(val irBuiltIns: IrBuiltIns) {
   }
 
   private fun IrFunctionSymbol.toKey(receiver: FqName): Key {
-    return Key(receiver, owner.name.asString(), owner.valueParameters.map(::getParameterTypeFqName))
+    return Key(
+      receiver,
+      owner.name.asString(),
+      owner.parameters.filter { it.kind == IrParameterKind.Regular }.map(::getParameterTypeFqName),
+    )
   }
 }
 

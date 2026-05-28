@@ -39,7 +39,6 @@ public class Method extends Member implements MethodLike {
   @Visitable List<Variable> parameters = new ArrayList<>();
   @Visitable Block body;
   private final String jsDocDescription;
-  private final String wasmExportName;
   @Nullable private Boolean isForcedJavaOverride;
 
   private boolean hasSuppressNothingToOverrideAnnotation;
@@ -50,14 +49,12 @@ public class Method extends Member implements MethodLike {
       List<Variable> parameters,
       Block body,
       String jsDocDescription,
-      String wasmExportName,
       @Nullable Boolean isForcedJavaOverride,
       boolean hasSuppressNothingToOverrideAnnotation) {
     super(sourcePosition);
     this.methodDescriptor = checkNotNull(methodDescriptor);
     this.parameters.addAll(checkNotNull(parameters));
     this.jsDocDescription = jsDocDescription;
-    this.wasmExportName = wasmExportName;
     this.body = checkNotNull(body);
     this.isForcedJavaOverride = isForcedJavaOverride;
     this.hasSuppressNothingToOverrideAnnotation = hasSuppressNothingToOverrideAnnotation;
@@ -105,16 +102,6 @@ public class Method extends Member implements MethodLike {
     return jsDocDescription;
   }
 
-  public boolean isWasmEntryPoint() {
-    return wasmExportName != null;
-  }
-
-  /** The name of the export for the Wasm entry point. */
-  @Nullable
-  public String getWasmExportName() {
-    return wasmExportName;
-  }
-
   @Nullable
   public Boolean isForcedJavaOverride() {
     return isForcedJavaOverride;
@@ -135,10 +122,6 @@ public class Method extends Member implements MethodLike {
   public void setHasSuppressNothingToOverrideAnnotation(
       boolean hasSuppressNothingToOverrideAnnotation) {
     this.hasSuppressNothingToOverrideAnnotation = hasSuppressNothingToOverrideAnnotation;
-  }
-
-  public static Builder newBuilder() {
-    return new Builder();
   }
 
   @Override
@@ -189,6 +172,22 @@ public class Method extends Member implements MethodLike {
         || (statements.size() == 1 && isConstructor() && AstUtils.hasSuperCall(this));
   }
 
+  public Builder toBuilder() {
+    return builder()
+        .setMethodDescriptor(this.getDescriptor())
+        .setParameters(Lists.newArrayList(this.getParameters()))
+        .setStatements(Lists.newArrayList(this.getBody().getStatements()))
+        .setJsDocDescription(this.getJsDocDescription())
+        .setBodySourcePosition(this.getBody().getSourcePosition())
+        .setSourcePosition(this.getSourcePosition())
+        .setForcedJavaOverride(this.isForcedJavaOverride())
+        .setSuppressNothingToOverrideAnnotation(this.hasSuppressNothingToOverrideAnnotation());
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /**
    * A Builder for Method.
    *
@@ -196,31 +195,14 @@ public class Method extends Member implements MethodLike {
    * list in sync.
    */
   public static class Builder {
-
     private MethodDescriptor methodDescriptor;
     private List<Variable> parameters = new ArrayList<>();
     private List<Statement> statements = new ArrayList<>();
     private String jsDocDescription;
-    private String wasmExportName;
     private SourcePosition bodySourcePosition;
     private SourcePosition sourcePosition;
     @Nullable private Boolean isForcedJavaOverride;
     private boolean hasSuppressNothingToOverrideAnnotation;
-
-    public static Builder from(Method method) {
-      Builder builder = new Builder();
-      builder.methodDescriptor = method.getDescriptor();
-      builder.parameters = Lists.newArrayList(method.getParameters());
-      builder.statements = Lists.newArrayList(method.getBody().getStatements());
-      builder.jsDocDescription = method.getJsDocDescription();
-      builder.wasmExportName = method.getWasmExportName();
-      builder.bodySourcePosition = method.getBody().getSourcePosition();
-      builder.sourcePosition = method.getSourcePosition();
-      builder.isForcedJavaOverride = method.isForcedJavaOverride();
-      builder.hasSuppressNothingToOverrideAnnotation =
-          method.hasSuppressNothingToOverrideAnnotation;
-      return builder;
-    }
 
     @CanIgnoreReturnValue
     public Builder addParameters(int index, Variable... parameters) {
@@ -231,7 +213,7 @@ public class Method extends Member implements MethodLike {
     public Builder addParameters(int index, Collection<Variable> newParameters) {
       parameters.addAll(index, newParameters);
       methodDescriptor =
-          MethodDescriptor.Builder.from(methodDescriptor)
+          methodDescriptor.toBuilder()
               .addParameterTypeDescriptors(
                   index,
                   newParameters.stream()
@@ -243,6 +225,7 @@ public class Method extends Member implements MethodLike {
 
     @CanIgnoreReturnValue
     public Builder setBody(Block body) {
+      setBodySourcePosition(body.getSourcePosition());
       return setStatements(body.getStatements());
     }
 
@@ -300,12 +283,6 @@ public class Method extends Member implements MethodLike {
     }
 
     @CanIgnoreReturnValue
-    public Builder setWasmExportName(String wasmExportName) {
-      this.wasmExportName = wasmExportName;
-      return this;
-    }
-
-    @CanIgnoreReturnValue
     public Builder setSourcePosition(SourcePosition sourcePosition) {
       this.sourcePosition = sourcePosition;
       return this;
@@ -332,7 +309,7 @@ public class Method extends Member implements MethodLike {
 
     public Method build() {
       Block body =
-          Block.newBuilder()
+          Block.builder()
               .setSourcePosition(bodySourcePosition != null ? bodySourcePosition : sourcePosition)
               .setStatements(statements)
               .build();
@@ -345,7 +322,6 @@ public class Method extends Member implements MethodLike {
           parameters,
           body,
           jsDocDescription,
-          wasmExportName,
           isForcedJavaOverride,
           hasSuppressNothingToOverrideAnnotation);
     }

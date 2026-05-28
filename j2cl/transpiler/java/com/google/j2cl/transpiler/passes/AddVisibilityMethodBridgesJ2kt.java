@@ -45,7 +45,7 @@ public class AddVisibilityMethodBridgesJ2kt extends NormalizationPass {
         // class and it only needs to be considered override if at the same time the class
         // implements an interface which this method overrides.
         if (methodDescriptor.getJavaOverriddenMethodDescriptors().stream()
-            .allMatch(it -> !it.getEnclosingTypeDescriptor().isInterface())) {
+            .noneMatch(it -> it.getEnclosingTypeDescriptor().isInterface())) {
           method.setForcedJavaOverride(false);
         }
 
@@ -67,9 +67,9 @@ public class AddVisibilityMethodBridgesJ2kt extends NormalizationPass {
     ImmutableList<Expression> arguments =
         parameters.stream().map(Variable::createReference).collect(toImmutableList());
 
-    return Method.newBuilder()
+    return Method.builder()
         .setMethodDescriptor(
-            MethodDescriptor.Builder.from(overriddenMethod)
+            overriddenMethod.toBuilder()
                 .makeDeclaration()
                 .setEnclosingTypeDescriptor(type.getTypeDescriptor())
                 // Use the parameter and return types from the target methods since it might have

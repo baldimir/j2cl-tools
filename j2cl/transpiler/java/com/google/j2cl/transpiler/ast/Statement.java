@@ -17,6 +17,7 @@ package com.google.j2cl.transpiler.ast;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.j2cl.common.HasSourcePosition;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.common.visitor.Processor;
 import com.google.j2cl.common.visitor.Visitable;
@@ -44,12 +45,27 @@ public abstract class Statement extends Node implements HasSourcePosition, Clone
     return false;
   }
 
+  /**
+   * Returns {@code true} if the statement completes abruptly (JLS 14.1).
+   *
+   * <p>Returns {@code true} if the statement is guaranteed not to follow the normal control flow.
+   * Note that neither labeled statements nor constructs with implicit breaks (like switch
+   * statements) are not considered to terminate abruptly in this approximation.
+   */
+  public boolean terminatesAbruptly() {
+    return false;
+  }
+
   public LabeledStatement encloseWithLabel(Label label) {
-    return LabeledStatement.newBuilder()
+    return LabeledStatement.builder()
         .setStatement(this)
         .setLabel(label)
         .setSourcePosition(getSourcePosition())
         .build();
+  }
+
+  public Block ensureBlock() {
+    return Block.builder().setSourcePosition(getSourcePosition()).setStatements(this).build();
   }
 
   @Override
@@ -61,6 +77,6 @@ public abstract class Statement extends Node implements HasSourcePosition, Clone
   }
 
   public static Statement createNoopStatement() {
-    return Block.newBuilder().build();
+    return Block.builder().build();
   }
 }

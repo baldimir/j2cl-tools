@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -22,168 +23,168 @@ import kotlin.Any
 import kotlin.Suppress
 
 open class ImportResolution {
- open class Parent internal constructor() {
+ internal open class Parent internal constructor() {
   internal open fun testJavaLangString_pp_j2kt(string: kotlin.String) {
    string.java_trim()
   }
-
+  
   internal open fun testParentString_pp_j2kt(string: j2kt.ImportResolution.Parent.String) {
    string.parentStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testChildString_pp_j2kt(string: Child.String) {
    string.childStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testSiblingParentString_pp_j2kt(string: SiblingParent.String) {
    string.siblingParentStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testGenericString_pp_j2kt(string: Generic<*>.String) {
    string.genericMethod_pp_j2kt()
   }
-
-  open inner class String internal constructor() {
+  
+  internal open inner class String internal constructor() {
    internal open fun parentStringMethod_pp_j2kt() {}
-
+   
    internal open fun testJavaLangString_pp_j2kt(string: kotlin.String) {
     string.java_trim()
    }
-
+   
    internal open fun testParentString_pp_j2kt(string: j2kt.ImportResolution.Parent.String) {
     string.parentStringMethod_pp_j2kt()
    }
-
+   
    internal open fun testChildString_pp_j2kt(string: Child.String) {
     string.childStringMethod_pp_j2kt()
    }
-
+   
    internal open fun testSiblingParentString_pp_j2kt(string: SiblingParent.String) {
     string.siblingParentStringMethod_pp_j2kt()
    }
-
+   
    internal open fun testGenericString_pp_j2kt(string: Generic<*>.String) {
     string.genericMethod_pp_j2kt()
    }
   }
  }
-
- open class Child internal constructor(): j2kt.ImportResolution.Parent() {
+ 
+ internal open class Child internal constructor(): j2kt.ImportResolution.Parent() {
   override fun testJavaLangString_pp_j2kt(string: kotlin.String) {
    string.java_trim()
   }
-
+  
   override fun testParentString_pp_j2kt(string: j2kt.ImportResolution.Parent.String) {
    string.parentStringMethod_pp_j2kt()
   }
-
+  
   override fun testChildString_pp_j2kt(string: Child.String) {
    string.childStringMethod_pp_j2kt()
   }
-
+  
   override fun testSiblingParentString_pp_j2kt(string: SiblingParent.String) {
    string.siblingParentStringMethod_pp_j2kt()
   }
-
+  
   override fun testGenericString_pp_j2kt(string: Generic<*>.String) {
    string.genericMethod_pp_j2kt()
   }
-
-  open inner class String internal constructor() {
+  
+  internal open inner class String internal constructor() {
    internal open fun childStringMethod_pp_j2kt() {}
-
+   
    internal open fun testJavaLang_pp_j2kt(string: kotlin.String) {
     string.java_trim()
    }
-
+   
    internal open fun testParentString_pp_j2kt(string: j2kt.ImportResolution.Parent.String) {
     string.parentStringMethod_pp_j2kt()
    }
-
+   
    internal open fun testChildString_pp_j2kt(string: Child.String) {
     string.childStringMethod_pp_j2kt()
    }
-
+   
    internal open fun testSiblingParentString_pp_j2kt(string: SiblingParent.String) {
     string.siblingParentStringMethod_pp_j2kt()
    }
-
+   
    internal open fun testGenericString_pp_j2kt(string: Generic<*>.String) {
     string.genericMethod_pp_j2kt()
    }
   }
  }
-
- open class GrandChild internal constructor(): Child() {
+ 
+ internal open class GrandChild internal constructor(): Child() {
   override fun testJavaLangString_pp_j2kt(string: kotlin.String) {
    string.java_trim()
   }
-
+  
   override fun testParentString_pp_j2kt(string: j2kt.ImportResolution.Parent.String) {
    string.parentStringMethod_pp_j2kt()
   }
-
+  
   override fun testChildString_pp_j2kt(string: Child.String) {
    string.childStringMethod_pp_j2kt()
   }
-
+  
   override fun testSiblingParentString_pp_j2kt(string: SiblingParent.String) {
    string.siblingParentStringMethod_pp_j2kt()
   }
-
+  
   override fun testGenericString_pp_j2kt(string: Generic<*>.String) {
    string.genericMethod_pp_j2kt()
   }
  }
-
- open class SiblingParent internal constructor() {
+ 
+ internal open class SiblingParent internal constructor() {
   internal open fun testJavaLangString_pp_j2kt(string: kotlin.String) {
    string.java_trim()
   }
-
+  
   internal open fun testParentString_pp_j2kt(string: j2kt.ImportResolution.Parent.String) {
    string.parentStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testChildString_pp_j2kt(string: Child.String) {
    string.childStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testSiblingParentString_pp_j2kt(string: SiblingParent.String) {
    string.siblingParentStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testGenericString_pp_j2kt(string: Generic<*>.String) {
    string.genericMethod_pp_j2kt()
   }
-
-  open inner class String internal constructor() {
+  
+  internal open inner class String internal constructor() {
    internal open fun siblingParentStringMethod_pp_j2kt() {}
   }
  }
-
- open class Generic<Parent: Any> internal constructor() {
+ 
+ internal open class Generic<Parent: Any> internal constructor() {
   internal open fun testJavaLangString_pp_j2kt(string: kotlin.String) {
    string.java_trim()
   }
-
+  
   internal open fun testParentString_pp_j2kt(string: j2kt.ImportResolution.Parent.String) {
    string.parentStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testChildString_pp_j2kt(string: Child.String) {
    string.childStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testSiblingParentString_pp_j2kt(string: SiblingParent.String) {
    string.siblingParentStringMethod_pp_j2kt()
   }
-
+  
   internal open fun testGenericString_pp_j2kt(string: Generic<Parent>.String) {
    string.genericMethod_pp_j2kt()
   }
-
-  open inner class String internal constructor() {
+  
+  internal open inner class String internal constructor() {
    internal open fun genericMethod_pp_j2kt() {}
   }
  }

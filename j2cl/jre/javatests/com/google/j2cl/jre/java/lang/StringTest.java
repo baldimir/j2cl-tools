@@ -33,50 +33,33 @@ public class StringTest extends TestCase {
   public void testCharAt() {
     assertEquals('b', hideFromCompiler("abc").charAt(1));
 
-    try {
-      hideFromCompiler("abc").charAt(-1);
-      fail();
-    } catch (StringIndexOutOfBoundsException ignore) {
-      // expected
-    }
+    assertThrows(StringIndexOutOfBoundsException.class, () -> hideFromCompiler("abc").charAt(-1));
 
-    try {
-      hideFromCompiler("abc").charAt(3);
-      fail();
-    } catch (StringIndexOutOfBoundsException ignore) {
-      // expected
-    }
+    assertThrows(StringIndexOutOfBoundsException.class, () -> hideFromCompiler("abc").charAt(3));
   }
 
   public void testCodePoint() {
     String testPlain = hideFromCompiler("CAT");
     String testUnicode = hideFromCompiler("C\uD801\uDF00T");
     assertEquals("CAT", new String(new int[] {'C', 'A', 'T'}, 0, 3));
-    assertEquals("C\uD801\uDF00T",
-        new String(new int[] {'C', 67328, 'T'}, 0, 3));
+    assertEquals("C\uD801\uDF00T", new String(new int[] {'C', 67328, 'T'}, 0, 3));
     assertEquals("\uD801\uDF00", new String(new int[] {'C', 67328, 'T'}, 1, 1));
     assertEquals(65, testPlain.codePointAt(1));
-    assertEquals("codePointAt fails on surrogate pair", 67328,
-        testUnicode.codePointAt(1));
+    assertEquals("codePointAt fails on surrogate pair", 67328, testUnicode.codePointAt(1));
     assertEquals(65, testPlain.codePointBefore(2));
-    assertEquals("codePointBefore fails on surrogate pair", 67328,
-        testUnicode.codePointBefore(3));
+    assertEquals("codePointBefore fails on surrogate pair", 67328, testUnicode.codePointBefore(3));
     assertEquals("codePointCount(plain): ", 3, testPlain.codePointCount(0, 3));
-    assertEquals("codePointCount(unicode): ", 3, testUnicode.codePointCount(0,
-        4));
+    assertEquals("codePointCount(unicode): ", 3, testUnicode.codePointCount(0, 4));
     assertEquals(1, testPlain.codePointCount(1, 2));
     assertEquals(1, testUnicode.codePointCount(1, 2));
     assertEquals(2, testUnicode.codePointCount(2, 4));
     assertEquals(1, testUnicode.offsetByCodePoints(0, 1));
-    assertEquals("offsetByCodePoints(1,1): ", 3,
-        testUnicode.offsetByCodePoints(1, 1));
-    assertEquals("offsetByCodePoints(2,1): ", 3,
-        testUnicode.offsetByCodePoints(2, 1));
+    assertEquals("offsetByCodePoints(1,1): ", 3, testUnicode.offsetByCodePoints(1, 1));
+    assertEquals("offsetByCodePoints(2,1): ", 3, testUnicode.offsetByCodePoints(2, 1));
     assertEquals(4, testUnicode.offsetByCodePoints(3, 1));
     assertEquals(1, testUnicode.offsetByCodePoints(2, -1));
     assertEquals(1, testUnicode.offsetByCodePoints(3, -1));
-    assertEquals("offsetByCodePoints(4.-1): ", 3,
-        testUnicode.offsetByCodePoints(4, -1));
+    assertEquals("offsetByCodePoints(4.-1): ", 3, testUnicode.offsetByCodePoints(4, -1));
     assertEquals(0, testUnicode.offsetByCodePoints(3, -2));
     /*
      * The next line contains a Unicode character outside the base multilingual
@@ -117,32 +100,15 @@ public class StringTest extends TestCase {
     assertTrue(hideFromCompiler("İ").compareTo("z") > 0);
   }
 
-  public static void testCompareToNull() {
+  public void testCompareToNull() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
-    try {
-      returnNull().compareTo("");
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
-
-    try {
-      returnNull().compareTo(returnNull());
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
-
-    try {
-      "".compareTo(returnNull());
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
+    assertThrows(NullPointerException.class, () -> returnNull().compareTo(""));
+    assertThrows(NullPointerException.class, () -> returnNull().compareTo(returnNull()));
+    assertThrows(NullPointerException.class, () -> "".compareTo(returnNull()));
   }
 
   public void testCompareToIgnoreCase() {
@@ -188,25 +154,14 @@ public class StringTest extends TestCase {
     assertEquals("abcd", s);
   }
 
-  public static void testConcatNull() {
+  public void testConcatNull() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
-    try {
-      returnNull().concat("");
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
-
-    try {
-      hideFromCompiler("").concat(returnNull());
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
+    assertThrows(NullPointerException.class, () -> returnNull().concat(""));
+    assertThrows(NullPointerException.class, () -> hideFromCompiler("").concat(returnNull()));
   }
 
   @J2ktIncompatible
@@ -226,8 +181,7 @@ public class StringTest extends TestCase {
     assertEquals(constant, new String(chars), constant);
     assertEquals(shortString, new String(chars, 2, 3), shortString);
     assertEquals("", new String(hideFromCompiler("")));
-    assertEquals("", new String(new String(new String(new String(
-        hideFromCompiler(""))))));
+    assertEquals("", new String(new String(new String(new String(hideFromCompiler(""))))));
     assertEquals("", new String(new char[] {}));
     StringBuilder sb = new StringBuilder();
     sb.append('c');
@@ -242,7 +196,7 @@ public class StringTest extends TestCase {
     assertEquals("\uD801\uDC00", new String(sb));
   }
 
-  public static void testConstructorNull() {
+  public void testConstructorNull() {
 
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
@@ -261,7 +215,7 @@ public class StringTest extends TestCase {
     }
   }
 
-  public static void testConstructorBytes() {
+  public void testConstructorBytes() {
     if (isWasm()) {
       // TODO(b/233695357): Re-enable when EmulatedCharsed is fixed.
       return;
@@ -272,24 +226,14 @@ public class StringTest extends TestCase {
     assertEquals("abcdef", str);
     str = new String(bytes, 1, 3);
     assertEquals("bcd", str);
-    try {
-      new String(bytes, 1, 6);
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
-    }
-    try {
-      new String(bytes, -1, 2);
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
-    }
-    try {
-      new String(bytes, 6, 2);
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
+    if (isJvm()) {
+      assertThrows(IndexOutOfBoundsException.class, () -> new String(bytes, 1, 6));
+      assertThrows(IndexOutOfBoundsException.class, () -> new String(bytes, -1, 2));
+      assertThrows(IndexOutOfBoundsException.class, () -> new String(bytes, 6, 2));
     }
   }
 
-  public static void testConstructorLatin1() throws UnsupportedEncodingException {
+  public void testConstructorLatin1() throws UnsupportedEncodingException {
     if (isWasm()) {
       // TODO(b/233695357): Re-enable when EmulatedCharsed is fixed.
       return;
@@ -307,39 +251,23 @@ public class StringTest extends TestCase {
     assertEquals("àßçÐéf", str);
     str = new String(bytes, 1, 3, encoding);
     assertEquals("ßçÐ", str);
-    try {
-      new String(bytes, 1, 6, encoding);
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
-    }
-    try {
-      new String(bytes, -1, 2, encoding);
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
-    }
-    try {
-      new String(bytes, 6, 2, encoding);
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
-    }
-    try {
-      new String(bytes, 1, 6, Charset.forName(encoding));
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
-    }
-    try {
-      new String(bytes, -1, 2, Charset.forName(encoding));
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
-    }
-    try {
-      new String(bytes, 6, 2, Charset.forName(encoding));
-      assertTrue("Should have thrown IOOB in JVM", !isJvm());
-    } catch (IndexOutOfBoundsException expected) {
+    if (isJvm()) {
+      assertThrows(IndexOutOfBoundsException.class, () -> new String(bytes, 1, 6, encoding));
+      assertThrows(IndexOutOfBoundsException.class, () -> new String(bytes, -1, 2, encoding));
+      assertThrows(IndexOutOfBoundsException.class, () -> new String(bytes, 6, 2, encoding));
+      assertThrows(
+          IndexOutOfBoundsException.class,
+          () -> new String(bytes, 1, 6, Charset.forName(encoding)));
+      assertThrows(
+          IndexOutOfBoundsException.class,
+          () -> new String(bytes, -1, 2, Charset.forName(encoding)));
+      assertThrows(
+          IndexOutOfBoundsException.class,
+          () -> new String(bytes, 6, 2, Charset.forName(encoding)));
     }
   }
 
-  public static void testConstructorUtf8() throws UnsupportedEncodingException {
+  public void testConstructorUtf8() throws UnsupportedEncodingException {
     if (isWasm()) {
       // TODO(b/233695357): Re-enable when EmulatedCharsed is fixed.
       return;
@@ -571,25 +499,14 @@ public class StringTest extends TestCase {
     assertFalse(hideFromCompiler("acba").equals("abca"));
   }
 
-  public static void testEqualsNull() {
+  public void testEqualsNull() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
-    try {
-      returnNull().equals("other");
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
-
-    try {
-      returnNull().equals(returnNull());
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
+    assertThrows(NullPointerException.class, () -> returnNull().equals("other"));
+    assertThrows(NullPointerException.class, () -> returnNull().equals(returnNull()));
   }
 
   public void testEqualsIgnoreCase() {
@@ -619,25 +536,14 @@ public class StringTest extends TestCase {
     assertFalse(hideFromCompiler("acba").equalsIgnoreCase("abca"));
   }
 
-  public static void testEqualsIgnoreCaseNull() {
+  public void testEqualsIgnoreCaseNull() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
-    try {
-      returnNull().equalsIgnoreCase("other");
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
-
-    try {
-      returnNull().equalsIgnoreCase(returnNull());
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
+    assertThrows(NullPointerException.class, () -> returnNull().equalsIgnoreCase("other"));
+    assertThrows(NullPointerException.class, () -> returnNull().equalsIgnoreCase(returnNull()));
   }
 
   public void testEqualsIgnoreCaseNonAscii() {
@@ -687,7 +593,7 @@ public class StringTest extends TestCase {
     assertTrue(Arrays.equals(bytes, str.getBytes()));
   }
 
-  public static void testGetBytesLatin1() throws UnsupportedEncodingException {
+  public void testGetBytesLatin1() throws UnsupportedEncodingException {
     if (isWasm()) {
       // TODO(b/233695357): Re-enable when EmulatedCharsed is fixed.
       return;
@@ -703,12 +609,11 @@ public class StringTest extends TestCase {
     byte[] bytes = str.getBytes(encoding);
     assertEquals(str.length(), bytes.length);
     for (int i = 0; i < str.length(); ++i) {
-      assertEquals("latin1 byte " + i + " differs", (byte) str.charAt(i),
-          bytes[i]);
+      assertEquals("latin1 byte " + i + " differs", (byte) str.charAt(i), bytes[i]);
     }
   }
 
-  public static void testGetBytesUtf8() throws UnsupportedEncodingException {
+  public void testGetBytesUtf8() throws UnsupportedEncodingException {
     if (isWasm()) {
       // TODO(b/233695357): Re-enable when EmulatedCharsed is fixed.
       return;
@@ -735,8 +640,7 @@ public class StringTest extends TestCase {
       byte first = bytes[2 * i - 128];
       byte second = bytes[2 * i - 127];
       char ch = str.charAt(i);
-      assertEquals("byte " + i + " differs", ch,
-          ((first & 31) << 6) | (second & 63));
+      assertEquals("byte " + i + " differs", ch, ((first & 31) << 6) | (second & 63));
     }
 
     // non-BMP characters, all take 4 UTF8 bytes.
@@ -751,10 +655,8 @@ public class StringTest extends TestCase {
     for (int i = 0; i < numChars; ++i) {
       assertEquals("1st byte of " + i, (byte) 0xF4, bytes[4 * i]);
       assertEquals("2nd byte of " + i, (byte) 0x80, bytes[4 * i + 1]);
-      assertEquals("3rd byte of " + i, (byte) 0x80 + ((i >> 6) & 63),
-          bytes[4 * i + 2]);
-      assertEquals("4th byte of " + i, (byte) 0x80 + (i & 63),
-          bytes[4 * i + 3]);
+      assertEquals("3rd byte of " + i, (byte) 0x80 + ((i >> 6) & 63), bytes[4 * i + 2]);
+      assertEquals("4th byte of " + i, (byte) 0x80 + (i & 63), bytes[4 * i + 3]);
     }
 
     // Invalid unicode code point.
@@ -796,19 +698,29 @@ public class StringTest extends TestCase {
   /**
    * Tests hashing with strings.
    *
-   * The specific strings used in this test used to trigger failures because we
-   * use a JavaScript object as a hash map to cache the computed hash codes.
-   * This conflicts with built-in properties defined on objects -- see issue
-   * #631.
-   *
+   * <p>The specific strings used in this test used to trigger failures because we use a JavaScript
+   * object as a hash map to cache the computed hash codes. This conflicts with built-in properties
+   * defined on objects -- see issue #631.
    */
   public void testHashCode() {
     String[] testStrings = {
-        "watch", "unwatch", "toString", "toSource", "eval", "valueOf",
-        "constructor", "__proto__", "polygenelubricants", "xy", "x", "" };
+      "watch", "unwatch", "toString", "toSource", "eval", "valueOf",
+      "constructor", "__proto__", "polygenelubricants", "xy", "x", ""
+    };
     int[] javaHashes = {
-        112903375, -274141738, -1776922004, -1781441930, 3125404, 231605032,
-        -1588406278, 2139739112, Integer.MIN_VALUE, 3841, 120, 0 };
+      112903375,
+      -274141738,
+      -1776922004,
+      -1781441930,
+      3125404,
+      231605032,
+      -1588406278,
+      2139739112,
+      Integer.MIN_VALUE,
+      3841,
+      120,
+      0
+    };
 
     for (int i = 0; i < testStrings.length; ++i) {
       String testString = testStrings[i];
@@ -816,8 +728,7 @@ public class StringTest extends TestCase {
 
       // verify that the hash codes of these strings match their java
       // counterparts
-      assertEquals("Unexpected hash for string " + testString, expectedHash,
-          testString.hashCode());
+      assertEquals("Unexpected hash for string " + testString, expectedHash, testString.hashCode());
 
       // Verify that the resulting hash code is numeric (might not be if it is collided with a
       // property).
@@ -828,18 +739,13 @@ public class StringTest extends TestCase {
     }
   }
 
-  public static void testHashCodeNull() {
+  public void testHashCodeNull() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
-    try {
-      returnNull().hashCode();
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
+    assertThrows(NullPointerException.class, () -> returnNull().hashCode());
   }
 
   public void testIndexOf() {
@@ -853,19 +759,13 @@ public class StringTest extends TestCase {
     assertEquals(0, haystack.indexOf(""));
   }
 
-  public static void testIndexOfNull() {
+  public void testIndexOfNull() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
-    try {
-      int index = returnNull().indexOf("");
-      // Use return value to avoid side-effect to be ignored by JSC.
-      fail(String.valueOf(index));
-    } catch (NullPointerException e) {
-      // expected
-    }
+    assertThrows(NullPointerException.class, () -> returnNull().indexOf(""));
   }
 
   public void testLastIndexOf() {
@@ -885,6 +785,31 @@ public class StringTest extends TestCase {
     assertEquals(1 << 16, str.length());
     String cat = String.valueOf(new char[] {'C', '\uD801', '\uDF00', 'T'});
     assertEquals(4, cat.length());
+  }
+
+  public void testIsEmpty() {
+    assertTrue("".isEmpty());
+    assertFalse(" ".isEmpty());
+    assertFalse("\n".isEmpty());
+    assertFalse("\u001F".isEmpty());
+    assertFalse("a".isEmpty());
+  }
+
+  public void testIsBlank() {
+    assertTrue("".isBlank());
+    assertTrue(" ".isBlank());
+    assertTrue("\n".isBlank());
+    assertTrue("\t".isBlank());
+    assertTrue("\r".isBlank());
+    assertTrue("\u001F".isBlank());
+    assertTrue("\n\t ".isBlank());
+    assertTrue("\u2028".isBlank());
+    assertTrue("\u2029".isBlank());
+    assertFalse("a".isBlank());
+    assertFalse(" a ".isBlank());
+    assertFalse("a ".isBlank());
+    assertFalse(" a".isBlank());
+    assertFalse("\u00a0".isBlank());
   }
 
   public void testLowerCase() {
@@ -1022,12 +947,7 @@ public class StringTest extends TestCase {
     assertEquals("abcabc", "abc".repeat(2));
 
     // Invalid calls
-    try {
-      String unused = "abc".repeat(-1);
-      fail("Repeating a negative count should throw an exception.");
-    } catch (IllegalArgumentException ex) {
-      // expected.
-    }
+    assertThrows(IllegalArgumentException.class, () -> "abc".repeat(-1));
   }
 
   public void testReplace() {
@@ -1044,31 +964,30 @@ public class StringTest extends TestCase {
       assertEquals(toS(to), toS(from).replace(from, to));
     }
     // issue 1480
-    String exampleXd = String.valueOf(new char[] {
-        'e', 'x', 'a', 'm', 'p', 'l', 'e', ' ', 'x', 'd'});
+    String exampleXd =
+        String.valueOf(new char[] {'e', 'x', 'a', 'm', 'p', 'l', 'e', ' ', 'x', 'd'});
     assertEquals("example xd", exampleXd.replace('\r', ' ').replace('\n', ' '));
     String dotFood = String.valueOf(new char[] {'d', 'o', 't', '\u0120', 'f', 'o', 'o', 'd'});
     assertEquals("dot food", dotFood.replace('\u0120', ' '));
-    String testStr = String.valueOf(new char[] {
-        '\u1111', 'B', '\u1111', 'B', '\u1111', 'B'});
+    String testStr = String.valueOf(new char[] {'\u1111', 'B', '\u1111', 'B', '\u1111', 'B'});
     assertEquals("ABABAB", testStr.replace('\u1111', 'A'));
   }
 
   public void testReplaceAll() {
-    String regex = hideFromCompiler("*[").replaceAll(
-        "([/\\\\\\.\\*\\+\\?\\|\\(\\)\\[\\]\\{\\}])", "\\\\$1");
+    String regex =
+        hideFromCompiler("*[").replaceAll("([/\\\\\\.\\*\\+\\?\\|\\(\\)\\[\\]\\{\\}])", "\\\\$1");
     assertEquals("\\*\\[", regex);
-    String replacement = hideFromCompiler("\\").replaceAll("\\\\", "\\\\\\\\").replaceAll(
-        "\\$", "\\\\$");
+    String replacement =
+        hideFromCompiler("\\").replaceAll("\\\\", "\\\\\\\\").replaceAll("\\$", "\\\\$");
     assertEquals("\\\\", replacement);
     assertEquals("+1", hideFromCompiler("*[1").replaceAll(regex, "+"));
-    String x1 = String.valueOf(new char[] {
-        'x', 'x', 'x', 'a', 'b', 'c', 'x', 'x', 'd', 'e', 'x', 'f'});
+    String x1 =
+        String.valueOf(new char[] {'x', 'x', 'x', 'a', 'b', 'c', 'x', 'x', 'd', 'e', 'x', 'f'});
     assertEquals("abcdef", x1.replaceAll("x*", ""));
-    String x2 = String.valueOf(new char[] {
-        '1', 'a', 'b', 'c', '1', '2', '3', 'd', 'e', '1', '2', '3', '4', 'f'});
-    assertEquals("1\\1abc123\\123de1234\\1234f", x2.replaceAll("([1234]+)",
-        "$1\\\\$1"));
+    String x2 =
+        String.valueOf(
+            new char[] {'1', 'a', 'b', 'c', '1', '2', '3', 'd', 'e', '1', '2', '3', '4', 'f'});
+    assertEquals("1\\1abc123\\123de1234\\1234f", x2.replaceAll("([1234]+)", "$1\\\\$1"));
     String x3 = String.valueOf(new char[] {'x', ' ', ' ', 'x'});
     assertEquals("\n  \n", x3.replaceAll("x", "\n"));
     String x4 = String.valueOf(new char[] {'\n', ' ', ' ', '\n'});
@@ -1097,21 +1016,18 @@ public class StringTest extends TestCase {
   }
 
   public void testSplit() {
-    compareList("fullSplit", new String[] {"abc", "", "", "de", "f"},
+    compareList(
+        "fullSplit",
+        new String[] {"abc", "", "", "de", "f"},
         hideFromCompiler("abcxxxdexfxx").split("x"));
     String booAndFoo = hideFromCompiler("boo:and:foo");
     compareList("2:", new String[] {"boo", "and:foo"}, booAndFoo.split(":", 2));
-    compareList("5:", new String[] {"boo", "and", "foo"}, booAndFoo.split(":",
-        5));
-    compareList("-2:", new String[] {"boo", "and", "foo"}, booAndFoo.split(":",
-        -2));
-    compareList("5o", new String[] {"b", "", ":and:f", "", ""},
-        booAndFoo.split("o", 5));
-    compareList("-2o", new String[] {"b", "", ":and:f", "", ""},
-        booAndFoo.split("o", -2));
+    compareList("5:", new String[] {"boo", "and", "foo"}, booAndFoo.split(":", 5));
+    compareList("-2:", new String[] {"boo", "and", "foo"}, booAndFoo.split(":", -2));
+    compareList("5o", new String[] {"b", "", ":and:f", "", ""}, booAndFoo.split("o", 5));
+    compareList("-2o", new String[] {"b", "", ":and:f", "", ""}, booAndFoo.split("o", -2));
     compareList("0o", new String[] {"b", "", ":and:f"}, booAndFoo.split("o", 0));
-    compareList("0:", new String[] {"boo", "and", "foo"}, booAndFoo.split(":",
-        0));
+    compareList("0:", new String[] {"boo", "and", "foo"}, booAndFoo.split(":", 0));
     // issue 2742
     compareList("issue2742", new String[] {}, hideFromCompiler("/").split("/", 0));
 
@@ -1126,10 +1042,33 @@ public class StringTest extends TestCase {
 
   public void testSplit_emptyExpr() {
     // TODO(rluble):  implement JDK8 string.split semantics and fix test.
-    String[] expected = (TestUtils.getJdkVersion() > 7) ?
-        new String[] {"a", "b", "c", "x", "x", "d", "e", "x", "f", "x"} :
-        new String[] {"", "a", "b", "c", "x", "x", "d", "e", "x", "f", "x"};
+    String[] expected =
+        (TestUtils.getJdkVersion() > 7)
+            ? new String[] {"a", "b", "c", "x", "x", "d", "e", "x", "f", "x"}
+            : new String[] {"", "a", "b", "c", "x", "x", "d", "e", "x", "f", "x"};
     compareList("emptyRegexSplit", expected, "abcxxdexfx".split(""));
+  }
+
+  public void testLines() {
+    assertLines("empty string", "");
+    assertLines("one line", "a", "a");
+    assertLines("only newlines", "\n", "");
+    assertLines("only newlines 2", "\n\n", "", "");
+    assertLines("only cr", "\r", "");
+    assertLines("only crlf", "\r\n", "");
+    assertLines("leading newline", "\na", "", "a");
+    assertLines("trailing whitespace", "\n ", "", " ");
+    assertLines("non-trailing newlines", "a\nb\nc", "a", "b", "c");
+    assertLines("trailing newline", "a\nb\nc\n", "a", "b", "c");
+    assertLines("trailing crlf", "a\nb\nc\r\n", "a", "b", "c");
+    assertLines("emptylines", "a\n\nb\n\nc\n\n", "a", "", "b", "", "c", "");
+    assertLines("carriage return", "a\rb\rc", "a", "b", "c");
+    assertLines("mixed line feed/carriage return", "a\nb\rc", "a", "b", "c");
+    assertLines("combined line feed/carriage return", "a\r\nb\r\nc", "a", "b", "c");
+  }
+
+  private static void assertLines(String caseName, String input, String... expectedLines) {
+    compareList("Input: " + caseName, expectedLines, input.lines().toArray(String[]::new));
   }
 
   public void testStartsWith() {
@@ -1147,29 +1086,11 @@ public class StringTest extends TestCase {
     assertEquals("", hideFromCompiler("abcdef").substring(6));
     assertEquals("", hideFromCompiler("abcdef").substring(6, 6));
 
-    try {
-      hideFromCompiler("abc").substring(-1);
-      fail("Should have thrown");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> hideFromCompiler("abc").substring(-1));
 
-    try {
-      hideFromCompiler("abc").substring(4);
-      fail("Should have thrown");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      hideFromCompiler("abc").substring(2, 4);
-      fail("Should have thrown");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      hideFromCompiler("abc").substring(2, 1);
-      fail("Should have thrown");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> hideFromCompiler("abc").substring(4));
+    assertThrows(IndexOutOfBoundsException.class, () -> hideFromCompiler("abc").substring(2, 4));
+    assertThrows(IndexOutOfBoundsException.class, () -> hideFromCompiler("abc").substring(2, 1));
   }
 
   public void testToCharArray() {
@@ -1194,18 +1115,13 @@ public class StringTest extends TestCase {
     assertSame("s same as s.toString()", s, s.toString());
   }
 
-  public static void testToStringNull() {
+  public void testToStringNull() {
     if (isWasm()) {
       // TODO(b/183769034): Re-enable when NPE on dereference is supported
       return;
     }
 
-    try {
-      returnNull().toString();
-      fail();
-    } catch (NullPointerException e) {
-      // expected
-    }
+    assertThrows(NullPointerException.class, () -> returnNull().toString());
   }
 
   /*
@@ -1233,14 +1149,117 @@ public class StringTest extends TestCase {
     trimRightAssertEquals("abc \0 a", "    abc \0 a   \0");
     trimRightAssertEquals("abc \0 a", "    abc \0 a   \0   ");
     trimRightAssertEquals("\u0021\u0020abc", "\u0019\u0017\u0021\u0020abc\u0019\u0017\u0018 ");
-    trimRightAssertEquals("\u0021 abc",
-        "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009" +
-        "\n" + "\u000b\u000c" + "\r" + "\u000e\u000f" +
-        "\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019" +
-        "\u001A\u001b\u001c\u001d\u001e\u001f\u0020\u0021 " + "abc");
+    trimRightAssertEquals(
+        "\u0021 abc",
+        "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009"
+            + "\n"
+            + "\u000b\u000c"
+            + "\r"
+            + "\u000e\u000f"
+            + "\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019"
+            + "\u001A\u001b\u001c\u001d\u001e\u001f\u0020\u0021 "
+            + "abc");
 
     // JavaScript would trim \u2029 and other unicode whitespace type characters; but Java wont
     trimRightAssertEquals("\u2029abc\u00a0", "\u2029abc\u00a0");
+  }
+
+  public void testStrip() {
+    assertEquals("", "".strip());
+    assertEquals("", "   ".strip());
+    assertEquals("", " \t ".strip());
+    assertEquals("abc", "abc".strip());
+    assertEquals("a b c", " a b c ".strip());
+    assertEquals("a\tb\nc", "\n\t\r\n\r a\tb\nc\n\t\r\n\r ".strip());
+    // line separators should be stripped.
+    assertEquals("abc", "\r\n\u2028\u2029abc\r\n\u2028\u2029".strip());
+    // nbsp should not be stripped, this differs from JS's String#trim
+    assertEquals("\u00a0abc\u00a0", "\u00a0abc\u00a0".strip());
+    // nulls should not be stripped.
+    assertEquals("\0abc\0", "\0abc\0".strip());
+  }
+
+  public void testStripTrailing() {
+    assertEquals("", "".stripTrailing());
+    assertEquals("", "   ".stripTrailing());
+    assertEquals("", " \t ".stripTrailing());
+    assertEquals("abc", "abc".stripTrailing());
+    assertEquals(" a b c", " a b c ".stripTrailing());
+    // line separators should be stripped.
+    assertEquals("\r\n\u2028\u2029abc", "\r\n\u2028\u2029abc\r\n\u2028\u2029".stripTrailing());
+    // nbsp should not be stripped, this differs from JS's String#trim
+    assertEquals("\u00a0abc\u00a0", "\u00a0abc\u00a0".stripTrailing());
+    // nulls should not be stripped.
+    assertEquals("\0abc\0", "\0abc\0".stripTrailing());
+  }
+
+  public void testStripLeading() {
+    assertEquals("", "".stripLeading());
+    assertEquals("", "   ".stripLeading());
+    assertEquals("", " \t ".stripLeading());
+    assertEquals("abc", "abc".stripLeading());
+    assertEquals("a b c ", " a b c ".stripLeading());
+    assertEquals("a\tb\nc\n\t\r\n\r ", "\n\t\r\n\r a\tb\nc\n\t\r\n\r ".stripLeading());
+    // line separators should be stripped.
+    assertEquals("abc\r\n\u2028\u2029", "\r\n\u2028\u2029abc\r\n\u2028\u2029".stripLeading());
+    // nbsp should not be stripped, this differs from JS's String#trim
+    assertEquals("\u00a0abc\u00a0", "\u00a0abc\u00a0".stripLeading());
+    // nulls should not be stripped.
+    assertEquals("\0abc\0", "\0abc\0".stripLeading());
+  }
+
+  public void testStripIndent() {
+    // empty string
+    assertEquals("", "".stripIndent());
+    // blank string
+    assertEquals("", "   ".stripIndent());
+    assertEquals("", " \t ".stripIndent());
+    // blank string with newlines
+    assertEquals("\n", "\n".stripIndent());
+    assertEquals("\n\n", "\n\n".stripIndent());
+    assertEquals("\n", " \n ".stripIndent());
+    assertEquals("\n\n", "  \n    \n\t".stripIndent());
+
+    // single line
+    assertEquals("abc", "  abc".stripIndent());
+    assertEquals("abc", "  abc \t".stripIndent());
+
+    // trailing newline. Note there's there's technically two lines here with the second having no
+    // indent. Therefore no whitespace is stripped from the first line.
+    assertEquals("  abc\n", "  abc\n".stripIndent());
+    assertEquals("  abc\n", "  abc \n".stripIndent());
+
+    // multiple lines
+    assertEquals("abc\ndef", "  abc\n  def".stripIndent());
+    assertEquals("abc\n def", "  abc\n   def".stripIndent());
+
+    // blank lines
+    assertEquals("abc\n\ndef", "  abc\n\n  def".stripIndent());
+    assertEquals("abc\n\ndef", "  abc\n    \n  def".stripIndent());
+    assertEquals("\nabc", "\n  abc".stripIndent());
+
+    // leading tabs
+    assertEquals("abc\ndef", "\t\tabc\n\t\tdef".stripIndent());
+
+    // jagged indentation
+    assertEquals("abc\n def\nghi", "  abc\n   def\n  ghi".stripIndent());
+
+    // last line blank and affecting indentation
+    assertEquals("abc\n", " abc\n ".stripIndent());
+
+    // check only indentation is stripped, not other spaces
+    assertEquals("a b c\nd e f", "  a b c\n  d e f".stripIndent());
+
+    // check trailing space on last line
+    assertEquals("abc\n def", "  abc\n   def ".stripIndent());
+
+    // mixed whitespace
+    assertEquals(" abc\ndef", "  abc\n\tdef".stripIndent());
+    assertEquals("abc\n def", "\t abc\n\t  def".stripIndent());
+
+    // Mixed whitespace and line separators with jagged indentation.
+    assertEquals(
+        "abc\ndef\n\t\tghi\n  jkl\n", "  abc\n\t\tdef\r\n \t\t\tghi\r    jkl\n  ".stripIndent());
   }
 
   public void testUpperCase() {
@@ -1279,18 +1298,34 @@ public class StringTest extends TestCase {
     assertTrue(String.valueOf(C.DOUBLE_VALUE).startsWith(C.DOUBLE_STRING));
     assertEquals(C.CHAR_STRING, String.valueOf(C.CHAR_VALUE));
     assertEquals(C.CHAR_ARRAY_STRING, String.valueOf(C.CHAR_ARRAY_VALUE));
-    assertEquals(
-        C.CHAR_ARRAY_STRING_SUB, String.valueOf(C.CHAR_ARRAY_VALUE, 1,
-        4));
+    assertEquals(C.CHAR_ARRAY_STRING_SUB, String.valueOf(C.CHAR_ARRAY_VALUE, 1, 4));
     assertEquals(C.FALSE_STRING, String.valueOf(C.FALSE_VALUE));
     assertEquals(C.TRUE_STRING, String.valueOf(C.TRUE_VALUE));
     assertEquals(C.getLargeCharArrayString(), String.valueOf(C.getLargeCharArrayValue()));
   }
 
+  public void testJoin() {
+    assertEquals("", String.join("", ""));
+    assertEquals("", String.join(",", ""));
+    assertEquals("", String.join(",", Arrays.<String>asList()));
+
+    assertEquals("a", String.join("", "a"));
+    assertEquals("a", String.join(",", "a"));
+    assertEquals("a", String.join(",", Arrays.asList("a")));
+
+    assertEquals("ab", String.join("", "a", "b"));
+    assertEquals("a,b", String.join(",", "a", "b"));
+    assertEquals("a,b", String.join(",", Arrays.asList("a", "b")));
+
+    assertEquals("abc", String.join("", "a", "b", "c"));
+    assertEquals("a,b,c", String.join(",", "a", "b", "c"));
+    assertEquals("a,b,c", String.join(",", Arrays.asList("a", "b", "c")));
+  }
+
   /**
    * Helper method for testTrim to avoid compiler optimizations.
    *
-   * TODO: insufficient, compiler now inlines.
+   * <p>TODO: insufficient, compiler now inlines.
    */
   public void trimRightAssertEquals(String left, String right) {
     assertEquals("trimRightAssertEquals", left, right.trim());
@@ -1299,7 +1334,7 @@ public class StringTest extends TestCase {
   /**
    * Helper method for testTrim to avoid compiler optimizations.
    *
-   * TODO: insufficient, compiler now inlines.
+   * <p>TODO: insufficient, compiler now inlines.
    */
   public void trimRightAssertSame(String left, String right) {
     assertSame("trimRightAssertSame", left, right.trim());

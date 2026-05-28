@@ -1,6 +1,7 @@
 """Utility functions for running benchmarks."""
 
 load("@rules_java//java:defs.bzl", "java_binary")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//:benchmarking/java/com/google/j2cl/benchmarking/benchmark_library.bzl", "benchmark_library")
 load(
     "//:benchmarking/java/com/google/j2cl/benchmarking/templates.bzl",
@@ -95,6 +96,7 @@ def benchmark(name, deps = [], data = [], jvm_only = False, perfgate_test_tags =
             "%s.%sLauncher#execute" % (benchmark_java_package, name),
             "%s.%sLauncher#prepareForRunOnce" % (benchmark_java_package, name),
             "%s.%sLauncher#runOnce" % (benchmark_java_package, name),
+            "%s.%sLauncher#runFixedCount" % (benchmark_java_package, name),
         ],
     )
 
@@ -158,7 +160,7 @@ def _jsvm_benchmark_impl(name, cmd, data, tags):
         tags = tags,
     )
 
-    native.sh_binary(
+    sh_binary(
         name = name,
         srcs = ["gen_%s_sh" % name],
         data = data,

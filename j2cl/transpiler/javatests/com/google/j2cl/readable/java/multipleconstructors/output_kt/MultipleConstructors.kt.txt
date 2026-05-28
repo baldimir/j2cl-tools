@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package multipleconstructors
 
@@ -24,19 +25,19 @@ import kotlin.Suppress
 
 open class MultipleConstructors {
  private var id: Int = 0
-
+ 
  private var flag: Boolean = false
-
+ 
  constructor(id: Int) {
   this.id = id
   this.flag = id == 0
  }
-
+ 
  constructor(flag: Boolean) {
-  this.id = - 1
+  this.id = -1
   this.flag = flag
  }
-
+ 
  constructor(id: Int, flag: Boolean) {
   this.id = id
   this.flag = flag

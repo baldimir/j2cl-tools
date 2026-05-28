@@ -1,0 +1,7 @@
+goog.module('recordclass.RecordClass.ArrayRecord');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const ArrayRecord = goog.require('recordclass.RecordClass.ArrayRecord$impl');
+exports = ArrayRecord;

@@ -25,6 +25,7 @@ fun main(vararg unused: String) {
   captures.testLambdaNoCapture()
   captures.testInstanceofLambda()
   captures.testLambdaCaptureField()
+  captures.testCapturedVariableScoping()
   captures.testLambdaCaptureLocal()
   captures.testLambdaCaptureFieldAndLocal()
   // fun interfaces must have exactly one abstract method and SubEquals becomes a fun interface if
@@ -106,6 +107,44 @@ private class Captures {
       )
     assertTrue(result == 121)
     assertTrue(x == 10)
+  }
+
+  fun interface IntSupplier {
+    fun get(): Int
+  }
+
+  internal fun testCapturedVariableScoping() {
+    val suppliers = mutableListOf<IntSupplier>()
+
+    fun captureAndReturn(intSupplier: IntSupplier): Int {
+      suppliers.add(intSupplier)
+      return intSupplier.get()
+    }
+
+    var x = 0
+    do {
+      var i = x++
+      // The variable `i` is captured by the Supplier lambda.
+      suppliers.add { i }
+      // and modified here, which should be reflected in the lambda above when
+      // evaluating.
+      i++
+      if (x == 1) {
+        continue
+      }
+      // This modification will be seen only in the second supplier.
+      i++
+      // Condition on a variable that is declared in the body.
+    } while (captureAndReturn { i + 1 } < 3)
+
+    // At the end suppliers[0] = () -> 1, suppliers[1] = () -> 2, suppliers[2] = () -> 3 and
+    // suppliers[3] = () -> 4
+    assertEquals(4, suppliers.size)
+    assertEquals(1, suppliers[0].get())
+    assertEquals(2, suppliers[1].get())
+    assertEquals(3, suppliers[2].get())
+
+    assertEquals(4, suppliers[3].get())
   }
 
   internal fun testLambdaCaptureFieldAndLocal() {

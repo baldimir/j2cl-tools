@@ -28,6 +28,7 @@ class SubWithLambda extends Super {
  m_n__void() {
   let r = Runnable.$adapt(() =>{
    super.m_m__void();
+   return;
   });
  }
  /** @nodts */

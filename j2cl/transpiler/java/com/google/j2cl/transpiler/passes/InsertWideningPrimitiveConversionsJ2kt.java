@@ -86,7 +86,7 @@ public class InsertWideningPrimitiveConversionsJ2kt extends NormalizationPass {
       }
 
       @Override
-      public Expression rewriteSwitchSubjectContext(Expression expression) {
+      public Expression rewriteSwitchSubjectContext(Expression expression, boolean allowsNulls) {
         // Don't apply unary numeric promotion to switch expression.
         return expression;
       }
@@ -107,7 +107,7 @@ public class InsertWideningPrimitiveConversionsJ2kt extends NormalizationPass {
     if (expression instanceof NumberLiteral literal) {
       return new NumberLiteral(toTypeDescriptor.toUnboxedType(), literal.getValue());
     }
-    return CastExpression.newBuilder()
+    return CastExpression.builder()
         .setExpression(expression)
         .setCastTypeDescriptor(toTypeDescriptor)
         .build();

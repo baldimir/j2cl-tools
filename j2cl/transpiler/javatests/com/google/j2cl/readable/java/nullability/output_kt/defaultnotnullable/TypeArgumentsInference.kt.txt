@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package nullability.defaultnotnullable
 
@@ -26,21 +27,21 @@ open class TypeArgumentsInference {
  companion object {
   @JvmStatic
   fun <K> wildcardPair(): Pair<K, *> {
-   return Pair<K, Any>()
+   return Pair<K, Any?>()
   }
-
+  
   @JvmStatic
   fun <K, V> pairIdentity(pair: Pair<K, V>): Pair<K, V> {
    return pair
   }
-
+  
   @JvmStatic
   fun <K> wildcardPairAndIdentity(): Pair<K, *> {
-   return TypeArgumentsInference.pairIdentity<K, Any?>(
-    TypeArgumentsInference.wildcardPair<K>() as Pair<K, Any?>,
+   return TypeArgumentsInference.pairIdentity(
+    TypeArgumentsInference.wildcardPair<K>(),
    )
   }
  }
-
+ 
  class Pair<K, V>
 }

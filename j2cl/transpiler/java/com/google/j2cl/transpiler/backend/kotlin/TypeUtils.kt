@@ -18,11 +18,14 @@ package com.google.j2cl.transpiler.backend.kotlin
 import com.google.j2cl.transpiler.ast.Field
 import com.google.j2cl.transpiler.ast.Member
 import com.google.j2cl.transpiler.ast.Method
+import com.google.j2cl.transpiler.ast.MethodDescriptor
 import com.google.j2cl.transpiler.ast.Type
 import com.google.j2cl.transpiler.ast.TypeDescriptor
+import com.google.j2cl.transpiler.ast.TypeDescriptors.isJavaLangObject
 import com.google.j2cl.transpiler.backend.kotlin.ast.Member as KtMember
 import com.google.j2cl.transpiler.backend.kotlin.ast.toCompanionObjectOrNull
 import com.google.j2cl.transpiler.backend.kotlin.common.runIfNotNull
+import kotlin.streams.asSequence
 
 /** Returns a list of type descriptors declared on this type. */
 internal val Type.declaredSuperTypeDescriptors: List<TypeDescriptor>
@@ -32,11 +35,11 @@ internal val Type.declaredSuperTypeDescriptors: List<TypeDescriptor>
 internal val Type.hasConstructors: Boolean
   get() = constructors.isNotEmpty()
 
-/** Returns the constructor to render as primary in Kotlin. */
+/** Returns the constructor to translate as primary in Kotlin. */
 internal val Type.ktPrimaryConstructor: Method?
   get() =
     constructors.singleOrNull()?.takeIf {
-      // Render primary constructors for inner classes only, where it's necessary.
+      // Include primary constructors for inner classes only, where it's necessary for visibility.
       // Don't do it all classes, because Kotlin does not allow using `return` inside `init {}`.
       // It's also necessary because of: https://youtrack.jetbrains.com/issue/KT-65299
       // TODO(b/322331738): Remove special handling of primary constructors when the bug is fixed.
@@ -51,7 +54,7 @@ internal val Type.ktMembers: List<KtMember>
       .filter { !it.isStatic }
       .filter { !it.descriptor.enclosingTypeDescriptor.isAnnotation }
       .filter { !declaration.isAnonymous || !it.isConstructor }
-      .filter { it !is Method || it != ktPrimaryConstructor || it.renderedStatements.isNotEmpty() }
+      .filter { it !is Method || it != ktPrimaryConstructor || it.includedStatements.isNotEmpty() }
       .runIfNotNull(ktPrimaryConstructor) { moveAfterFields(it) }
       .map { KtMember.WithJavaMember(it) }
       .plus(toCompanionObjectOrNull()?.let { KtMember.WithCompanionObject(it) })
@@ -73,7 +76,7 @@ private fun Sequence<Member>.moveAfterFields(member: Member): Sequence<Member> =
 
 // TODO(b/310160330): Remove this restriction once Kotlin allows for that:
 // https://github.com/Kotlin/KEEP/blob/master/proposals/jvm-field-annotation-in-interface-companion.md#open-questions
-/** Returns whether it's illegal to render [@JvmField] annotations in this type. */
+/** Returns whether it's illegal to include [@JvmField] annotations in this type. */
 internal val Type.jvmFieldsAreIllegal
   get() =
     isInterface &&
@@ -83,3 +86,33 @@ internal val Type.jvmFieldsAreIllegal
 
 internal val Type.needExplicitPrimaryConstructor: Boolean
   get() = isClass && !hasConstructors && !declaration.visibility.defaultMemberKtVisibility.isPublic
+
+internal val Type.needsCompanionSupplierInterface: Boolean
+  get() =
+    typeDescriptor.isCollection &&
+      declaration.visibility.isPublic &&
+      !declaration.isKtNative &&
+      toCompanionObjectOrNull() != null
+
+/** Returns whether this type needs `@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")`. */
+internal val Type.needsIncompatibleObjCNameOverrideSuppression: Boolean
+  get() =
+    typeDescriptor.polymorphicMethods.any { methodDescriptor ->
+      !methodDescriptor.isStatic &&
+        !isJavaLangObject(methodDescriptor.enclosingTypeDescriptor) &&
+        overridesFromMultipleIndependentPaths(methodDescriptor)
+    }
+
+/** Returns whether the given method overrides from more than one independent supertype paths. */
+private fun Type.overridesFromMultipleIndependentPaths(
+  methodDescriptor: MethodDescriptor
+): Boolean =
+  getSuperTypesStream()
+    .asSequence()
+    .filter { superType ->
+      superType.polymorphicMethods.any { superMethod ->
+        methodDescriptor.isOverride(superMethod) || methodDescriptor == superMethod
+      }
+    }
+    .drop(1)
+    .any()

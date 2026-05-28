@@ -15,8 +15,6 @@
  */
 package com.google.j2cl.transpiler.backend.kotlin
 
-import com.google.j2cl.transpiler.ast.MemberDescriptor
-import com.google.j2cl.transpiler.ast.MethodDescriptor
 import com.google.j2cl.transpiler.ast.TypeDeclaration
 import com.google.j2cl.transpiler.ast.TypeVariable
 import com.google.j2cl.transpiler.ast.Visibility
@@ -58,14 +56,6 @@ internal val TypeDeclaration.isKtInner: Boolean
 internal val TypeDeclaration.isOpen: Boolean
   get() = !isFinal && !isAnonymous
 
-internal val MethodDescriptor.isOpen: Boolean
-  get() =
-    enclosingTypeDescriptor.typeDeclaration.isOpen &&
-      !isFinal &&
-      !isConstructor &&
-      !isStatic &&
-      !visibility.isPrivate
-
 /**
  * Returns whether the described type is a test class, i.e. has the JUnit `@RunWith` annotation or
  * `@RunParameterized` annotation.
@@ -88,11 +78,58 @@ internal val Visibility.defaultMemberKtVisibility: KtVisibility
       Visibility.PRIVATE -> KtVisibility.INTERNAL
     }
 
-internal val MemberDescriptor.isEnumConstructor: Boolean
-  get() = enclosingTypeDescriptor.isEnum && isConstructor
+internal val TypeDeclaration.defaultKtVisibility: KtVisibility
+  get() = KtVisibility.PUBLIC
 
-internal val MemberDescriptor.isInterfaceMethod: Boolean
-  get() = enclosingTypeDescriptor.isInterface
+internal val TypeDeclaration.ktVisibility: KtVisibility
+  get() =
+    if (useActualKtVisibility) {
+      KtVisibility.from(visibility)
+    } else {
+      KtVisibility.PUBLIC
+    }
+
+internal val TypeDeclaration.declaredKtVisibility: KtVisibility?
+  get() = ktVisibility.takeIf { !isAnonymous && !isLocal && it != defaultKtVisibility }
 
 internal fun TypeDeclaration.equalsOrEnclosedIn(other: TypeDeclaration): Boolean =
   this == other || enclosingTypeDeclaration?.equalsOrEnclosedIn(other) ?: false
+
+internal fun TypeDeclaration.isFromJRE(): Boolean =
+  packageName.startsWith("javaemul.") ||
+    packageName.startsWith("java.") ||
+    packageName.startsWith("javax.") ||
+    packageName.startsWith("kotlin.")
+
+private val AUTO_CONVERTER_PREFIXES: List<String> = listOf("AutoConverter_", "AutoEnumConverter_")
+
+internal val TypeDeclaration.isAutoConverter: Boolean
+  get() = classComponents.any { classComponent ->
+    AUTO_CONVERTER_PREFIXES.any { classComponent.startsWith(it) }
+  }
+
+internal val TypeDeclaration.isAutoValueOrBuilder: Boolean
+  get() =
+    hasAnnotation("com.google.auto.value.AutoValue") ||
+      hasAnnotation("com.google.auto.value.AutoValue.Builder")
+
+internal val TypeDeclaration.hasAutoValueOrBuilderSuperType: Boolean
+  get() =
+    toDescriptor().superTypesStream.map { it.typeDeclaration }.anyMatch { it.isAutoValueOrBuilder }
+
+internal val TypeDeclaration.isEnumWithNonEmptyValues: Boolean
+  get() = isEnum && declaredFieldDescriptors.any { it.isEnumConstant }
+
+internal val TypeDeclaration.isKtNative: Boolean
+  get() =
+    hasAnnotation("javaemul.internal.annotations.KtNative") ||
+      hasAnnotation("com.google.j2kt.annotations.KtNative")
+
+internal val TypeDeclaration.ktNativeQualifiedName: String?
+  get() = getAnnotation("javaemul.internal.annotations.KtNative")?.getStringValue("name")
+
+internal val TypeDeclaration.ktBridgeQualifiedName: String?
+  get() = getAnnotation("javaemul.internal.annotations.KtNative")?.getStringValue("bridgeName")
+
+internal val TypeDeclaration.ktCompanionQualifiedName: String?
+  get() = getAnnotation("javaemul.internal.annotations.KtNative")?.getStringValue("companionName")

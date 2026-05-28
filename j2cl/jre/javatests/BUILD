@@ -1,8 +1,7 @@
 # Description:
 #   j2cl/jre: JRE subset for transpilation.
 
-load("@rules_closure//closure:defs.bzl", "closure_js_binary")
-load("//build_defs:rules.bzl", "j2cl_library", "j2kt_native_library")
+load("//build_defs:rules.bzl", "j2cl_library")
 load("@rules_closure//closure:defs.bzl", "closure_js_binary")
 load("@rules_java//java:defs.bzl", "java_library")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
@@ -25,18 +24,19 @@ SRCS = glob(
 
 ERROR_PRONE_SUPPRESSIONS = [
     # keep sorted
+    "-Xep:AssertSameIncompatible:OFF",
     "-Xep:CheckReturnValue:OFF",
     "-Xep:ComparableType:OFF",
     "-Xep:DoNotCall:OFF",
     "-Xep:EqualsIncompatibleType:OFF",
     "-Xep:IdentityBinaryExpression:OFF",
-    "-Xep:MixedArrayDimensions:OFF",  # See go/lsc-mixedarraydimensions
     "-Xep:ReturnValueIgnored:OFF",
     "-Xep:SelfAssertion:OFF",
     "-Xep:SelfComparison:OFF",
     "-Xep:SelfEquality:OFF",
     "-Xep:SelfEquals:OFF",
     "-Xep:StringJoin:OFF",
+    "-Xlint:-removal",
 ]
 
 java_library(
@@ -46,7 +46,6 @@ java_library(
     javacopts = ERROR_PRONE_SUPPRESSIONS,
     deps = [
         "//jre/java:javaemul_internal_annotations",
-        "//third_party:jsinterop-annotations",
         "//third_party:jspecify_annotations",
         "//third_party:junit",
     ],
@@ -58,32 +57,13 @@ j2cl_library(
     srcs = SRCS,
     # Safe here as this is for tests only and there are no downstream users.
     experimental_enable_jspecify_support_do_not_enable_without_jspecify_static_checking_or_you_might_cause_an_outage = True,
+    generate_j2kt_native_library = True,
     javacopts = ERROR_PRONE_SUPPRESSIONS,
     deps = [
         "//jre/java:javaemul_internal_annotations-j2cl",
         "//third_party:jsinterop-annotations-j2cl",
         "//third_party:jspecify_annotations-j2cl",
         "//third_party:junit-j2cl",
-    ],
-)
-
-j2kt_native_library(
-    name = "emul_tests_lib-j2kt-native",
-    testonly = 1,
-    srcs = glob(
-        ["**/*.java"],
-        exclude = JS_ONLY_SRCS + [
-            "com/google/j2cl/jre/AllTests.java",
-            "com/google/j2cl/jre/EmulJava9Suite.java",
-            "com/google/j2cl/jre/java9/**/*.java",
-        ],
-    ),
-    javacopts = ERROR_PRONE_SUPPRESSIONS,
-    deps = [
-        "//jre/java:javaemul_internal_annotations-j2kt-native",
-        "//third_party:jsinterop-annotations-j2kt-native",
-        "//third_party:jspecify_annotations-j2kt-native",
-        "//third_party:junit-j2kt-native",
     ],
 )
 

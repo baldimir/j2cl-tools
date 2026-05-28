@@ -33,13 +33,12 @@ public abstract class PackageInfo {
    * When nothing is known about a particular package in a particular class path entry the answers
    * to questions about package properties are taken from this instance.
    */
-  public static final PackageInfo DEFAULT = PackageInfo.newBuilder().setPackageName("").build();
+  public static final PackageInfo DEFAULT = PackageInfo.builder().setPackageName("").build();
 
   public static PackageInfo read(InputStream packageInfoStream) throws IOException {
     var annotations = new HashMap<String, String>();
     // Prefill with known annotations so we can use it to avoid traversing unrelated annotations.
     annotations.put(FrontendConstants.JS_PACKAGE_ANNOTATION_NAME, null);
-    annotations.put(FrontendConstants.J2KT_OBJECTIVE_C_ANNOTATION_NAME, null);
     annotations.put(FrontendConstants.NULL_MARKED_ANNOTATION_NAME, null);
 
     final int opcode = org.objectweb.asm.Opcodes.ASM9;
@@ -67,10 +66,9 @@ public abstract class PackageInfo {
     var reader = new ClassReader(packageInfoStream);
     reader.accept(visitor, ClassReader.SKIP_CODE);
     var packageName = reader.getClassName().replace("/package-info", "").replace('/', '.');
-    return PackageInfo.newBuilder()
+    return PackageInfo.builder()
         .setPackageName(packageName)
         .setJsNamespace(annotations.get(FrontendConstants.JS_PACKAGE_ANNOTATION_NAME))
-        .setObjectiveCName(annotations.get(FrontendConstants.J2KT_OBJECTIVE_C_ANNOTATION_NAME))
         .setNullMarked(annotations.get(FrontendConstants.NULL_MARKED_ANNOTATION_NAME) != null)
         .build();
   }
@@ -80,12 +78,9 @@ public abstract class PackageInfo {
   @Nullable
   public abstract String getJsNamespace();
 
-  @Nullable
-  public abstract String getObjectiveCName();
-
   public abstract boolean isNullMarked();
 
-  public static Builder newBuilder() {
+  public static Builder builder() {
     return new AutoValue_PackageInfo.Builder().setNullMarked(false);
   }
 
@@ -95,9 +90,7 @@ public abstract class PackageInfo {
 
     public abstract Builder setPackageName(String packageName);
 
-    public abstract Builder setJsNamespace(String jsNamespace);
-
-    public abstract Builder setObjectiveCName(String objectiveCName);
+    public abstract Builder setJsNamespace(@Nullable String jsNamespace);
 
     public abstract Builder setNullMarked(boolean isNullMarked);
 

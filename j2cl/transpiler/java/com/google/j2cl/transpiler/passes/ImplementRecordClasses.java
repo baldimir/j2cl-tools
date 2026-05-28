@@ -1,0 +1,374 @@
+/*
+ * Copyright 2025 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+package com.google.j2cl.transpiler.passes;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.MoreCollectors;
+import com.google.common.collect.Streams;
+import com.google.j2cl.common.SourcePosition;
+import com.google.j2cl.transpiler.ast.AbstractVisitor;
+import com.google.j2cl.transpiler.ast.AstUtils;
+import com.google.j2cl.transpiler.ast.BinaryExpression;
+import com.google.j2cl.transpiler.ast.BinaryOperator;
+import com.google.j2cl.transpiler.ast.BindingPattern;
+import com.google.j2cl.transpiler.ast.BooleanLiteral;
+import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
+import com.google.j2cl.transpiler.ast.Expression;
+import com.google.j2cl.transpiler.ast.Field;
+import com.google.j2cl.transpiler.ast.FieldAccess;
+import com.google.j2cl.transpiler.ast.FieldDescriptor;
+import com.google.j2cl.transpiler.ast.IfStatement;
+import com.google.j2cl.transpiler.ast.Method;
+import com.google.j2cl.transpiler.ast.MethodCall;
+import com.google.j2cl.transpiler.ast.MethodDescriptor;
+import com.google.j2cl.transpiler.ast.PatternMatchExpression;
+import com.google.j2cl.transpiler.ast.ReturnStatement;
+import com.google.j2cl.transpiler.ast.RuntimeMethods;
+import com.google.j2cl.transpiler.ast.Statement;
+import com.google.j2cl.transpiler.ast.ThisReference;
+import com.google.j2cl.transpiler.ast.Type;
+import com.google.j2cl.transpiler.ast.TypeDescriptor;
+import com.google.j2cl.transpiler.ast.TypeDescriptors;
+import com.google.j2cl.transpiler.ast.Variable;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+/**
+ * Provides implementations for Java record classes.
+ *
+ * <p>Example record class:
+ *
+ * <pre>{@code
+ * record Foo(String a, int b) {}
+ * }</pre>
+ *
+ * <p>The AST representation of a record contains only what is written in the source but not the
+ * implicit fields and methods. The fields are present in the type model. We must generate the
+ * following:
+ *
+ * <ul>
+ *   <li>Field declarations for record fields in the AST.
+ *   <li>Public field accessors for record fields.
+ *   <li>A canonical constructor that takes all record fields as parameters.
+ *   <li>For compact constructors, add field assignments to the body.
+ *   <li>Implementations for Object methods, such as equals, hashCode, and toString.
+ * </ul>
+ */
+public class ImplementRecordClasses extends NormalizationPass {
+
+  @Override
+  public void applyTo(Type type) {
+    if (!type.isJavaRecord()) {
+      return;
+    }
+
+    addFieldDeclarations(type);
+    normalizeConstructors(type);
+    addFieldAccessors(type);
+    if (isValueTypeBasedImplementation(type)) {
+      AstUtils.preserveFields(type, ImmutableList.of());
+      return;
+    }
+    implementEquals(type);
+    implementHashCode(type);
+    implementToString(type);
+  }
+
+  private static boolean isValueTypeBasedImplementation(Type type) {
+    DeclaredTypeDescriptor javaemulInternalValueType =
+        TypeDescriptors.get().javaemulInternalValueType;
+    return javaemulInternalValueType != null
+        && type.getDeclaration().isSubtypeOf(javaemulInternalValueType.getTypeDeclaration());
+  }
+
+  /**
+   * Adds field declarations for record fields.
+   *
+   * <p>Record fields are present in the type model but not in the AST.
+   */
+  private static void addFieldDeclarations(Type type) {
+    for (FieldDescriptor field : type.getTypeDescriptor().getRecordComponentFieldDescriptors()) {
+      if (type.getInstanceFields().stream()
+          .anyMatch(f -> f.getDescriptor().getName().equals(field.getName()))) {
+        continue;
+      }
+      type.addMember(Field.builderFrom(field).setSourcePosition(type.getSourcePosition()).build());
+    }
+  }
+
+  private static void addFieldAccessors(Type type) {
+    var typeDescriptor = type.getTypeDescriptor();
+    for (FieldDescriptor field : typeDescriptor.getRecordComponentFieldDescriptors()) {
+      var fieldAccessorDescriptor =
+          typeDescriptor.getRecordComponentAccessors().stream()
+              .filter(m -> m.getName().equals(field.getName()))
+              .collect(MoreCollectors.onlyElement());
+
+      if (type.containsMethod(fieldAccessorDescriptor::isSameSignature)) {
+        continue;
+      }
+      type.addMember(
+          Method.builder()
+              .setMethodDescriptor(fieldAccessorDescriptor)
+              .addStatements(
+                  ReturnStatement.builder()
+                      .setExpression(
+                          FieldAccess.builderFrom(field)
+                              .setQualifier(new ThisReference(type.getTypeDescriptor()))
+                              .build())
+                      .setSourcePosition(SourcePosition.NONE)
+                      .build())
+              .setSourcePosition(type.getSourcePosition())
+              .build());
+    }
+  }
+
+  private static void normalizeConstructors(Type type) {
+    ImmutableList<FieldDescriptor> recordFields =
+        type.getTypeDescriptor().getRecordComponentFieldDescriptors();
+
+    MethodDescriptor canonicalConstructorDescriptor =
+        type.getTypeDescriptor()
+            .getMethodDescriptor(
+                MethodDescriptor.CONSTRUCTOR_METHOD_NAME,
+                recordFields.stream()
+                    .map(FieldDescriptor::getTypeDescriptor)
+                    .toArray(TypeDescriptor[]::new));
+
+    Method canonicalConstructor =
+        type.getConstructors().stream()
+            .filter(m -> m.getDescriptor().isSameSignature(canonicalConstructorDescriptor))
+            .findFirst()
+            .orElse(null);
+    if (canonicalConstructor == null) {
+      canonicalConstructor =
+          Method.builder()
+              .setMethodDescriptor(canonicalConstructorDescriptor)
+              .setParameters(createParameters(recordFields))
+              .setSourcePosition(type.getSourcePosition())
+              .build();
+      type.addMember(canonicalConstructor);
+    }
+
+    // Add field assignments to compact constructors.
+    //
+    // For a compact constructor, such as:
+    // record Foo(String value) {
+    //   Foo {
+    //     // Example user-added logic:
+    //     checkArgument(value != null);
+    //   }
+    // }
+    //
+    // The frontend doesn't generate assignments for us. Add assignments, resulting in:
+    // record Foo(String value) {
+    //   Foo {
+    //     // Example user-added logic:
+    //     checkArgument(value != null);
+    //     this.value = value;
+    //   }
+    // }
+
+    if (!isCompactConstructor(canonicalConstructor)) {
+      return;
+    }
+
+    canonicalConstructor
+        .getBody()
+        .getStatements()
+        .addAll(
+            createFieldAssignments(
+                recordFields,
+                canonicalConstructor.getParameters(),
+                canonicalConstructor.getSourcePosition()));
+  }
+
+  private static ImmutableList<Statement> createFieldAssignments(
+      ImmutableList<FieldDescriptor> recordFields,
+      List<Variable> parameters,
+      SourcePosition sourcePosition) {
+    return Streams.zip(
+            recordFields.stream(),
+            parameters.stream(),
+            (field, parameter) ->
+                FieldAccess.builderFrom(field)
+                    .setDefaultInstanceQualifier()
+                    .build()
+                    .infixAssign(parameter.createReference())
+                    .makeStatement(sourcePosition))
+        .collect(toImmutableList());
+  }
+
+  private static ImmutableList<Variable> createParameters(
+      ImmutableList<FieldDescriptor> recordFields) {
+    return recordFields.stream()
+        .map(ImplementRecordClasses::createParameter)
+        .collect(toImmutableList());
+  }
+
+  private static Variable createParameter(FieldDescriptor fieldDescriptor) {
+    return Variable.builder()
+        .setName(fieldDescriptor.getName())
+        .setTypeDescriptor(fieldDescriptor.getTypeDescriptor())
+        .setParameter(true)
+        .build();
+  }
+
+  private static void implementHashCode(Type type) {
+    implementObjectMethodOverride(
+        type,
+        "hashCode",
+        () -> RuntimeMethods.createArraysHashCodeMethodCall(createRecordFieldAccessList(type)));
+  }
+
+  private static void implementToString(Type type) {
+    implementObjectMethodOverride(
+        type,
+        "toString",
+        () -> {
+          Expression qualifier =
+              RuntimeMethods.createGetClassMethodCall(new ThisReference(type.getTypeDescriptor()));
+          return BinaryExpression.builder()
+              .setOperator(BinaryOperator.PLUS)
+              .setLeftOperand(
+                  MethodCall.builderFrom(
+                          TypeDescriptors.get().javaLangClass.getMethodDescriptor("getName"))
+                      .setQualifier(qualifier)
+                      .build())
+              .setRightOperand(
+                  RuntimeMethods.createArraysToStringMethodCall(createRecordFieldAccessList(type)))
+              .build();
+        });
+  }
+
+  private static void implementEquals(Type type) {
+    implementObjectMethodOverride(
+        type,
+        "equals",
+        parameters -> {
+          Variable parameter = parameters.get(0);
+          Variable otherVariable =
+              Variable.builder()
+                  .setName("$other")
+                  .setTypeDescriptor(type.getTypeDescriptor())
+                  .build();
+          return ImmutableList.<Statement>of(
+              // if (!(other instanceof RecordClassType $other)) return false;
+              IfStatement.builder()
+                  .setConditionExpression(
+                      PatternMatchExpression.builder()
+                          .setExpression(parameter.createReference())
+                          .setPattern(new BindingPattern(otherVariable))
+                          .build()
+                          .prefixNot())
+                  .setThenStatement(
+                      ReturnStatement.builder()
+                          .setExpression(BooleanLiteral.get(false))
+                          .setSourcePosition(SourcePosition.NONE)
+                          .build())
+                  .setSourcePosition(SourcePosition.NONE)
+                  .build(),
+              // return Arrays.equals({this.a, this.b}, {$other.a, $other.b});
+              ReturnStatement.builder()
+                  .setExpression(
+                      RuntimeMethods.createArraysEqualsMethodCall(
+                          createRecordFieldAccessList(type),
+                          createRecordFieldAccessList(otherVariable.createReference())))
+                  .setSourcePosition(SourcePosition.NONE)
+                  .build());
+        },
+        TypeDescriptors.get().javaLangObject);
+  }
+
+  private static void implementObjectMethodOverride(
+      Type type, String methodName, Supplier<Expression> returnExpression) {
+    implementObjectMethodOverride(
+        type,
+        methodName,
+        unusedParameters ->
+            ImmutableList.of(
+                ReturnStatement.builder()
+                    .setExpression(returnExpression.get())
+                    .setSourcePosition(SourcePosition.NONE)
+                    .build()));
+  }
+
+  private static void implementObjectMethodOverride(
+      Type type,
+      String methodName,
+      Function<List<Variable>, List<Statement>> makeMethodStatements,
+      TypeDescriptor... parameterTypes) {
+    MethodDescriptor methodDescriptor =
+        TypeDescriptors.get().javaLangObject.getMethodDescriptor(methodName, parameterTypes);
+    if (type.containsMethod(m -> m.isOverride(methodDescriptor))) {
+      return;
+    }
+
+    // Do not mark the implicit object overrides as synthetic. Implicit members are never marked as
+    // synthetic because the usage sites have to agree, and they don't have the information of
+    // whether they are synthesized or not.
+    MethodDescriptor generatedMethodDescriptor =
+        methodDescriptor.toBuilder()
+            .setEnclosingTypeDescriptor(type.getTypeDescriptor())
+            .setDeclarationDescriptor(null)
+            .setNative(false)
+            .build();
+    List<Variable> parameters =
+        AstUtils.createParameterVariables(methodDescriptor.getParameterTypeDescriptors());
+    type.addMember(
+        Method.builder()
+            .setMethodDescriptor(generatedMethodDescriptor)
+            .setParameters(parameters)
+            .setSourcePosition(type.getSourcePosition())
+            .setStatements(makeMethodStatements.apply(parameters))
+            .build());
+  }
+
+  private static ImmutableList<Expression> createRecordFieldAccessList(Type recordType) {
+    return createRecordFieldAccessList(new ThisReference(recordType.getTypeDescriptor()));
+  }
+
+  private static ImmutableList<Expression> createRecordFieldAccessList(Expression qualifier) {
+    DeclaredTypeDescriptor recordTypeDescriptor =
+        (DeclaredTypeDescriptor) qualifier.getTypeDescriptor();
+    return recordTypeDescriptor.getRecordComponentFieldDescriptors().stream()
+        .map(field -> FieldAccess.builderFrom(field).setQualifier(qualifier.clone()).build())
+        .collect(toImmutableList());
+  }
+
+  private static boolean isCompactConstructor(Method canonicalConstructor) {
+    DeclaredTypeDescriptor enclosingTypeDescriptor =
+        canonicalConstructor.getDescriptor().getEnclosingTypeDescriptor();
+    boolean[] isCompactConstructor = {true};
+    // A canonical constructor is compact if it doesn't have any field assignments.
+    canonicalConstructor.accept(
+        new AbstractVisitor() {
+          @Override
+          public void exitBinaryExpression(BinaryExpression binaryExpression) {
+            if (binaryExpression.isSimpleOrCompoundAssignment()
+                && binaryExpression.getLeftOperand() instanceof FieldAccess fieldAccess
+                && fieldAccess.getTarget().isInstanceMember()
+                && fieldAccess.getTarget().isMemberOf(enclosingTypeDescriptor)) {
+              isCompactConstructor[0] = false;
+            }
+          }
+        });
+    return isCompactConstructor[0];
+  }
+}

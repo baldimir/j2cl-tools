@@ -13,55 +13,41 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package autovalue
 
 import javaemul.lang.*
-import autovalue.AutoValueWithFields
-import kotlin.Any
+import autovalue.___AutoValue_AutoValueWithFields
+import javaemul.lang.J2ktMonitor
 import kotlin.Boolean
 import kotlin.Int
-import kotlin.Long
-import kotlin.String
 import kotlin.Suppress
+import kotlin.Unit
+import kotlin.concurrent.Volatile
+import kotlin.synchronized
 
-class AutoValue_AutoValueWithFields: AutoValueWithFields {
- private val intField: Int
-
- internal constructor(intField: Int) {
-  this.intField = intField
- }
-
- override fun getIntField(): Int {
-  return this.intField
- }
-
- override fun toString(): String {
-  return "AutoValueWithFields{" + "intField=" + this.intField + "}"
- }
-
- override fun equals(o: Any?): Boolean {
-  if (o === this) {
-   return true
+class AutoValue_AutoValueWithFields: ___AutoValue_AutoValueWithFields {
+ private val monitor: J2ktMonitor? = J2ktMonitor()
+ 
+ @Volatile
+ private var getMemoizedNative: Int = 0
+ 
+ @Volatile
+ private var getMemoizedNative___Memoized: Boolean = false
+ 
+ internal constructor(intField: Int): super(intField)
+ 
+ override fun getMemoizedNative_pp_autovalue(): Int {
+  if (!this.getMemoizedNative___Memoized) {
+   synchronized<Unit>(this.monitor!!) {
+    if (!this.getMemoizedNative___Memoized) {
+     this.getMemoizedNative = super<___AutoValue_AutoValueWithFields>.getMemoizedNative_pp_autovalue()
+     this.getMemoizedNative___Memoized = true
+    }
+   }
   }
-  if (o is AutoValueWithFields) {
-   val that: AutoValueWithFields? = o as AutoValueWithFields?
-   return this.intField == that!!.getIntField()
-  }
-  return false
- }
-
- override fun hashCode(): Int {
-  var h___: Int = 1
-  h___ = h___ * 1000003
-  h___ = h___.xor(
-   this.intField,
-  )
-  return h___
- }
-
- companion object {
-  private const val serialVersionUID: Long = 42L
+  return this.getMemoizedNative
  }
 }

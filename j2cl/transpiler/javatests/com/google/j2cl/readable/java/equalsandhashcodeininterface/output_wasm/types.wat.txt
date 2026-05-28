@@ -1,0 +1,10 @@
+
+(type $equalsandhashcodeininterface.BothInInterface.vtable (sub (struct
+ ))
+)
+(type $equalsandhashcodeininterface.NeitherInInterface.vtable (sub (struct
+ ))
+)
+(type $equalsandhashcodeininterface.ViaJsMethodInInterface.$Overlay.vtable (sub (struct
+ ))
+)

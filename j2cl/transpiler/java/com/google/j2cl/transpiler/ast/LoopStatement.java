@@ -37,17 +37,13 @@ public abstract class LoopStatement extends Statement {
   @Override
   abstract Node acceptInternal(Processor processor);
 
-  abstract LoopStatement.Builder<?, ?> toBuilder();
+  public abstract Builder<?, ?> toBuilder();
 
   /** Common logic for a builder to create loop statements. */
   public abstract static class Builder<T extends Builder<T, L>, L extends LoopStatement> {
     private Expression conditionExpression;
     private Statement body;
     private SourcePosition sourcePosition;
-
-    public static Builder<?, ?> from(LoopStatement loopStatement) {
-      return loopStatement.toBuilder();
-    }
 
     @CanIgnoreReturnValue
     public final T setConditionExpression(Expression conditionExpression) {
@@ -63,10 +59,10 @@ public abstract class LoopStatement extends Statement {
 
     @CanIgnoreReturnValue
     public T setBodyStatements(Statement... statements) {
-      if (statements.length == 1 && statements[0] instanceof Block) {
-        setBody(statements[0]);
+      if (statements.length == 1 && statements[0] instanceof Block block) {
+        return setBody(block);
       }
-      return setBody(Block.newBuilder().setStatements(statements).build());
+      return setBody(Block.builder().setStatements(statements).build());
     }
 
     @CanIgnoreReturnValue

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package javaemul
 
@@ -21,7 +22,7 @@ import javaemul.lang.*
 import jsinterop.annotations.JsMethod
 import kotlin.Suppress
 
-open class InternalType internal constructor() {
+internal open class InternalType internal constructor() {
  @JsMethod(name = "foo")
  internal open fun foo_pp_javaemul() {}
 }

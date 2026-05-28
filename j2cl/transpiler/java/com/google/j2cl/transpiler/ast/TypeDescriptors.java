@@ -78,6 +78,9 @@ public class TypeDescriptors {
   @QualifiedBinaryName("java.lang.NullPointerException")
   public DeclaredTypeDescriptor javaLangNullPointerException;
 
+  @QualifiedBinaryName("java.lang.UnsupportedOperationException")
+  public DeclaredTypeDescriptor javaLangUnsupportedOperationException;
+
   @QualifiedBinaryName("java.lang.AssertionError")
   public DeclaredTypeDescriptor javaLangAssertionError;
 
@@ -88,9 +91,49 @@ public class TypeDescriptors {
 
   public DeclaredTypeDescriptor javaLangThrowable;
 
+  public DeclaredTypeDescriptor javaLangRecord;
+
   public DeclaredTypeDescriptor javaUtilArrays;
   public DeclaredTypeDescriptor javaUtilCollection;
+  public DeclaredTypeDescriptor javaUtilIterator;
+
+  @QualifiedBinaryName("java.util.ListIterator")
+  public DeclaredTypeDescriptor javaUtilListIterator;
+
   public DeclaredTypeDescriptor javaUtilMap;
+  public DeclaredTypeDescriptor javaUtilSet;
+
+  @QualifiedBinaryName("java.util.Map$Entry")
+  public DeclaredTypeDescriptor javaUtilMapEntry;
+
+  @Nullable
+  @QualifiedBinaryName("java.util.MutableCollection")
+  public DeclaredTypeDescriptor javaUtilMutableCollection;
+
+  @Nullable
+  @QualifiedBinaryName("java.util.MutableIterator")
+  public DeclaredTypeDescriptor javaUtilMutableIterator;
+
+  @Nullable
+  @QualifiedBinaryName("java.util.MutableList")
+  public DeclaredTypeDescriptor javaUtilMutableList;
+
+  @Nullable
+  @QualifiedBinaryName("java.util.MutableListIterator")
+  public DeclaredTypeDescriptor javaUtilMutableListIterator;
+
+  @Nullable
+  @QualifiedBinaryName("java.util.MutableMap")
+  public DeclaredTypeDescriptor javaUtilMutableMap;
+
+  @Nullable
+  @QualifiedBinaryName("java.util.MutableMap$MutableEntry")
+  public DeclaredTypeDescriptor javaUtilMutableMapMutableEntry;
+
+  @Nullable
+  @QualifiedBinaryName("java.util.MutableSet")
+  public DeclaredTypeDescriptor javaUtilMutableSet;
+
   public DeclaredTypeDescriptor javaUtilList;
   public DeclaredTypeDescriptor javaUtilObjects;
   public DeclaredTypeDescriptor javaUtilOptional;
@@ -148,6 +191,10 @@ public class TypeDescriptors {
   @Nullable public DeclaredTypeDescriptor javaemulInternalAsserts;
 
   @Nullable
+  @QualifiedBinaryName("javaemul.internal.J2clSealedTypeMarker")
+  public DeclaredTypeDescriptor javaemulInternalSealedTypeMarker;
+
+  @Nullable
   @QualifiedBinaryName("javaemul.internal.ValueType")
   public DeclaredTypeDescriptor javaemulInternalValueType;
 
@@ -174,6 +221,14 @@ public class TypeDescriptors {
   @QualifiedBinaryName("javaemul.internal.Ref")
   public DeclaredTypeDescriptor javaemulInternalRef;
 
+  @Nullable
+  @QualifiedBinaryName("javaemul.internal.JsUtils")
+  public DeclaredTypeDescriptor javaemulInternalJsUtils;
+
+  @Nullable
+  @QualifiedBinaryName("javaemul.internal.WasmExtern")
+  public DeclaredTypeDescriptor javaemulInternalWasmExtern;
+
   public ArrayTypeDescriptor javaLangObjectArray;
 
   // Common browser native types.
@@ -188,6 +243,10 @@ public class TypeDescriptors {
   @Nullable
   @QualifiedBinaryName("kotlin.coroutines.Continuation")
   public DeclaredTypeDescriptor kotlinCoroutinesContinuation;
+
+  @Nullable
+  @QualifiedBinaryName("kotlin.Unit")
+  public DeclaredTypeDescriptor kotlinUnit;
 
   @Nullable
   @QualifiedBinaryName("kotlin.jvm.internal.NothingStub")
@@ -242,6 +301,10 @@ public class TypeDescriptors {
     return typeDescriptors.get() != null;
   }
 
+  public static void reset() {
+    typeDescriptors.remove();
+  }
+
   public static TypeVariable getUnknownType() {
     return TypeVariable.createWildcard();
   }
@@ -265,9 +328,10 @@ public class TypeDescriptors {
     return typeDescriptor.isPrimitive() && !isPrimitiveVoid(typeDescriptor);
   }
 
-  public static boolean isBoxedBooleanOrDouble(TypeDescriptor typeDescriptor) {
+  public static boolean isBoxedBooleanOrDoubleOrLong(TypeDescriptor typeDescriptor) {
     return TypeDescriptors.isJavaLangBoolean(typeDescriptor)
-        || TypeDescriptors.isJavaLangDouble(typeDescriptor);
+        || TypeDescriptors.isJavaLangDouble(typeDescriptor)
+        || TypeDescriptors.isJavaLangLong(typeDescriptor);
   }
 
   public static boolean isPrimitiveBoolean(TypeDescriptor typeDescriptor) {
@@ -310,8 +374,10 @@ public class TypeDescriptors {
     return typeDescriptor == PrimitiveTypes.VOID;
   }
 
-  public static boolean isPrimitiveBooleanOrDouble(TypeDescriptor typeDescriptor) {
-    return isPrimitiveBoolean(typeDescriptor) || isPrimitiveDouble(typeDescriptor);
+  public static boolean isPrimitiveBooleanOrDoubleOrLong(TypeDescriptor typeDescriptor) {
+    return isPrimitiveBoolean(typeDescriptor)
+        || isPrimitiveDouble(typeDescriptor)
+        || isPrimitiveLong(typeDescriptor);
   }
 
   public static boolean isJavaLangObject(TypeDescriptor typeDescriptor) {
@@ -386,6 +452,10 @@ public class TypeDescriptors {
     return typeDescriptor.isSameBaseType(get().javaLangEnum);
   }
 
+  public static boolean isJavaLangRecord(TypeDescriptor typeDescriptor) {
+    return typeDescriptor.isSameBaseType(get().javaLangRecord);
+  }
+
   public static boolean isJavaLangAnnotation(TypeDescriptor typeDescriptor) {
     return typeDescriptor.isSameBaseType(get().javaLangAnnotation);
   }
@@ -396,6 +466,10 @@ public class TypeDescriptors {
 
   public static boolean isJavaLangThrowable(TypeDescriptor typeDescriptor) {
     return typeDescriptor.isSameBaseType(get().javaLangThrowable);
+  }
+
+  public static boolean isKotlinUnit(TypeDescriptor typeDescriptor) {
+    return typeDescriptor.isSameBaseType(get().kotlinUnit);
   }
 
   public static boolean isKotlinNothing(TypeDescriptor typeDescriptor) {
@@ -421,7 +495,7 @@ public class TypeDescriptors {
   }
 
   public static boolean isBoxedTypeAsJsPrimitives(TypeDescriptor typeDescriptor) {
-    return isBoxedBooleanOrDouble(typeDescriptor)
+    return isBoxedBooleanOrDoubleOrLong(typeDescriptor)
         || isJavaLangString(typeDescriptor)
         || isJavaLangVoid(typeDescriptor);
   }
@@ -522,7 +596,9 @@ public class TypeDescriptors {
       PrimitiveTypeDescriptor primitiveTypeDescriptor) {
     // Prepend "$" so that internal aliases start with "$".
     return createSyntheticTypeDescriptor(
-        Kind.CLASS, "vmbootstrap.primitives", "$" + primitiveTypeDescriptor.getSimpleSourceName());
+        Kind.CLASS,
+        "javaemul.internal.primitives",
+        "$" + primitiveTypeDescriptor.getSimpleSourceName());
   }
 
   public static DeclaredTypeDescriptor createGlobalNativeTypeDescriptor(
@@ -544,7 +620,7 @@ public class TypeDescriptors {
   private static DeclaredTypeDescriptor createSyntheticTypeDescriptor(
       Kind kind, String jsNamespace, String className, TypeDescriptor... typeArgumentDescriptors) {
 
-    return TypeDeclaration.newBuilder()
+    return TypeDeclaration.builder()
         .setClassComponents(className)
         // Mark bootstrap classes as non native so that the goog.require doesn't reference
         // overlay.
@@ -584,7 +660,7 @@ public class TypeDescriptors {
       // types are handwritten non native types.
       jsNamespace = "$synthetic." + jsNamespace;
     }
-    return PackageDeclaration.newBuilder().setName(jsNamespace).build();
+    return PackageDeclaration.builder().setName(jsNamespace).build();
   }
 
   /** Returns the declaration version of {@code typeDescriptors}. */
@@ -636,7 +712,7 @@ public class TypeDescriptors {
       }
       set(typeDescriptors);
       typeDescriptors.javaLangObjectArray =
-          ArrayTypeDescriptor.newBuilder()
+          ArrayTypeDescriptor.builder()
               .setComponentTypeDescriptor(typeDescriptors.javaLangObject)
               .build();
     }

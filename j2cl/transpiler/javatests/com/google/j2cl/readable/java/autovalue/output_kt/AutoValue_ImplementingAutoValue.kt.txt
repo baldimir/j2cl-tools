@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package autovalue
 
@@ -28,22 +29,22 @@ import kotlin.Suppress
 
 class AutoValue_ImplementingAutoValue: ImplementingAutoValue {
  private val foo: String?
-
+ 
  internal constructor(foo: String?) {
   if (foo == null) {
    throw NullPointerException("Null foo")
   }
   this.foo = foo
  }
-
+ 
  override fun getFoo(): String? {
   return this.foo
  }
-
+ 
  override fun toString(): String {
-  return "ImplementingAutoValue{" + "foo=" + this.foo + "}"
+  return "ImplementingAutoValue{foo=" + this.foo + "}"
  }
-
+ 
  override fun equals(o: Any?): Boolean {
   if (o === this) {
    return true
@@ -56,7 +57,7 @@ class AutoValue_ImplementingAutoValue: ImplementingAutoValue {
   }
   return false
  }
-
+ 
  override fun hashCode(): Int {
   var h___: Int = 1
   h___ = h___ * 1000003

@@ -1,0 +1,51 @@
+goog.module('recordclass.RecordClass.RecordWithOverriddenAccessor$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class RecordWithOverriddenAccessor extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {?string} @nodts*/
+  this.f_value__recordclass_RecordClass_RecordWithOverriddenAccessor_;
+ }
+ /** @nodts @return {?string} */
+ m_value__java_lang_String() {
+  return 'foo';
+ }
+ /** @nodts @return {!RecordWithOverriddenAccessor} */
+ static $create__java_lang_String(/** ?string */ value) {
+  RecordWithOverriddenAccessor.$clinit();
+  let $instance = new RecordWithOverriddenAccessor();
+  $instance.$ctor__recordclass_RecordClass_RecordWithOverriddenAccessor__java_lang_String__void(value);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_RecordWithOverriddenAccessor__java_lang_String__void(/** ?string */ value) {
+  this.$ctor__java_lang_Record__void();
+  this.f_value__recordclass_RecordClass_RecordWithOverriddenAccessor_ = value;
+  $J2CL_PRESERVE$(this.f_value__recordclass_RecordClass_RecordWithOverriddenAccessor_);
+ }
+ /** @nodts */
+ static $clinit() {
+  RecordWithOverriddenAccessor.$clinit = () =>{};
+  RecordWithOverriddenAccessor.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof RecordWithOverriddenAccessor;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(RecordWithOverriddenAccessor, 'recordclass.RecordClass$RecordWithOverriddenAccessor');
+
+exports = RecordWithOverriddenAccessor;
+
+//# sourceMappingURL=RecordClass$RecordWithOverriddenAccessor.js.map

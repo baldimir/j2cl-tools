@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package abstractmethodoverridedefault
 
@@ -23,33 +24,34 @@ import kotlin.Suppress
 open class AbstractMethodOverrideDefault {
  fun interface I {
   fun foo()
-
+  
   fun bar() {}
  }
-
+ 
  fun interface J {
   fun foo() {}
-
+  
   fun bar()
  }
-
+ 
  abstract class A internal constructor(): I {
   abstract override fun foo()
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  abstract class B internal constructor(): A(), J {
   override fun bar() {
    if (false) {
     this.bar()
    }
   }
-
+  
   abstract override fun foo()
  }
-
+ 
  open class C internal constructor(): A() {
   override fun foo() {}
-
+  
   override fun bar() {
    super<A>.bar()
   }

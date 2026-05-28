@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package autovalue
 
@@ -28,11 +29,15 @@ import kotlin.jvm.JvmStatic
 @WasAutoValue
 abstract class AutoValueWithExtensions internal constructor() {
  abstract fun getIntField(): Int
-
+ 
  abstract fun getStringField(): String?
-
+ 
+ internal open fun getMemoizedNative_pp_autovalue(): Int {
+  return this.getIntField() * 2
+ }
+ 
  internal abstract fun toPrettyString_pp_autovalue(): String?
-
+ 
  companion object {
   @JvmStatic
   internal fun create_pp_autovalue(): AutoValueWithExtensions? {

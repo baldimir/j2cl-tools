@@ -15,7 +15,7 @@
  */
 package com.google.j2cl.transpiler.backend.kotlin.objc
 
-import com.google.j2cl.transpiler.backend.kotlin.objc.Renderer.Companion.rendererOf
+import com.google.j2cl.transpiler.backend.kotlin.objc.Dependent.Companion.dependent
 import com.google.j2cl.transpiler.backend.kotlin.source.Source.Companion.source
 import com.google.j2cl.transpiler.backend.kotlin.source.testing.assertBuilds
 import org.junit.Test
@@ -30,23 +30,8 @@ class SourceTest {
   }
 
   @Test
-  fun sourceSemicolonEnded() {
-    semicolonEnded(source("foo")).assertBuilds("foo;")
-  }
-
-  @Test
-  fun sourceAssignment() {
-    assignment(source("foo"), source("bar")).assertBuilds("foo = bar")
-  }
-
-  @Test
-  fun sourceParameter() {
-    parameter(source("name"), source("value")).assertBuilds("name:value")
-  }
-
-  @Test
-  fun sourcePointer() {
-    pointer(source("foo")).assertBuilds("foo*")
+  fun sourcePlusSemicolon() {
+    source("foo").plusSemicolon().assertBuilds("foo;")
   }
 
   @Test
@@ -57,12 +42,6 @@ class SourceTest {
   @Test
   fun sourceMacroDefine() {
     macroDefine(source("foo")).assertBuilds("#define foo")
-  }
-
-  @Test
-  fun sourceCompatibilityAlias() {
-    compatibilityAlias(source("alias"), source("target"))
-      .assertBuilds("@compatibility_alias alias target")
   }
 
   @Test
@@ -124,16 +103,16 @@ class SourceTest {
   }
 
   @Test
-  fun rendererSourceWithDependencies() {
-    rendererOf(source("void main() {}"))
+  fun sourceWithDependencies() {
+    dependent(source("void main() {}"))
       .with(Dependency.of(Import.system("std.h")))
       .sourceWithDependencies
       .assertBuilds(
         """
-      #import <std.h>
+        #import <std.h>
 
-      void main() {}
-      """
+        void main() {}
+        """
           .trimIndent()
       )
   }

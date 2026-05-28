@@ -15,18 +15,16 @@
  */
 package com.google.j2cl.jre.java.util;
 
+import static org.junit.Assert.assertThrows;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashSet;
 
-/**
- * Tests BitSet class.
- */
+/** Tests BitSet class. */
 public class BitSetTest extends EmulTestBase {
 
-  /**
-   * This class is used to describe numerical patterns.
-   */
+  /** This class is used to describe numerical patterns. */
   private interface Pattern {
     boolean contains(int i);
   }
@@ -89,16 +87,15 @@ public class BitSetTest extends EmulTestBase {
   }
 
   // Checks that the values in the given range are the only true values
-  private static void checkRange(BitSet set, int fromIndex1, int toIndex1,
-      int fromIndex2, int toIndex2) {
+  private static void checkRange(
+      BitSet set, int fromIndex1, int toIndex1, int fromIndex2, int toIndex2) {
     for (int i = fromIndex1; i < toIndex1; i++) {
       assertTrue(set, i);
     }
     for (int i = fromIndex2; i < toIndex2; i++) {
       assertTrue(set, i);
     }
-    assertEquals(toIndex1 - fromIndex1 + toIndex2 - fromIndex2,
-        set.cardinality());
+    assertEquals(toIndex1 - fromIndex1 + toIndex2 - fromIndex2, set.cardinality());
   }
 
   private static void checkPattern(BitSet set, Pattern pattern) {
@@ -119,23 +116,19 @@ public class BitSetTest extends EmulTestBase {
     assertEquals(0, set.cardinality());
 
     // test exceptions
-    try {
-      set = new BitSet(-1);
-      fail("exception expected");
-    } catch (NegativeArraySizeException expected) {
-    }
-
+    assertThrows(NegativeArraySizeException.class, () -> new BitSet(-1));
     set = new BitSet(0);
     set = new BitSet(BIG_NUMBER);
   }
 
   public void testAnd() {
-    Pattern multiplesOf6 = new Pattern() {
-      @Override
-      public boolean contains(int i) {
-        return i % 6 == 0;
-      }
-    };
+    Pattern multiplesOf6 =
+        new Pattern() {
+          @Override
+          public boolean contains(int i) {
+            return i % 6 == 0;
+          }
+        };
 
     // setA will contain all multiples of 2
     BitSet setA = createSetOfMultiples(2);
@@ -228,12 +221,13 @@ public class BitSetTest extends EmulTestBase {
   }
 
   public void testAndNot() {
-    Pattern multiplesOf2Not3 = new Pattern() {
-      @Override
-      public boolean contains(int i) {
-        return i % 2 == 0 && i % 3 != 0;
-      }
-    };
+    Pattern multiplesOf2Not3 =
+        new Pattern() {
+          @Override
+          public boolean contains(int i) {
+            return i % 2 == 0 && i % 3 != 0;
+          }
+        };
 
     // setA will contain all multiples of 2
     BitSet setA = createSetOfMultiples(2);
@@ -374,18 +368,9 @@ public class BitSetTest extends EmulTestBase {
     assertTrue(set.isEmpty());
 
     // test exceptions
-    try {
-      set.clear(-1, 2);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      set.clear(3, 1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.clear(-1, 2));
+    assertThrows(IndexOutOfBoundsException.class, () -> s.clear(3, 1));
     set.clear(2, 2);
   }
 
@@ -491,33 +476,14 @@ public class BitSetTest extends EmulTestBase {
     checkRange(set, 1, 5);
 
     // test clear(int, int) exceptions
-    try {
-      set.clear(-1, 2);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      set.clear(3, 1);
-      fail("expected exception");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.clear(-1, 2));
+    assertThrows(IndexOutOfBoundsException.class, () -> s.clear(3, 1));
     set.clear(2, 2);
 
     // test set(int, int) exceptions
-    try {
-      set.set(-1, 2);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      set.set(3, 1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    assertThrows(IndexOutOfBoundsException.class, () -> s.set(-1, 2));
+    assertThrows(IndexOutOfBoundsException.class, () -> s.set(3, 1));
     set.set(2, 2);
   }
 
@@ -623,12 +589,8 @@ public class BitSetTest extends EmulTestBase {
     assertTrue(set.isEmpty());
 
     // test exceptions
-    try {
-      set.flip(-1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.flip(-1));
     set.flip(BIG_NUMBER);
     set.flip(BIG_NUMBER);
   }
@@ -695,18 +657,9 @@ public class BitSetTest extends EmulTestBase {
     checkRange(set, 1, 5, 10, 15);
 
     // test exceptions
-    try {
-      set.flip(-1, 2);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      set.flip(3, 1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.flip(-1, 2));
+    assertThrows(IndexOutOfBoundsException.class, () -> s.flip(3, 1));
     set.flip(2, 2);
   }
 
@@ -735,21 +688,12 @@ public class BitSetTest extends EmulTestBase {
     checkValues(set, 0, 4, 7, 10, 31, 32, 33, 69);
 
     // test get() exceptions
-    try {
-      set.get(-1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.get(-1));
     set.get(BIG_NUMBER);
 
     // test set() exceptions
-    try {
-      set.set(-1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    assertThrows(IndexOutOfBoundsException.class, () -> s.set(-1));
     set.set(BIG_NUMBER);
   }
 
@@ -790,17 +734,9 @@ public class BitSetTest extends EmulTestBase {
     }
 
     // test exceptions
-    try {
-      set.get(-1, 2);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      set.get(3, 1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.get(-1, 2));
+    assertThrows(IndexOutOfBoundsException.class, () -> s.get(3, 1));
 
     set.get(2, 2);
   }
@@ -983,12 +919,9 @@ public class BitSetTest extends EmulTestBase {
       assertEquals(i + 1, set.nextClearBit(0));
     }
     assertEquals(BIG_NUMBER, set.nextClearBit(BIG_NUMBER));
+    var s = set;
 
-    try {
-      set.nextClearBit(-1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> s.nextClearBit(-1));
   }
 
   public void testNextSetBit() {
@@ -1025,11 +958,8 @@ public class BitSetTest extends EmulTestBase {
     set.set(TEST_SIZE / 2);
     assertEquals(TEST_SIZE / 2, set.nextSetBit(0));
 
-    try {
-      set.nextSetBit(-1);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.nextSetBit(-1));
   }
 
   public void testPreviousClearBit() {
@@ -1051,11 +981,7 @@ public class BitSetTest extends EmulTestBase {
       assertEquals(-1, set.previousClearBit(i));
     }
 
-    try {
-      set.previousClearBit(-100);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> set.previousClearBit(-100));
   }
 
   public void testPreviousSetBit() {
@@ -1078,20 +1004,17 @@ public class BitSetTest extends EmulTestBase {
       assertEquals(i, set.previousSetBit(i));
     }
 
-    try {
-      set.previousSetBit(-100);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
+    assertThrows(IndexOutOfBoundsException.class, () -> set.previousSetBit(-100));
   }
 
   public void testOr() {
-    Pattern multiplesOf2And5 = new Pattern() {
-      @Override
-      public boolean contains(int i) {
-        return i % 2 == 0 || i % 5 == 0;
-      }
-    };
+    Pattern multiplesOf2And5 =
+        new Pattern() {
+          @Override
+          public boolean contains(int i) {
+            return i % 2 == 0 || i % 5 == 0;
+          }
+        };
 
     // setA will contain all multiples of 2
     BitSet setA = createSetOfMultiples(2);
@@ -1223,32 +1146,12 @@ public class BitSetTest extends EmulTestBase {
     checkRange(set, 1, 5, 10, 15);
 
     // test exceptions
-    try {
-      set.set(-1, 2, true);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      set.set(3, 1, true);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    var s = set;
+    assertThrows(IndexOutOfBoundsException.class, () -> s.set(-1, 2, true));
+    assertThrows(IndexOutOfBoundsException.class, () -> s.set(3, 1, true));
     set.set(2, 2, true);
-
-    try {
-      set.set(-1, 2, false);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
-    try {
-      set.set(3, 1, false);
-      fail("exception expected");
-    } catch (IndexOutOfBoundsException expected) {
-    }
-
+    assertThrows(IndexOutOfBoundsException.class, () -> s.set(-1, 2, false));
+    assertThrows(IndexOutOfBoundsException.class, () -> s.set(3, 1, false));
     set.set(2, 2, false);
   }
 
@@ -1279,12 +1182,13 @@ public class BitSetTest extends EmulTestBase {
   }
 
   public void testXor() {
-    Pattern exclusiveMultiples = new Pattern() {
-      @Override
-      public boolean contains(int i) {
-        return (i % 2 == 0) ^ (i % 3 == 0);
-      }
-    };
+    Pattern exclusiveMultiples =
+        new Pattern() {
+          @Override
+          public boolean contains(int i) {
+            return (i % 2 == 0) ^ (i % 3 == 0);
+          }
+        };
 
     // setA will contain all multiples of 2
     BitSet setA = createSetOfMultiples(2);
@@ -1310,12 +1214,14 @@ public class BitSetTest extends EmulTestBase {
     setA.xor(trueSet);
 
     // verify by checking for !(exclusive multiples of 2 and 3)
-    checkPattern(setA, new Pattern() {
-      @Override
-      public boolean contains(int i) {
-        return !((i % 2 == 0) ^ (i % 3 == 0));
-      }
-    });
+    checkPattern(
+        setA,
+        new Pattern() {
+          @Override
+          public boolean contains(int i) {
+            return !((i % 2 == 0) ^ (i % 3 == 0));
+          }
+        });
     // there were "TEST_SIZE" extra trues, so verify those came out as true
     for (int i = TEST_SIZE; i < TEST_SIZE * 2; i++) {
       assertTrue(setA.get(i));
@@ -1342,13 +1248,16 @@ public class BitSetTest extends EmulTestBase {
     BitSet set = new BitSet();
     assertEquals(0, set.toByteArray().length);
 
-    int[] bits = {7, 8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 32, 33, 34, 35, 36, 37, 38,
-        47, 49, 51, 52, 53, 54, 55};
+    int[] bits = {
+      7, 8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 32, 33, 34, 35, 36, 37, 38, 47, 49, 51,
+      52, 53, 54, 55
+    };
     for (int bit : bits) {
       set.set(bit);
     }
-    byte[] expected = {(byte) -128, (byte) -1, (byte) 0, (byte) 31,
-        (byte) 127, (byte) 128, (byte) 250};
+    byte[] expected = {
+      (byte) -128, (byte) -1, (byte) 0, (byte) 31, (byte) 127, (byte) 128, (byte) 250
+    };
     assertTrue(Arrays.equals(expected, set.toByteArray()));
 
     set.clear();
@@ -1359,28 +1268,41 @@ public class BitSetTest extends EmulTestBase {
     BitSet set = new BitSet();
     assertEquals(0, set.toLongArray().length);
 
-    int[] bits = {63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82,
-        83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103,
-        104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121,
-        122, 123, 124, 125, 126, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140,
-        141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158,
-        159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
-        177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 287, 288, 289,
-        290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307,
-        308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325,
-        326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343,
-        344, 345, 346, 347, 348, 349, 350, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394,
-        395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412,
-        413, 414, 450, 453, 454, 514, 515, 516, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528,
-        529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546,
-        547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564,
-        565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 584, 640, 641, 642, 643, 644, 645,
-        646, 711};
+    int[] bits = {
+      63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
+      86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106,
+      107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125,
+      126, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145,
+      146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164,
+      165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183,
+      184, 185, 186, 187, 188, 189, 190, 191, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297,
+      298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316,
+      317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335,
+      336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 384, 385, 386, 387,
+      388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406,
+      407, 408, 409, 410, 411, 412, 413, 414, 450, 453, 454, 514, 515, 516, 519, 520, 521, 522, 523,
+      524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542,
+      543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561,
+      562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 584, 640, 641, 642, 643,
+      644, 645, 646, 711
+    };
     for (int bit : bits) {
       set.set(bit);
     }
-    long[] expected = {Long.MIN_VALUE, Long.MAX_VALUE, -1, 0, Integer.MIN_VALUE,
-        Integer.MAX_VALUE, 0x7fffffff, 100, -100, 256, 127, 128};
+    long[] expected = {
+      Long.MIN_VALUE,
+      Long.MAX_VALUE,
+      -1,
+      0,
+      Integer.MIN_VALUE,
+      Integer.MAX_VALUE,
+      0x7fffffff,
+      100,
+      -100,
+      256,
+      127,
+      128
+    };
     assertTrue(Arrays.equals(expected, set.toLongArray()));
 
     set.clear();
@@ -1391,8 +1313,11 @@ public class BitSetTest extends EmulTestBase {
     BitSet set = BitSet.valueOf(new byte[0]);
     assertTrue(set.isEmpty());
 
-    set = BitSet.valueOf(new byte[]{(byte) -128, (byte) -1, (byte) 0, (byte) 31,
-        (byte) 127, (byte) 128, (byte) 250});
+    set =
+        BitSet.valueOf(
+            new byte[] {
+              (byte) -128, (byte) -1, (byte) 0, (byte) 31, (byte) 127, (byte) 128, (byte) 250
+            });
     assertEquals(
         "{7, 8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 32, 33, 34, 35, 36, 37, 38, "
             + "47, 49, 51, 52, 53, 54, 55}",
@@ -1403,8 +1328,22 @@ public class BitSetTest extends EmulTestBase {
     BitSet set = BitSet.valueOf(new long[0]);
     assertTrue(set.isEmpty());
 
-    set = BitSet.valueOf(new long[]{Long.MIN_VALUE, Long.MAX_VALUE, -1, 0, Integer.MIN_VALUE,
-        Integer.MAX_VALUE, 0x7fffffff, 100, -100, 256, 127, 128});
+    set =
+        BitSet.valueOf(
+            new long[] {
+              Long.MIN_VALUE,
+              Long.MAX_VALUE,
+              -1,
+              0,
+              Integer.MIN_VALUE,
+              Integer.MAX_VALUE,
+              0x7fffffff,
+              100,
+              -100,
+              256,
+              127,
+              128
+            });
     assertEquals(
         "{63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84,"
             + " 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103,"

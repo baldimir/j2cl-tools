@@ -1,0 +1,51 @@
+goog.module('recordclass.RecordClass.ArrayRecord$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class ArrayRecord extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {Array<number>} @nodts*/
+  this.f_value__recordclass_RecordClass_ArrayRecord_;
+ }
+ /** @nodts @return {!ArrayRecord} */
+ static $create__arrayOf_int(/** Array<number> */ value) {
+  ArrayRecord.$clinit();
+  let $instance = new ArrayRecord();
+  $instance.$ctor__recordclass_RecordClass_ArrayRecord__arrayOf_int__void(value);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_ArrayRecord__arrayOf_int__void(/** Array<number> */ value) {
+  this.$ctor__java_lang_Record__void();
+  this.f_value__recordclass_RecordClass_ArrayRecord_ = value;
+  $J2CL_PRESERVE$(this.f_value__recordclass_RecordClass_ArrayRecord_);
+ }
+ /** @nodts @return {Array<number>} */
+ m_value__arrayOf_int() {
+  return this.f_value__recordclass_RecordClass_ArrayRecord_;
+ }
+ /** @nodts */
+ static $clinit() {
+  ArrayRecord.$clinit = () =>{};
+  ArrayRecord.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof ArrayRecord;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(ArrayRecord, 'recordclass.RecordClass$ArrayRecord');
+
+exports = ArrayRecord;
+
+//# sourceMappingURL=RecordClass$ArrayRecord.js.map

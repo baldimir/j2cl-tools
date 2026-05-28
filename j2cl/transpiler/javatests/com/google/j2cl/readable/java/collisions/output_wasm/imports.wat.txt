@@ -1,0 +1,15 @@
+
+
+;;; Blah()
+(func $m_<init>__@collisions.Blah (import "imports" "String.constructor") 
+ (result (ref null extern))
+)
+
+;;; void Blah.m()
+(func $m_m__void@collisions.Blah (import "imports" "Math.random") 
+)
+
+;;; double Blah.getN()
+(func $m_getN__double@collisions.Blah (import "imports" "get String.prototype.length") 
+ (result f64)
+)

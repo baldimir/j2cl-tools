@@ -1,0 +1,15 @@
+/** @externs */
+
+/**
+ * @interface
+ */
+var jsmethod_JsMethodExample_InterfaceExposingJsMethods = function() {};
+
+/**
+ */
+jsmethod_JsMethodExample_InterfaceExposingJsMethods.prototype.m = function() {};
+
+/**
+ * @abstract
+ */
+jsmethod_JsMethodExample_InterfaceExposingJsMethods.prototype.n = function() {};

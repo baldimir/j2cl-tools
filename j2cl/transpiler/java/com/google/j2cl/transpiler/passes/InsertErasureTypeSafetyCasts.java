@@ -83,18 +83,18 @@ public class InsertErasureTypeSafetyCasts extends NormalizationPass {
 
       @Override
       public Expression rewriteCastContext(CastExpression castExpression) {
-        // Explicit casts are treated specifically because ContextRewriter does't treat them as
-        // a regular type conversion context however they may hide the ereasure. e.g.
+        // Explicit casts are treated specifically because ContextRewriter doesn't treat them as
+        // a regular type conversion context however they may hide the erasure. e.g.
         //
         //   List<Integer> integerList = ....;
         //   int i = (int) integerList.get(0);
         //
         // In this example an erasure cast to Integer needs to be inserted before the unboxing
-        // implied by the explict cast to int.
+        // implied by the explicit cast to int.
         Expression expression = castExpression.getExpression();
         if (castExpression.getCastTypeDescriptor().isPrimitive()
             && !expression.getTypeDescriptor().isPrimitive()) {
-          return CastExpression.Builder.from(castExpression)
+          return castExpression.toBuilder()
               .setExpression(
                   maybeInsertErasureTypeSafetyCast(expression.getTypeDescriptor(), expression))
               .build();
@@ -128,7 +128,7 @@ public class InsertErasureTypeSafetyCasts extends NormalizationPass {
       }
 
       @Override
-      public Expression rewriteSwitchSubjectContext(Expression expression) {
+      public Expression rewriteSwitchSubjectContext(Expression expression, boolean allowsNulls) {
         return maybeInsertErasureTypeSafetyCast(expression);
       }
     };
@@ -168,11 +168,11 @@ public class InsertErasureTypeSafetyCasts extends NormalizationPass {
     }
     if (!fromTypeDescriptor.toRawTypeDescriptor().isAssignableTo(toTypeDescriptor)) {
       return isUncheckedCast(expression)
-          ? JsDocCastExpression.newBuilder()
+          ? JsDocCastExpression.builder()
               .setExpression(expression)
               .setCastTypeDescriptor(toTypeDescriptor)
               .build()
-          : CastExpression.newBuilder()
+          : CastExpression.builder()
               .setExpression(expression)
               .setCastTypeDescriptor(toTypeDescriptor)
               .build();

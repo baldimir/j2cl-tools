@@ -15,14 +15,11 @@
  */
 package com.google.j2cl.transpiler.passes;
 
-import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
-import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.Block;
 import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Expression;
 import com.google.j2cl.transpiler.ast.Field;
-import com.google.j2cl.transpiler.ast.FieldDescriptor;
 import com.google.j2cl.transpiler.ast.InitializerBlock;
 import com.google.j2cl.transpiler.ast.Member;
 import com.google.j2cl.transpiler.ast.NullLiteral;
@@ -46,7 +43,7 @@ public class NormalizeFieldInitialization extends NormalizationPass {
           @Override
           public Member rewriteField(Field field) {
             fieldDeclarations.add(
-                Field.Builder.from(field)
+                field.toBuilder()
                     .setInitializer(getDeclarationValue(field))
                     .setSourcePosition(field.getSourcePosition())
                     .build());
@@ -56,11 +53,11 @@ public class NormalizeFieldInitialization extends NormalizationPass {
               return null;
             }
 
-            // Replace the field declaration with an initializer block inplace to preserve
+            // Replace the field declaration with an initializer block in place to preserve
             // ordering.
             DeclaredTypeDescriptor enclosingTypeDescriptor =
                 field.getDescriptor().getEnclosingTypeDescriptor();
-            return InitializerBlock.newBuilder()
+            return InitializerBlock.builder()
                 .setDescriptor(
                     field.isStatic()
                         ? enclosingTypeDescriptor.getClinitMethodDescriptor()
@@ -88,15 +85,9 @@ public class NormalizeFieldInitialization extends NormalizationPass {
   }
 
   private static Block createInitializerBlockFromFieldInitializer(Field field) {
-    FieldDescriptor fieldDescriptor = field.getDescriptor();
-    SourcePosition sourcePosition = field.getSourcePosition();
-    return Block.newBuilder()
-        .setSourcePosition(sourcePosition)
-        .setStatements(
-            BinaryExpression.Builder.asAssignmentTo(fieldDescriptor)
-                .setRightOperand(field.getInitializer())
-                .build()
-                .makeStatement(sourcePosition))
-        .build();
+    return field
+        .infixAssign(field.getInitializer())
+        .makeStatement(field.getSourcePosition())
+        .ensureBlock();
   }
 }

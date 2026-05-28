@@ -13,18 +13,30 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
 import javaemul.lang.*
 import java.lang.IndexOutOfBoundsException
+import java.lang.Runnable
 import java.lang.RuntimeException
 import java.util.AbstractCollection
 import java.util.AbstractList
 import java.util.AbstractMap
+import java.util.AbstractSet
+import java.util.ArrayList
+import java.util.HashMap
 import java.util.Spliterator
+import java.util.function.BiFunction
+import java.util.function.Consumer
+import java.util.function.Function
+import java.util.function.Predicate
+import java.util.function.Supplier
+import java.util.function.UnaryOperator
 import javaemul.lang.MutableCollectionJvm
+import javaemul.lang.MutableIterableJvm
 import javaemul.lang.MutableListJvm
 import javaemul.lang.MutableMapJvm
 import javaemul.lang.uninitializedArrayOf
@@ -37,8 +49,10 @@ import kotlin.Suppress
 import kotlin.collections.Collection
 import kotlin.collections.Map
 import kotlin.collections.MutableCollection
+import kotlin.collections.MutableIterable
 import kotlin.collections.MutableIterator
 import kotlin.collections.MutableList
+import kotlin.collections.MutableListIterator
 import kotlin.collections.MutableMap
 import kotlin.collections.MutableMap.MutableEntry
 import kotlin.collections.MutableSet
@@ -51,75 +65,75 @@ open class Collections {
    collection.java_contains(
     Collections.generic<T>(),
    )
-   collection.java_remove(
+   collection.asMutableCollection().java_remove(
     Collections.generic<T>(),
    )
    collection.java_containsAll(
     Collections.genericCollection<T>(),
    )
-   collection.java_addAll(
+   collection.asMutableCollection().java_addAll(
     Collections.genericCollection<T>(),
    )
-   collection.java_removeAll(
+   collection.asMutableCollection().java_removeAll(
     Collections.genericCollection<T>(),
    )
-   collection.java_retainAll(
+   collection.asMutableCollection().java_retainAll(
     Collections.genericCollection<T>(),
    )
    collection.java_contains(
     Collections.mismatching() as Any?,
    )
-   collection.java_remove(
+   collection.asMutableCollection().java_remove(
     Collections.mismatching() as Any?,
    )
    collection.java_containsAll(
     Collections.mismatchingCollection(),
    )
-   collection.java_removeAll(
+   collection.asMutableCollection().java_removeAll(
     Collections.mismatchingCollection(),
    )
-   collection.java_retainAll(
+   collection.asMutableCollection().java_retainAll(
     Collections.mismatchingCollection(),
    )
   }
-
+  
   @JvmStatic
   fun testCollection_parameterized(collection: MutableCollection<String>) {
    collection.java_contains(
     Collections.string(),
    )
-   collection.java_remove(
+   collection.asMutableCollection().java_remove(
     Collections.string(),
    )
    collection.java_containsAll(
     Collections.collectionOfString(),
    )
-   collection.java_addAll(
+   collection.asMutableCollection().java_addAll(
     Collections.collectionOfString(),
    )
-   collection.java_removeAll(
+   collection.asMutableCollection().java_removeAll(
     Collections.collectionOfString(),
    )
-   collection.java_retainAll(
+   collection.asMutableCollection().java_retainAll(
     Collections.collectionOfString(),
    )
    collection.java_contains(
     Collections.mismatching() as Any?,
    )
-   collection.java_remove(
+   collection.asMutableCollection().java_remove(
     Collections.mismatching() as Any?,
    )
    collection.java_containsAll(
     Collections.mismatchingCollection(),
    )
-   collection.java_removeAll(
+   collection.asMutableCollection().java_removeAll(
     Collections.mismatchingCollection(),
    )
-   collection.java_retainAll(
+   collection.asMutableCollection().java_retainAll(
     Collections.mismatchingCollection(),
    )
   }
-
+  
   @JvmStatic
   fun testCollection_specialized(collection: CollectionOfString) {
    collection.java_contains(
@@ -156,10 +170,10 @@ open class Collections {
     Collections.mismatchingCollection(),
    )
   }
-
+  
   @JvmStatic
   fun <T> testList_generic(list: MutableList<T>) {
-   list.java_addAll(
+   list.asMutableList().java_addAll(
     0,
     Collections.genericCollection<T>(),
    )
@@ -176,10 +190,10 @@ open class Collections {
     Collections.mismatching() as Any?,
    )
   }
-
+  
   @JvmStatic
   fun testList_parameterized(list: MutableList<String>) {
-   list.java_addAll(
+   list.asMutableList().java_addAll(
     0,
     Collections.collectionOfString(),
    )
@@ -196,7 +210,7 @@ open class Collections {
     Collections.mismatching() as Any?,
    )
   }
-
+  
   @JvmStatic
   fun testList_specialized(list: ListOfString) {
    list.java_addAll(
@@ -216,7 +230,7 @@ open class Collections {
     Collections.mismatching() as Any?,
    )
   }
-
+  
   @JvmStatic
   fun <K, V> testMap_generic(map: MutableMap<K, V>) {
    map.java_get(
@@ -224,7 +238,7 @@ open class Collections {
    )
    map.java_getOrDefault(
     Collections.generic<K>(),
-    Collections.generic<V?>(),
+    Collections.generic<V>(),
    )
    map.java_containsKey(
     Collections.generic<K>(),
@@ -232,13 +246,13 @@ open class Collections {
    map.java_containsValue(
     Collections.generic<V>(),
    )
-   map.java_putAll(
+   map.asMutableMap().java_putAll(
     Collections.genericMap<K, V>(),
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.generic<K>(),
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.generic<K>(),
     Collections.generic<V>(),
    )
@@ -247,7 +261,7 @@ open class Collections {
    )
    map.java_getOrDefault(
     Collections.mismatching() as Any?,
-    Collections.generic<V?>(),
+    Collections.generic<V>(),
    )
    map.java_containsKey(
     Collections.mismatching() as Any?,
@@ -255,15 +269,15 @@ open class Collections {
    map.java_containsValue(
     Collections.mismatching() as Any?,
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.mismatching() as Any?,
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.mismatching() as Any?,
     Collections.mismatching() as Any?,
    )
   }
-
+  
   @JvmStatic
   fun testMap_parameterized(map: MutableMap<String, String>) {
    map.java_get(
@@ -279,13 +293,13 @@ open class Collections {
    map.java_containsValue(
     Collections.string(),
    )
-   map.java_putAll(
+   map.asMutableMap().java_putAll(
     Collections.mapOfString(),
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.string(),
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.string(),
     Collections.string(),
    )
@@ -302,15 +316,15 @@ open class Collections {
    map.java_containsValue(
     Collections.mismatching() as Any?,
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.mismatching() as Any?,
    )
-   map.java_remove(
+   map.asMutableMap().java_remove(
     Collections.mismatching() as Any?,
     Collections.mismatching() as Any?,
    )
   }
-
+  
   @JvmStatic
   fun testMap_specialized(map: MapOfString) {
    map.java_get(
@@ -357,73 +371,347 @@ open class Collections {
     Collections.mismatching() as Any?,
    )
   }
-
+  
+  @JvmStatic
+  fun <L: MutableList<String>, M: L> testMutability(iterator: MutableIterator<String>, listIterator: MutableListIterator<String>, collection: MutableCollection<String>, list: MutableList<String>, genericList: L, genericList2: M, set: MutableSet<String>, map: MutableMap<String, String>, mapEntry: MutableEntry<String, String>) {
+   iterator.asMutableIterator().remove()
+   listIterator.asMutableListIterator().add("foo")
+   listIterator.asMutableListIterator().set("foo")
+   listIterator.asMutableListIterator().remove()
+   collection.asMutableCollection().add("foo")
+   collection.asMutableCollection().java_addAll(list)
+   collection.asMutableCollection().java_remove("foo")
+   collection.asMutableCollection().java_removeAll(list)
+   collection.asMutableCollection().removeIf(
+    Predicate { x: String ->
+     return@Predicate true
+    },
+   )
+   collection.asMutableCollection().java_retainAll(list)
+   collection.asMutableCollection().clear()
+   list.asMutableList().add(0, "foo")
+   list.asMutableList().java_addAll(list)
+   list.asMutableList().set(0, "foo")
+   list.asMutableList().sort(null)
+   list.asMutableList().removeAt(0)
+   list.asMutableList().replaceAll(
+    UnaryOperator { x_1: String ->
+     return@UnaryOperator x_1
+    },
+   )
+   genericList.asMutableList().add(0, "foo")
+   genericList.asMutableList().set(0, "foo")
+   genericList.asMutableList().removeAt(0)
+   genericList.asMutableList().sort(null)
+   genericList2.asMutableList().add(0, "foo")
+   genericList2.asMutableList().set(0, "foo")
+   genericList2.asMutableList().removeAt(0)
+   genericList2.asMutableList().sort(null)
+   set.asMutableSet().add("foo")
+   set.asMutableSet().java_addAll(list)
+   set.asMutableSet().java_remove("foo")
+   set.asMutableSet().java_removeAll(list)
+   set.asMutableSet().removeIf(
+    Predicate { x_2: String ->
+     return@Predicate true
+    },
+   )
+   set.asMutableSet().java_retainAll(list)
+   set.asMutableSet().clear()
+   map.asMutableMap().put("foo", "bar")
+   map.asMutableMap().java_putAll(map)
+   map.asMutableMap().putIfAbsent("foo", "bar")
+   map.asMutableMap().java_remove("foo")
+   map.asMutableMap().replace("foo", "bar")
+   map.asMutableMap().replaceAll(
+    BiFunction { k: String, v: String ->
+     return@BiFunction v
+    },
+   )
+   map.asMutableMap().clear()
+   map.asMutableMap().compute(
+    "foo",
+    BiFunction { k_1: String, v_1: String? ->
+     return@BiFunction v_1
+    },
+   )
+   map.asMutableMap().computeIfAbsent(
+    "foo",
+    Function { k_2: String ->
+     return@Function "bar"
+    },
+   )
+   map.asMutableMap().computeIfPresent(
+    "foo",
+    BiFunction { k_3: String, v_2: String ->
+     return@BiFunction v_2
+    },
+   )
+   map.asMutableMap().merge(
+    "foo",
+    "bar",
+    BiFunction { v1: String, v2: String ->
+     return@BiFunction v1
+    },
+   )
+   mapEntry.asMutableEntry().setValue("bar")
+  }
+  
+  @JvmStatic
+  fun testMutability_subtypes(collection: CustomCollection<String>, list: CustomList<String>, map: CustomMap<String, String>) {
+   collection.add("foo")
+   collection.java_addAll(list)
+   collection.java_remove("foo")
+   collection.java_removeAll(list)
+   collection.removeIf(
+    Predicate { x: String ->
+     return@Predicate true
+    },
+   )
+   collection.java_retainAll(list)
+   collection.clear()
+   list.add(0, "foo")
+   list.java_addAll(list)
+   list.set(0, "foo")
+   list.sort(null)
+   list.removeAt(0)
+   list.replaceAll(
+    UnaryOperator { x_1: String ->
+     return@UnaryOperator x_1
+    },
+   )
+   map.put("foo", "bar")
+   map.java_putAll(map)
+   map.putIfAbsent("foo", "bar")
+   map.java_remove("foo")
+   map.replace("foo", "bar")
+   map.replaceAll(
+    BiFunction { k: String, v: String ->
+     return@BiFunction v
+    },
+   )
+   map.clear()
+   map.compute(
+    "foo",
+    BiFunction { k_1: String, v_1: String? ->
+     return@BiFunction v_1
+    },
+   )
+   map.computeIfAbsent(
+    "foo",
+    Function { k_2: String ->
+     return@Function "bar"
+    },
+   )
+   map.computeIfPresent(
+    "foo",
+    BiFunction { k_3: String, v_2: String ->
+     return@BiFunction v_2
+    },
+   )
+   map.merge(
+    "foo",
+    "bar",
+    BiFunction { v1: String, v2: String ->
+     return@BiFunction v1
+    },
+   )
+  }
+  
+  @JvmStatic
+  fun testLowerBoundAssignment(collection: MutableCollection<String>, list: MutableList<String>, set: MutableSet<String>, map: MutableMap<String, String>, mapEntry: MutableEntry<String, String>, customCollection: CustomCollection<String>) {
+   var lowerC: /* @mutable */ MutableCollection<in String> = collection.asMutableCollection()
+   var lowerL: /* @mutable */ MutableList<in String> = list.asMutableList()
+   var lowerS: /* @mutable */ MutableSet<in String> = set.asMutableSet()
+   var lowerM: /* @mutable */ MutableMap<in String, in String> = map.asMutableMap()
+   var lowerMe: /* @mutable */ MutableEntry<String, in String> = mapEntry.asMutableEntry()
+   val lowerC2: /* @mutable */ MutableCollection<in String> = customCollection
+   val lowerC3: /* @mutable */ MutableCollection<in String> = lowerC
+   lowerC = collection.asMutableCollection()
+   lowerL = list.asMutableList()
+   lowerS = set.asMutableSet()
+   lowerM = map.asMutableMap()
+   lowerMe = mapEntry.asMutableEntry()
+   Collections.passLowerBoundCollection(
+    collection.asMutableCollection(),
+   )
+   Collections.passLowerBoundList(
+    list.asMutableList(),
+   )
+   Collections.passLowerBoundSet(
+    set.asMutableSet(),
+   )
+   Collections.passLowerBoundMap(
+    map.asMutableMap(),
+   )
+   Collections.passLowerBoundMapEntry(
+    mapEntry.asMutableEntry(),
+   )
+   val nestedList: MutableList</* @mutable */ MutableList<in String>> = ArrayList</* @mutable */ MutableList<in String>>()
+   nestedList.asMutableList().add(
+    ArrayList<String>(),
+   )
+   nestedList.asMutableList().add(
+    ArrayList<Any>(),
+   )
+   val nestedMap: MutableList</* @mutable */ MutableMap<String, in String>> = ArrayList</* @mutable */ MutableMap<String, in String>>()
+   val innerMap: MutableMap<String, String> = HashMap<String, String>()
+   nestedMap.asMutableList().add(innerMap)
+   Collections.testNestedLowerBounds(
+    Consumer { l: /* @mutable */ MutableList<in String> ->
+    },
+    nestedList as MutableList</* @mutable */ MutableList<in String>>,
+    nestedMap as MutableList</* @mutable */ MutableMap<String, in String>>,
+   )
+  }
+  
+  @JvmStatic
+  private fun testNestedLowerBounds(consumer: Consumer</* @mutable */ MutableList<in String>>, nestedList: MutableList</* @mutable */ MutableList<in String>>, nestedMap: MutableList</* @mutable */ MutableMap<String, in String>>) {}
+  
+  @JvmStatic
+  private fun passLowerBoundCollection(collection: /* @mutable */ MutableCollection<in String>) {}
+  
+  @JvmStatic
+  private fun passLowerBoundList(list: /* @mutable */ MutableList<in String>) {}
+  
+  @JvmStatic
+  private fun passLowerBoundSet(set: /* @mutable */ MutableSet<in String>) {}
+  
+  @JvmStatic
+  private fun passLowerBoundMap(map: /* @mutable */ MutableMap<in String, in String>) {}
+  
+  @JvmStatic
+  private fun passLowerBoundMapEntry(mapEntry: /* @mutable */ MutableEntry<String, in String>) {}
+  
+  @JvmStatic
+  private fun returnLowerBoundCollection(collection: MutableCollection<String>): /* @mutable */ MutableCollection<in String> {
+   return collection.asMutableCollection()
+  }
+  
+  @JvmStatic
+  private fun returnLowerBoundList(list: MutableList<String>): /* @mutable */ MutableList<in String> {
+   return list.asMutableList()
+  }
+  
+  @JvmStatic
+  private fun returnLowerBoundSet(set: MutableSet<String>): /* @mutable */ MutableSet<in String> {
+   return set.asMutableSet()
+  }
+  
+  @JvmStatic
+  private fun returnLowerBoundMap(map: MutableMap<String, String>): /* @mutable */ MutableMap<in String, in String> {
+   return map.asMutableMap()
+  }
+  
+  @JvmStatic
+  private fun returnLowerBoundMapEntry(mapEntry: MutableEntry<String, String>): /* @mutable */ MutableEntry<String, in String> {
+   return mapEntry.asMutableEntry()
+  }
+  
   @JvmStatic
   private fun <T> convert(`object`: T): T {
    return `object`
   }
-
+  
   @JvmStatic
   private fun <T> convertCollection(c: MutableCollection<T>): MutableCollection<T> {
    return c
   }
-
+  
   @JvmStatic
   private fun <K, V> convertMap(m: MutableMap<K, V>): MutableMap<K, V> {
    return m
   }
-
+  
   @JvmStatic
   private fun <T> generic(): T {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun string(): String {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun mismatching(): Int {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun <T> genericCollection(): MutableCollection<T> {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun collectionOfString(): MutableCollection<String> {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun mismatchingCollection(): MutableCollection<Int> {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun <K, V> genericMap(): MutableMap<K, V> {
    throw RuntimeException()
   }
-
+  
   @JvmStatic
   private fun mapOfString(): MutableMap<String, String> {
    throw RuntimeException()
   }
- }
-
- open class CustomCollection<T>: AbstractCollection<T>() {
-  override fun iterator(): MutableIterator<T> {
-   throw RuntimeException()
+  
+  @JvmStatic
+  private fun testCustomMapWithCustomSetEntry(map: CustomMapWithCustomSetEntry<String, String>) {
+   val entrySet: AbstractSet<MutableEntry<String, String>> = map.entries as AbstractSet<MutableEntry<String, String>>
+   val regularMap: MutableMap<String, String> = map
+   val regularEntrySet: MutableSet<MutableEntry<String, String>> = regularMap.entries
   }
-
+  
+  @JvmStatic
+  fun <L: MutableList<String>> testTypeVariableMutation(list: L) {
+   list.asMutableList().add("foo")
+  }
+  
+  @JvmStatic
+  fun <L: /* @mutable */ MutableList<in String>> testTypeVariableMutationWithLowerBound(list: L) {
+   list.add("foo")
+  }
+  
+  @JvmStatic
+  fun testWildcardMutation(lists: MutableList<out MutableList<String>>) {
+   lists.get(0)!!.asMutableList().add("foo")
+  }
+  
+  @JvmStatic
+  fun testIterableLambda() {
+   val list: MutableList<String> = ArrayList<String>()
+   val it: MutableIterable<String> = MutableIterableJvm {
+    return@MutableIterableJvm list.iterator().asMutableIterator()
+   }
+  }
+  
+  @JvmStatic
+  fun testCustomIterableLambda() {
+   val list: MutableList<String> = ArrayList<String>()
+   val it: CustomIterable<String> = CustomIterable {
+    return@CustomIterable list.iterator().asMutableIterator()
+   }
+  }
+ }
+ 
+ open class CustomCollection<T>: AbstractCollection<T>() {
+  override fun iterator(): /* @mutable */ MutableIterator<T> {
+   return java.util.Collections.emptyIterator<T>().asMutableIterator()
+  }
+  
   override val size: Int
    get() {
     return 0
    }
-
+  
   override fun contains(o: T): Boolean {
    val o_1: Any? = o
    var o_2: Any? = o_1
@@ -432,7 +720,7 @@ open class Collections {
     o_2 as T,
    )
   }
-
+  
   override fun remove(o: T): Boolean {
    val o_1: Any? = o
    var o_2: Any? = o_1
@@ -441,7 +729,7 @@ open class Collections {
     o_2 as T,
    )
   }
-
+  
   override fun addAll(c: Collection<T>): Boolean {
    val c_1: MutableCollection<out T> = c as MutableCollection<out T>
    var c_2: MutableCollection<out T> = c_1
@@ -450,7 +738,7 @@ open class Collections {
     c_2 as Collection<T>,
    )
   }
-
+  
   override fun containsAll(c: Collection<T>): Boolean {
    val c_1: MutableCollection<*> = c as MutableCollection<*>
    var c_2: MutableCollection<*> = c_1
@@ -459,7 +747,7 @@ open class Collections {
     c_2 as Collection<T>,
    )
   }
-
+  
   override fun removeAll(c: Collection<T>): Boolean {
    val c_1: MutableCollection<*> = c as MutableCollection<*>
    var c_2: MutableCollection<*> = c_1
@@ -468,7 +756,7 @@ open class Collections {
     c_2 as Collection<T>,
    )
   }
-
+  
   override fun retainAll(c: Collection<T>): Boolean {
    val c_1: MutableCollection<*> = c as MutableCollection<*>
    var c_2: MutableCollection<*> = c_1
@@ -477,32 +765,41 @@ open class Collections {
     c_2 as Collection<T>,
    )
   }
-
+  
   override fun toArray(): Array<Any?> {
    return super<AbstractCollection>.toArray()
   }
-
+  
   override fun <T1> toArray(a: Array<T1>): Array<T1> {
    return super<AbstractCollection>.toArray<T1>(a)
   }
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  open class CustomCollectionDisambiguatingOverrides<T>: CustomCollection<T>(), MutableCollectionJvm<T> {
   override fun spliterator(): Spliterator<T> {
    return super<CustomCollection>.spliterator()
   }
  }
-
+ 
  open class CustomList<T>: AbstractList<T>() {
   override fun get(index: Int): T {
    throw IndexOutOfBoundsException()
   }
-
+  
+  override fun listIterator(): /* @mutable */ MutableListIterator<T> {
+   return java.util.Collections.emptyListIterator<T>().asMutableListIterator()
+  }
+  
+  override fun subList(fromIndex: Int, toIndex: Int): /* @mutable */ MutableList<T> {
+   return java.util.Collections.emptyList<T>().asMutableList()
+  }
+  
   override val size: Int
    get() {
     return 0
    }
-
+  
   override fun addAll(index: Int, c: Collection<T>): Boolean {
    val c_1: MutableCollection<out T> = c as MutableCollection<out T>
    var c_2: MutableCollection<out T> = c_1
@@ -512,7 +809,7 @@ open class Collections {
     c_2 as Collection<T>,
    )
   }
-
+  
   override fun indexOf(o: T): Int {
    val o_1: Any? = o
    var o_2: Any? = o_1
@@ -521,7 +818,7 @@ open class Collections {
     o_2 as T,
    )
   }
-
+  
   override fun lastIndexOf(o: T): Int {
    val o_1: Any? = o
    var o_2: Any? = o_1
@@ -530,22 +827,55 @@ open class Collections {
     o_2 as T,
    )
   }
-
+  
   override fun toArray(): Array<Any?> {
    return super<AbstractList>.toArray()
   }
-
+  
   override fun <T1> toArray(a: Array<T1>): Array<T1> {
    return super<AbstractList>.toArray<T1>(a)
   }
  }
-
- open class CustomMap<K, V>: AbstractMap<K, V>() {
-  override val entries: MutableSet<MutableEntry<K, V>>
+ 
+ open class CustomListWithSuperCalls<T>: ArrayList<T>() {
+  override fun get(index: Int): T {
+   throw IndexOutOfBoundsException()
+  }
+  
+  override val size: Int
    get() {
-    throw RuntimeException()
+    return 0
    }
-
+  
+  override fun iterator(): /* @mutable */ MutableIterator<T> {
+   return super<ArrayList>.iterator().asMutableIterator()
+  }
+  
+  override fun listIterator(): /* @mutable */ MutableListIterator<T> {
+   return super<ArrayList>.listIterator().asMutableListIterator()
+  }
+  
+  override fun subList(fromIndex: Int, toIndex: Int): /* @mutable */ MutableList<T> {
+   return super<ArrayList>.subList(fromIndex, toIndex).asMutableList()
+  }
+ }
+ 
+ open class CustomMap<K, V>: AbstractMap<K, V>() {
+  override val entries: /* @mutable */ MutableSet</* @mutable */ MutableEntry<K, V>>
+   get() {
+    return (java.util.Collections.emptySet<MutableEntry<K, V>>() as MutableSet</* @mutable */ MutableEntry<K, V>>).asMutableSet()
+   }
+  
+  override val keys: /* @mutable */ MutableSet<K>
+   get() {
+    return java.util.Collections.emptySet<K>().asMutableSet()
+   }
+  
+  override val values: /* @mutable */ MutableCollection<V>
+   get() {
+    return java.util.Collections.emptyList<V>().asMutableList()
+   }
+  
   override fun containsKey(key: K): Boolean {
    val key_1: Any? = key
    var key_2: Any? = key_1
@@ -554,7 +884,7 @@ open class Collections {
     key_2 as K,
    )
   }
-
+  
   override fun containsValue(value: V): Boolean {
    val value_1: Any? = value
    var value_2: Any? = value_1
@@ -563,7 +893,7 @@ open class Collections {
     value_2 as V,
    )
   }
-
+  
   override fun remove(key: K): V? {
    val key_1: Any? = key
    var key_2: Any? = key_1
@@ -572,7 +902,7 @@ open class Collections {
     key_2 as K,
    )
   }
-
+  
   override fun remove(key: K, value: V): Boolean {
    val value_1: Any? = value
    val key_1: Any? = key
@@ -585,7 +915,7 @@ open class Collections {
     value_2 as V,
    )
   }
-
+  
   override fun get(key: K): V? {
    val key_1: Any? = key
    var key_2: Any? = key_1
@@ -594,7 +924,7 @@ open class Collections {
     key_2 as K,
    )
   }
-
+  
   override fun getOrDefault(key: K, defaultValue: V): V {
    val defaultValue_1: V? = defaultValue
    val key_1: Any? = key
@@ -605,7 +935,7 @@ open class Collections {
     defaultValue_1 as V,
    ) as V
   }
-
+  
   override fun putAll(m: Map<out K, V>) {
    val m_1: MutableMap<out K, out V> = m as MutableMap<out K, out V>
    var m_2: MutableMap<out K, out V> = m_1
@@ -615,7 +945,46 @@ open class Collections {
    )
   }
  }
-
+ 
+ open class CustomMapWithSuperCalls<K, V>: HashMap<K, V>() {
+  override val entries: /* @mutable */ MutableSet</* @mutable */ MutableEntry<K, V>>
+   get() {
+    return (super<HashMap>.entries as MutableSet</* @mutable */ MutableEntry<K, V>>).asMutableSet()
+   }
+  
+  override val keys: /* @mutable */ MutableSet<K>
+   get() {
+    return super<HashMap>.keys.asMutableSet()
+   }
+  
+  override val values: /* @mutable */ MutableCollection<V>
+   get() {
+    return super<HashMap>.values.asMutableCollection()
+   }
+ }
+ 
+ open class CustomMapSetValues<K, V>: CustomMap<K, V>() {
+  override val values: /* @mutable */ MutableSet<V>
+   get() {
+    return java.util.Collections.emptySet<V>().asMutableSet()
+   }
+ }
+ 
+ open class CustomMapWithNestedLambda<K, V>: CustomMap<K, V>() {
+  override val values: /* @mutable */ MutableCollection<V>
+   get() {
+    val r: Runnable = Runnable {
+     val ignored: MutableCollection<V> = java.util.Collections.emptySet<Any>() as MutableCollection<V>
+     return@Runnable
+    }
+    val s: Supplier<MutableCollection<V>> = Supplier {
+     return@Supplier java.util.Collections.emptySet<Any>() as MutableCollection<V>
+    }
+    return (java.util.Collections.emptyList<Any>() as MutableCollection<V>).asMutableCollection()
+   }
+ }
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  abstract class CustomMapDisambiguatingOverrides<K, V>: CustomMap<K, V>(), MutableMapJvm<K, V> {
   override fun getOrDefault(arg0: K, arg1: V): V {
    val arg1_1: V? = arg1
@@ -625,7 +994,7 @@ open class Collections {
     arg1_1 as V,
    ) as V
   }
-
+  
   override fun remove(arg0: K, arg1: V): Boolean {
    val arg1_1: Any? = arg1
    val arg0_1: Any? = arg0
@@ -635,7 +1004,7 @@ open class Collections {
    )
   }
  }
-
+ 
  open class CustomMapReturnTypes<K, V>: CustomMap<K, V>() {
   override fun getOrDefault(key: K, defaultValue: V): V {
    val defaultValue_1: V? = defaultValue
@@ -643,21 +1012,21 @@ open class Collections {
    return defaultValue_1 as V
   }
  }
-
+ 
  open class CollectionOfString: CustomCollection<String>() {
   open fun containsInteger(integer: Int): Boolean {
    return super<CustomCollection>.remove(
     integer as Any? as String,
    )
   }
-
+  
   open fun removeInteger(integer: Int): Boolean {
    return super<CustomCollection>.remove(
     integer as Any? as String,
    )
   }
  }
-
+ 
  open class ListOfString: CustomList<String>() {
   override fun indexOf(o: String): Int {
    val o_1: Any? = o
@@ -667,7 +1036,7 @@ open class Collections {
     o_2 as String,
    )
   }
-
+  
   override fun lastIndexOf(o: String): Int {
    val o_1: Any? = o
    var o_2: Any? = o_1
@@ -677,7 +1046,7 @@ open class Collections {
    )
   }
  }
-
+ 
  open class MapOfString: CustomMap<String, String>() {
   override fun containsKey(key: String): Boolean {
    val key_1: Any? = key
@@ -687,7 +1056,7 @@ open class Collections {
     key_2 as String,
    )
   }
-
+  
   override fun containsValue(value: String): Boolean {
    val value_1: Any? = value
    var value_2: Any? = value_1
@@ -696,7 +1065,7 @@ open class Collections {
     value_2 as String,
    )
   }
-
+  
   override fun remove(key: String): String? {
    val key_1: Any? = key
    var key_2: Any? = key_1
@@ -705,7 +1074,7 @@ open class Collections {
     key_2 as String,
    )
   }
-
+  
   override fun remove(key: String, value: String): Boolean {
    val value_1: Any? = value
    val key_1: Any? = key
@@ -718,7 +1087,7 @@ open class Collections {
     value_2 as String,
    )
   }
-
+  
   override fun get(key: String): String? {
    val key_1: Any? = key
    var key_2: Any? = key_1
@@ -727,7 +1096,7 @@ open class Collections {
     key_2 as String,
    )
   }
-
+  
   override fun getOrDefault(key: String, defaultValue: String): String {
    val defaultValue_1: String? = defaultValue
    val key_1: Any? = key
@@ -739,24 +1108,54 @@ open class Collections {
    ) as String
   }
  }
-
+ 
+ open class SpecificEntrySet: AbstractSet<MutableEntry<String, Int>>() {
+  override fun iterator(): /* @mutable */ MutableIterator<MutableEntry<String, Int>> {
+   return null!!.asMutableIterator()
+  }
+  
+  override val size: Int
+   get() {
+    return 0
+   }
+ }
+ 
+ open class CustomMapWithSpecificEntrySet: AbstractMap<String, Int>() {
+  override val entries: /* @mutable */ MutableSet</* @mutable */ MutableEntry<String, Int>>
+   get() {
+    return SpecificEntrySet() as AbstractSet</* @mutable */ MutableEntry<String, Int>>
+   }
+ }
+ 
  abstract class AbstractCollectionWithToArrayOverride<E>: MutableCollectionJvm<E> {
   @Suppress("NOTHING_TO_OVERRIDE")
   override fun toArray(): Array<Any?> {
    return uninitializedArrayOf<Any>(0) as Array<Any?>
   }
-
+  
   @Suppress("NOTHING_TO_OVERRIDE")
   override fun <T> toArray(a: Array<T>): Array<T> {
    return a
   }
  }
-
+ 
  interface CollectionInterfaceWithToArrayOverride<E>: MutableListJvm<E> {
   @Suppress("NOTHING_TO_OVERRIDE")
   override fun toArray(): Array<Any?>
-
+  
   @Suppress("NOTHING_TO_OVERRIDE")
   override fun <T> toArray(a: Array<T>): Array<T>
+ }
+ 
+ interface CustomMapWithCustomSetEntry<K, V>: MutableMapJvm<K, V> {
+  override val entries: AbstractSet</* @mutable */ MutableEntry<K, V>>
+ }
+ 
+ fun interface CustomIterable<E>: MutableIterableJvm<E> {
+  override fun iterator(): /* @mutable */ MutableIterator<E>
+ }
+ 
+ interface CustomListWithSubList: MutableListJvm<MutableList<String>> {
+  override fun subList(fromIndex: Int, toIndex: Int): /* @mutable */ MutableList<MutableList<String>>
  }
 }

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package autovalue
 
@@ -27,48 +28,59 @@ import kotlin.String
 import kotlin.Suppress
 
 class AutoValue_AutoValueJsType: AutoValueJsType {
- private val field: Int
-
- private val withJsMethod: Int
-
- internal constructor(field: Int, withJsMethod: Int) {
-  this.field = field
-  this.withJsMethod = withJsMethod
+ private val getField: Int
+ 
+ private val getWithJsMethod: Int
+ 
+ private val ignored: Int
+ 
+ internal constructor(getField: Int, getWithJsMethod: Int, ignored: Int) {
+  this.getField = getField
+  this.getWithJsMethod = getWithJsMethod
+  this.ignored = ignored
  }
-
+ 
  override fun getField(): Int {
-  return this.field
+  return this.getField
  }
-
+ 
  @JsMethod(name = "getField2")
  override fun getWithJsMethod_pp_autovalue(): Int {
-  return this.withJsMethod
+  return this.getWithJsMethod
  }
-
+ 
+ override fun ignored(): Int {
+  return this.ignored
+ }
+ 
  override fun toString(): String {
-  return "AutoValueJsType{" + "field=" + this.field + ", " + "withJsMethod=" + this.withJsMethod + "}"
+  return "AutoValueJsType{getField=" + this.getField + ", getWithJsMethod=" + this.getWithJsMethod + ", ignored=" + this.ignored + "}"
  }
-
+ 
  override fun equals(o: Any?): Boolean {
   if (o === this) {
    return true
   }
   if (o is AutoValueJsType) {
    val that: AutoValueJsType? = o as AutoValueJsType?
-   return this.field == that!!.getField() && this.withJsMethod == that!!.getWithJsMethod_pp_autovalue()
+   return this.getField == that!!.getField() && this.getWithJsMethod == that!!.getWithJsMethod_pp_autovalue() && this.ignored == that!!.ignored()
   }
   return false
  }
-
+ 
  override fun hashCode(): Int {
   var h___: Int = 1
   h___ = h___ * 1000003
   h___ = h___.xor(
-   this.field,
+   this.getField,
   )
   h___ = h___ * 1000003
   h___ = h___.xor(
-   this.withJsMethod,
+   this.getWithJsMethod,
+  )
+  h___ = h___ * 1000003
+  h___ = h___.xor(
+   this.ignored,
   )
   return h___
  }

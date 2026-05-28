@@ -8,7 +8,7 @@ ${BAZEL} build //transpiler/java/...:*
 ${BAZEL} build //tools/java/com/google/j2cl/tools/gwtincompatible:*
 ${BAZEL} build //tools/java/com/google/j2cl/tools/minifier:*
 
-${BAZEL} build //jre/java/javaemul/internal/vmbootstrap/primitives:primitives
+${BAZEL} build //jre/java/javaemul/internal/primitives:primitives
 
 ${BAZEL} build //jre/java:*
 
@@ -22,8 +22,3 @@ ${BAZEL} build //junit/generator/java/com/google/j2cl/junit/runtime:jsunit_helpe
 
 ${BAZEL} build //junit/generator/java/com/google/j2cl/junit/runtime:*
 ${BAZEL} build //junit/generator/java/com/google/j2cl/junit/runtime:internal_assumption_violated_exception-javadoc
-
-
-# This must be the last line, or else some other operation will apparently remove these
-# soft links that we rely on in the maven build
-${BAZEL} build //third_party:jdt-core

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package cloneable
 
@@ -31,21 +32,22 @@ open class Cloneables {
    return WithoutCloneable()
   }
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  open class WithCloneable: Cloneable {
   @Throws(CloneNotSupportedException::class)
   override fun clone(): Any {
    return WithCloneable()
   }
  }
-
+ 
  class WithoutCloneableChild: WithoutCloneable() {
   @Throws(CloneNotSupportedException::class)
   override fun clone(): Any {
    return WithoutCloneableChild()
   }
  }
-
+ 
  class WithCloneableChild: WithCloneable() {
   @Throws(CloneNotSupportedException::class)
   override fun clone(): Any {

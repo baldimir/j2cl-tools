@@ -56,6 +56,8 @@ public abstract class FieldDescriptor extends MemberDescriptor {
   @Override
   public abstract boolean isEnumConstant();
 
+  public abstract boolean isVolatile();
+
   @Override
   public abstract FieldOrigin getOrigin();
 
@@ -115,6 +117,7 @@ public abstract class FieldDescriptor extends MemberDescriptor {
   // the details.
   abstract FieldDescriptor getDeclarationDescriptorOrNullIfSelf();
 
+  @Override
   @Memoized
   public FieldDescriptor toRawMemberDescriptor() {
     return toBuilder()
@@ -144,6 +147,10 @@ public abstract class FieldDescriptor extends MemberDescriptor {
     return !isStatic();
   }
 
+  public boolean isRecordComponentField() {
+    return !isStatic() && getEnclosingTypeDescriptor().getTypeDeclaration().isJavaRecord();
+  }
+
   @Override
   public boolean isJsFunction() {
     return false;
@@ -155,13 +162,28 @@ public abstract class FieldDescriptor extends MemberDescriptor {
   }
 
   @Override
-  public JsInfo getJsInfo() {
+  public JsInfo getDeclarationJsInfo() {
+    if (isRecordComponentField()) {
+      // The record field itself should not be considered JsMember. The corresponding record
+      // component accessor will inherit the JsInfo from the 'originalJsInfo' and will become a
+      // JsMember.
+      return JsInfo.NONE;
+    }
     return getOriginalJsInfo();
   }
 
   @Override
+  public JsInfo getJsInfo() {
+    return getDeclarationJsInfo();
+  }
+
   public KtInfo getKtInfo() {
     return getOriginalKtInfo();
+  }
+
+  @Override
+  public boolean isKtProperty() {
+    return true;
   }
 
   @Override
@@ -204,7 +226,7 @@ public abstract class FieldDescriptor extends MemberDescriptor {
       return this;
     }
 
-    return FieldDescriptor.Builder.from(this)
+    return toBuilder()
         // Ensure that declaration descriptor is set to original since we are modifying the types.
         .setDeclarationDescriptor(getDeclarationDescriptor())
         .setTypeDescriptor(
@@ -221,23 +243,6 @@ public abstract class FieldDescriptor extends MemberDescriptor {
     return builder.build();
   }
 
-  abstract Builder toBuilder();
-
-  public static Builder newBuilder() {
-    return new AutoValue_FieldDescriptor.Builder()
-        // Default values.
-        .setVisibility(Visibility.PUBLIC)
-        .setOriginalJsInfo(JsInfo.NONE)
-        .setOriginalKtInfo(KtInfo.NONE)
-        .setAnnotations(ImmutableList.of())
-        .setCompileTimeConstant(false)
-        .setStatic(false)
-        .setFinal(false)
-        .setSynthetic(false)
-        .setEnumConstant(false)
-        .setOrigin(FieldOrigin.SOURCE);
-  }
-
   /** Returns a description that is useful for error messages. */
   @Override
   public String getReadableDescription() {
@@ -247,6 +252,23 @@ public abstract class FieldDescriptor extends MemberDescriptor {
   @Override
   MemberDescriptor acceptInternal(Processor processor) {
     return Visitor_FieldDescriptor.visit(processor, this);
+  }
+
+  public abstract Builder toBuilder();
+
+  public static Builder builder() {
+    return new AutoValue_FieldDescriptor.Builder()
+        // Default values.
+        .setVisibility(Visibility.PUBLIC)
+        .setOriginalJsInfo(JsInfo.NONE)
+        .setAnnotations(ImmutableList.of())
+        .setCompileTimeConstant(false)
+        .setStatic(false)
+        .setFinal(false)
+        .setVolatile(false)
+        .setSynthetic(false)
+        .setEnumConstant(false)
+        .setOrigin(FieldOrigin.SOURCE);
   }
 
   /** A Builder for FieldDescriptors. */
@@ -263,6 +285,8 @@ public abstract class FieldDescriptor extends MemberDescriptor {
     public abstract Builder setEnclosingTypeDescriptor(
         DeclaredTypeDescriptor enclosingTypeDescriptor);
 
+    public abstract Builder setVolatile(boolean isVolatile);
+
     public abstract Builder setName(String name);
 
     public abstract Builder setEnumConstant(boolean isEnumConstant);
@@ -277,7 +301,12 @@ public abstract class FieldDescriptor extends MemberDescriptor {
 
     public abstract Builder setOriginalJsInfo(JsInfo jsInfo);
 
-    public abstract Builder setOriginalKtInfo(KtInfo ktInfo);
+    abstract Builder setOriginalKtInfoInternal(KtInfo ktInfo);
+
+    @CanIgnoreReturnValue
+    public Builder setOriginalKtInfo(KtInfo ktInfo) {
+      return setOriginalKtInfoInternal(ktInfo);
+    }
 
     public abstract Builder setAnnotations(List<Annotation> annotations);
 
@@ -301,6 +330,9 @@ public abstract class FieldDescriptor extends MemberDescriptor {
 
     abstract DeclaredTypeDescriptor getEnclosingTypeDescriptor();
 
+    @Nullable
+    abstract FieldDescriptor getDeclarationDescriptorOrNullIfSelf();
+
     abstract FieldDescriptor autoBuild();
 
     public FieldDescriptor build() {
@@ -312,13 +344,14 @@ public abstract class FieldDescriptor extends MemberDescriptor {
         setOriginalJsInfo(JsInfo.NONE);
       }
 
+      if (getDeclarationDescriptorOrNullIfSelf() == null) {
+        // Use a canonical version of the enclosing type descriptor in field declarations.
+        setEnclosingTypeDescriptor(getEnclosingTypeDescriptor().getDeclarationDescriptor());
+      }
+
       FieldDescriptor fieldDescriptor = autoBuild();
 
       return interner.intern(fieldDescriptor);
-    }
-
-    public static Builder from(FieldDescriptor fieldDescriptor) {
-      return fieldDescriptor.toBuilder();
     }
 
     private static final ThreadLocalInterner<FieldDescriptor> interner =

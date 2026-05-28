@@ -15,7 +15,9 @@
  */
 package com.google.j2cl.transpiler.backend.wasm;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.j2cl.common.StringUtils.escapeAsWtf16;
+import static com.google.j2cl.transpiler.ast.AstUtils.hasWasmJsPrototype;
 import static com.google.j2cl.transpiler.backend.wasm.WasmGenerationEnvironment.getWasmInfo;
 import static java.util.function.Predicate.not;
 
@@ -113,6 +115,11 @@ public final class SummaryBuilder {
     if (type.isInterface()) {
       summary.addInterfaces(typeHierarchyInfoBuilder.build());
     } else {
+      if (environment.isCustomDescriptorsJsInteropEnabled()
+          && hasWasmJsPrototype(type.getDeclaration())) {
+        typeHierarchyInfoBuilder.setJsInfo(getJsInfo(type));
+      }
+
       type.getDeclaration().getAllSuperInterfaces().stream()
           .filter(not(TypeDeclaration::isNative))
           .forEach(t -> typeHierarchyInfoBuilder.addImplementsTypes(getTypeId(t.toDescriptor())));
@@ -124,7 +131,40 @@ public final class SummaryBuilder {
   private int getTypeId(DeclaredTypeDescriptor typeDescriptor) {
     String typeName = environment.getTypeSignature(typeDescriptor);
     // Note that the IDs start from '1' to reserve '0' for NULL_TYPE.
-    return typeIdByTypeName.computeIfAbsent(typeName, x -> typeIdByTypeName.size() + 1);
+    return typeIdByTypeName.computeIfAbsent(typeName, unused -> typeIdByTypeName.size() + 1);
+  }
+
+  private JsInfo getJsInfo(Type type) {
+    checkArgument(!type.isInterface());
+    TypeDeclaration typeDeclaration = type.getDeclaration();
+    JsInfo.Builder jsInfoBuilder =
+        JsInfo.newBuilder().setQualifiedJsName(typeDeclaration.getQualifiedJsName());
+
+    for (var method : type.getMethods()) {
+      MethodDescriptor methodDescriptor = method.getDescriptor();
+      if (!methodDescriptor.getOrigin().isWasmJsExport()) {
+        continue;
+      }
+
+      jsInfoBuilder.addJsMembers(
+          JsMemberInfo.newBuilder()
+              .setKind(
+                  switch (methodDescriptor.getJsInfo().getJsMemberType()) {
+                    case CONSTRUCTOR -> JsMemberInfo.Kind.CONSTRUCTOR;
+                    case METHOD -> JsMemberInfo.Kind.METHOD;
+                    case GETTER -> JsMemberInfo.Kind.GETTER;
+                    case SETTER -> JsMemberInfo.Kind.SETTER;
+                    default ->
+                        throw new AssertionError(
+                            "Unexpected JsMemberType: "
+                                + methodDescriptor.getJsInfo().getJsMemberType().name());
+                  })
+              .setWasmName(environment.getMethodImplementationName(methodDescriptor))
+              .setJsName(methodDescriptor.getSimpleJsName())
+              .setIsStatic(methodDescriptor.isStatic()));
+    }
+
+    return jsInfoBuilder.build();
   }
 
   private void summarizeSystemGetPropertyCalls(Library library) {
@@ -163,7 +203,7 @@ public final class SummaryBuilder {
         new AbstractRewriter() {
           @Override
           public Expression rewriteStringLiteral(StringLiteral stringLiteral) {
-            return MethodCall.Builder.from(
+            return MethodCall.builderFrom(
                     stringLiteralGetterCreator.getOrCreateLiteralMethod(
                         getCurrentType(), stringLiteral, /* synthesizeMethod= */ false))
                 .build();

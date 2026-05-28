@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.kie.j2cl.tools</groupId>
         <artifactId>j2cl-parent</artifactId>
-        <version>v20250822-1</version>
+        <version>v20260527-1</version>
     </parent>
     <artifactId>gwt-incompatible-stripper</artifactId>
     <packaging>pom</packaging>
@@ -80,12 +80,33 @@
                                     <type>jar</type>
                                     <classifier>sources</classifier>
                                 </artifact>
-                                <artifact>
-                                    <file>../../bazel-bin/tools/java/com/google/j2cl/tools/gwtincompatible/gwtincompatible_lib-javadoc.jar</file>
-                                    <type>jar</type>
-                                    <classifier>javadoc</classifier>
-                                </artifact>
                             </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>javadoc-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>javadoc</classifier>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>sources-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>sources</classifier>
                         </configuration>
                     </execution>
                 </executions>
@@ -109,62 +130,6 @@
             <groupId>org.kie.j2cl.tools</groupId>
             <artifactId>common</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.platform</groupId>
-            <artifactId>org.eclipse.core.runtime</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.equinox.common</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.equinox.preferences</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.core.contenttype</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.core.expressions</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.core.runtime</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.osgi</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.platform</groupId>
-            <artifactId>org.eclipse.equinox.common</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.osgi</groupId>
-            <artifactId>org.osgi.service.prefs</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.platform</groupId>
-            <artifactId>org.eclipse.core.contenttype</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.equinox.common</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.osgi</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.equinox.registry</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
     </dependencies>
 </project>

@@ -16,15 +16,15 @@
 
 package com.google.j2cl.jre.java.nio.charset;
 
+import static org.junit.Assert.assertThrows;
+
 import com.google.j2cl.jre.java.util.EmulTestBase;
 import com.google.j2cl.jre.testing.J2ktIncompatible;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
 
-/**
- * Unit test for the {@link java.nio.charset.Charset} emulated class.
- */
+/** Unit test for the {@link java.nio.charset.Charset} emulated class. */
 public class CharsetTest extends EmulTestBase {
 
   public void testIso88591() {
@@ -39,11 +39,7 @@ public class CharsetTest extends EmulTestBase {
 
   @J2ktIncompatible // Not nullable according to Jspecify
   public void testForName_null() {
-    try {
-      Charset.forName(null);
-      fail();
-    } catch (IllegalArgumentException expected) {
-    }
+    assertThrows(IllegalArgumentException.class, () -> Charset.forName(null));
   }
 
   public void testForName_illegal() {
@@ -70,15 +66,7 @@ public class CharsetTest extends EmulTestBase {
   }
 
   public void testForName_unsupported() {
-    try {
-      Charset.forName("qwer");
-      fail();
-    } catch (UnsupportedCharsetException expected) {
-    }
-    try {
-      Charset.forName("A:.+-:_Aa0");
-      fail();
-    } catch (UnsupportedCharsetException expected) {
-    }
+    assertThrows(UnsupportedCharsetException.class, () -> Charset.forName("qwer"));
+    assertThrows(UnsupportedCharsetException.class, () -> Charset.forName("A:.+-:_Aa0"));
   }
 }

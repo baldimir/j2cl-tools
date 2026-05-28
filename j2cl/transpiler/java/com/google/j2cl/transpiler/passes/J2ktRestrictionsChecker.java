@@ -16,19 +16,23 @@
 package com.google.j2cl.transpiler.passes;
 
 import static com.google.common.base.Predicates.not;
+import static com.google.j2cl.common.Problems.Severity.ERROR;
+import static com.google.j2cl.common.Problems.Severity.WARNING;
 import static com.google.j2cl.transpiler.ast.J2ktAstUtils.isSubtypeOfJ2ktMonitor;
 import static com.google.j2cl.transpiler.ast.J2ktAstUtils.isValidSynchronizedStatementExpressionTypeDescriptor;
 import static com.google.j2cl.transpiler.ast.TypeDescriptors.isPrimitiveVoid;
+import static java.lang.Boolean.getBoolean;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.j2cl.common.HasSourcePosition;
 import com.google.j2cl.common.Problems;
+import com.google.j2cl.common.Problems.Severity;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.transpiler.ast.AbstractVisitor;
 import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Field;
 import com.google.j2cl.transpiler.ast.FieldDescriptor;
-import com.google.j2cl.transpiler.ast.HasSourcePosition;
 import com.google.j2cl.transpiler.ast.Library;
 import com.google.j2cl.transpiler.ast.Member;
 import com.google.j2cl.transpiler.ast.MemberDescriptor;
@@ -46,6 +50,9 @@ import com.google.j2cl.transpiler.ast.Visibility;
 
 /** Checks and throws errors for constructs which can not be transpiled to Kotlin. */
 public final class J2ktRestrictionsChecker {
+  private static final boolean ENABLE_VISIBILITY_ERRORS =
+      getBoolean("com.google.j2cl.transpiler.backend.kotlin.enableVisibilityErrors");
+
   private J2ktRestrictionsChecker() {}
 
   public static void check(Library library, Problems problems) {
@@ -64,6 +71,7 @@ public final class J2ktRestrictionsChecker {
             checkNotGenericConstructor(method);
             checkReferencedTypeVisibilities(method);
             checkKtProperty(method);
+            checkJ2ObjCProperty(method);
           }
 
           @Override
@@ -79,6 +87,7 @@ public final class J2ktRestrictionsChecker {
             checkSuperTypeVisibilities(type);
             checkInterfaceTypeVisibilities(type);
             checkSynchronizedMethods(type);
+            checkJsTypeOnRecord(type);
           }
 
           @Override
@@ -113,7 +122,8 @@ public final class J2ktRestrictionsChecker {
                 getReferencedTypeDescriptors(memberDescriptor)) {
               Visibility referencedVisibility = getRequiredVisibility(referencedTypeDescriptor);
               if (isWiderThan(methodVisibility, referencedVisibility)) {
-                problems.warning(
+                problems.log(
+                    getSeverityForVisibilityCheck(),
                     member.getSourcePosition(),
                     "Member '%s' (%s) should not have wider visibility than '%s' (%s).",
                     member.getReadableDescription(),
@@ -158,6 +168,19 @@ public final class J2ktRestrictionsChecker {
                   method.getSourcePosition(),
                   "Method '%s' can not be '@KtProperty', as it has void return type.",
                   method.getReadableDescription());
+            }
+          }
+
+          private void checkJ2ObjCProperty(Method method) {
+            MethodDescriptor methodDescriptor = method.getDescriptor();
+            if (methodDescriptor.isJ2ObjCPropertyGetter()) {
+              if (methodDescriptor.isJsMember() && !methodDescriptor.isJsPropertyGetter()) {
+                problems.error(
+                    method.getSourcePosition(),
+                    "Method '%s' is marked @Property for J2ObjC but exposed to JS without a"
+                        + " @JsProperty.",
+                    method.getReadableDescription());
+              }
             }
           }
 
@@ -222,10 +245,16 @@ public final class J2ktRestrictionsChecker {
               return;
             }
 
+            // TODO(b/493518121): Remove when anonymous classes have default visibility.
+            if (typeDeclaration.isAnonymous()) {
+              return;
+            }
+
             Visibility visibility = typeDeclaration.getVisibility();
             Visibility superVisibility = superTypeDeclaration.getVisibility();
             if (isWiderThan(visibility, superVisibility)) {
-              problems.warning(
+              problems.log(
+                  getSeverityForVisibilityCheck(),
                   type.getSourcePosition(),
                   "Type '%s' (%s) should not have wider visibility than its super type '%s' (%s).",
                   type.getReadableDescription(),
@@ -249,7 +278,8 @@ public final class J2ktRestrictionsChecker {
               Visibility interfaceVisibility =
                   interfaceTypeDescriptor.getTypeDeclaration().getVisibility();
               if (isWiderThan(visibility, interfaceVisibility)) {
-                problems.warning(
+                problems.log(
+                    getSeverityForVisibilityCheck(),
                     type.getSourcePosition(),
                     "Type '%s' (%s) should not have wider visibility than its super type '%s'"
                         + " (%s).",
@@ -279,6 +309,27 @@ public final class J2ktRestrictionsChecker {
                 type.getReadableDescription(),
                 TypeDescriptors.get().javaemulLangJ2ktMonitor.getReadableDescription(),
                 TypeDescriptors.get().javaLangObject.getReadableDescription());
+          }
+
+          private void checkJsTypeOnRecord(Type type) {
+            TypeDeclaration typeDeclaration = type.getDeclaration();
+            if (typeDeclaration.isJavaRecord() && typeDeclaration.isNative()) {
+              problems.error(
+                  type.getSourcePosition(),
+                  "Record class '%s' cannot be a native JsType.",
+                  type.getDeclaration().getReadableDescription());
+            }
+            // For now allow JsType on records only for tests.
+            // TODO(b/470146353): Allow JsType on records when all Xplat infra is ready to rollout.
+            if (typeDeclaration.isJavaRecord()
+                && typeDeclaration.isJsType()
+                && !type.getSourcePosition().getFilePath().contains("/test/")
+                && !type.getSourcePosition().getFilePath().contains("/javatests/")) {
+              problems.error(
+                  type.getSourcePosition(),
+                  "Record class '%s' cannot be a JsType. (b/470146353)",
+                  typeDeclaration.getReadableDescription());
+            }
           }
 
           private void checkSynchronizedStatement(SynchronizedStatement synchronizedStatement) {
@@ -313,6 +364,10 @@ public final class J2ktRestrictionsChecker {
             }
           }
         });
+  }
+
+  private static Severity getSeverityForVisibilityCheck() {
+    return ENABLE_VISIBILITY_ERRORS ? ERROR : WARNING;
   }
 
   private static Iterable<TypeDescriptor> getReferencedTypeDescriptors(

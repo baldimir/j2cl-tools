@@ -1,0 +1,54 @@
+goog.module('recordclass.RecordClass.RecordImplementingInterface$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+const I = goog.require('recordclass.RecordClass.I$impl');
+
+/**
+ * @final
+ * @implements {I}
+ */
+class RecordImplementingInterface extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {?string} @nodts*/
+  this.f_a__recordclass_RecordClass_RecordImplementingInterface_;
+ }
+ /** @nodts @return {!RecordImplementingInterface} */
+ static $create__java_lang_String(/** ?string */ a) {
+  RecordImplementingInterface.$clinit();
+  let $instance = new RecordImplementingInterface();
+  $instance.$ctor__recordclass_RecordClass_RecordImplementingInterface__java_lang_String__void(a);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_RecordImplementingInterface__java_lang_String__void(/** ?string */ a) {
+  this.$ctor__java_lang_Record__void();
+  this.f_a__recordclass_RecordClass_RecordImplementingInterface_ = a;
+  $J2CL_PRESERVE$(this.f_a__recordclass_RecordClass_RecordImplementingInterface_);
+ }
+ /** @override @nodts @return {?string} */
+ m_a__java_lang_String() {
+  return this.f_a__recordclass_RecordClass_RecordImplementingInterface_;
+ }
+ /** @nodts */
+ static $clinit() {
+  RecordImplementingInterface.$clinit = () =>{};
+  RecordImplementingInterface.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof RecordImplementingInterface;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+I.$markImplementor(RecordImplementingInterface);
+$Util.$setClassMetadata(RecordImplementingInterface, 'recordclass.RecordClass$RecordImplementingInterface');
+
+exports = RecordImplementingInterface;
+
+//# sourceMappingURL=RecordClass$RecordImplementingInterface.js.map

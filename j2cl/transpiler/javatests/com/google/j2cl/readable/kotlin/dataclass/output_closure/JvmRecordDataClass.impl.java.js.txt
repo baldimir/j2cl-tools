@@ -1,0 +1,83 @@
+goog.module('dataclass.JvmRecordDataClass$impl');
+
+const DataClassInterface = goog.require('dataclass.DataClassInterface$impl');
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ * @implements {DataClassInterface}
+ */
+class JvmRecordDataClass extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {number} @nodts*/
+  this.f_f__dataclass_JvmRecordDataClass_ = 0;
+  /**@type {string} @nodts*/
+  this.f_z__dataclass_JvmRecordDataClass_;
+ }
+ /** @nodts @return {!JvmRecordDataClass} */
+ static $create__int__java_lang_String(/** number */ f, /** string */ z) {
+  JvmRecordDataClass.$clinit();
+  let $instance = new JvmRecordDataClass();
+  $instance.$ctor__dataclass_JvmRecordDataClass__int__java_lang_String__void(f, z);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__dataclass_JvmRecordDataClass__int__java_lang_String__void(/** number */ f, /** string */ z) {
+  this.$ctor__java_lang_Record__void();
+  this.f_f__dataclass_JvmRecordDataClass_ = f;
+  this.f_z__dataclass_JvmRecordDataClass_ = z;
+  $J2CL_PRESERVE$(this.f_f__dataclass_JvmRecordDataClass_, this.f_z__dataclass_JvmRecordDataClass_);
+ }
+ /** @nodts @return {number} */
+ m_f__int() {
+  return this.f_f__dataclass_JvmRecordDataClass_;
+ }
+ /** @final @nodts @return {string} */
+ m_z__java_lang_String() {
+  return this.f_z__dataclass_JvmRecordDataClass_;
+ }
+ /** @final @nodts @return {number} */
+ m_component1__int() {
+  return this.f_f__dataclass_JvmRecordDataClass_;
+ }
+ /** @final @override @nodts @return {string} */
+ m_component2__java_lang_String() {
+  return this.f_z__dataclass_JvmRecordDataClass_;
+ }
+ /** @final @nodts @return {!JvmRecordDataClass} */
+ m_copy__int__java_lang_String__dataclass_JvmRecordDataClass(/** number */ f, /** string */ z) {
+  return JvmRecordDataClass.$create__int__java_lang_String(f, z);
+ }
+ /** @nodts @return {!JvmRecordDataClass} */
+ static m_copy$default__dataclass_JvmRecordDataClass__int__java_lang_String__dataclass_JvmRecordDataClass(/** !JvmRecordDataClass */ $this, /** number= */ f, /** string= */ z) {
+  let f$defaulted = $Util.$isUndefined(f) ? $this.f_f__dataclass_JvmRecordDataClass_ : f;
+  let z$defaulted = $Util.$isUndefined(z) ? $this.f_z__dataclass_JvmRecordDataClass_ : z;
+  return $this.m_copy__int__java_lang_String__dataclass_JvmRecordDataClass(f$defaulted, z$defaulted);
+ }
+ /** @override @nodts @return {number} */
+ m_getF__int() {
+  return this.m_f__int();
+ }
+ /** @nodts */
+ static $clinit() {
+  JvmRecordDataClass.$clinit = () =>{};
+  JvmRecordDataClass.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof JvmRecordDataClass;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+DataClassInterface.$markImplementor(JvmRecordDataClass);
+$Util.$setClassMetadata(JvmRecordDataClass, 'dataclass.JvmRecordDataClass');
+
+exports = JvmRecordDataClass;
+
+//# sourceMappingURL=JvmRecordDataClass.js.map

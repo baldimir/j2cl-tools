@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package autovalue
 
@@ -29,12 +30,16 @@ import kotlin.jvm.JvmField
 abstract class AutoValueWithFields internal constructor(): Parent(), Serializable {
  @JvmField
  internal var userField2_pp_autovalue: Int = 0
-
+ 
  abstract fun getIntField(): Int
-
+ 
+ internal open fun getMemoizedNative_pp_autovalue(): Int {
+  return this.getIntField() * 2
+ }
+ 
  companion object {
   private const val serialVersionUID: Long = 42L
-
+  
   private const val staticField: Long = 42L
  }
 }
@@ -42,7 +47,7 @@ abstract class AutoValueWithFields internal constructor(): Parent(), Serializabl
 open class Parent internal constructor() {
  @JvmField
  internal var userField1_pp_autovalue: Int = 0
-
+ 
  companion object {
   private const val staticField: Long = 42L
  }

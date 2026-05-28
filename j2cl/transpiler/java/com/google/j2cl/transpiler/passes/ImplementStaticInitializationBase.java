@@ -34,7 +34,7 @@ import com.google.j2cl.transpiler.ast.TypeDescriptor;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Common code for different implementations of static intialization semantics. */
+/** Common code for different implementations of static initialization semantics. */
 public abstract class ImplementStaticInitializationBase extends NormalizationPass {
 
   private final Set<String> privateMembersCalledFromOtherClasses = new HashSet<>();
@@ -91,11 +91,11 @@ public abstract class ImplementStaticInitializationBase extends NormalizationPas
           @Override
           public Method rewriteMethod(Method method) {
             if (triggersClinit(method.getDescriptor(), type)) {
-              return Method.Builder.from(method)
+              return method.toBuilder()
                   .addStatement(
                       0,
                       createClinitCallStatement(
-                          method.getBody().getSourcePosition(),
+                          method.getSourcePosition(),
                           method.getDescriptor().getEnclosingTypeDescriptor()))
                   .build();
             }
@@ -107,7 +107,7 @@ public abstract class ImplementStaticInitializationBase extends NormalizationPas
   /** Synthesize a static initializer block that calls the necessary super type clinits. */
   private static void synthesizeSuperClinitCalls(Type type) {
     Block.Builder staticInitializerBuilder =
-        Block.newBuilder().setSourcePosition(type.getSourcePosition());
+        Block.builder().setSourcePosition(type.getSourcePosition());
 
     if (implementsClinitMethod(type.getSuperTypeDescriptor())) {
       staticInitializerBuilder.addStatement(
@@ -154,7 +154,7 @@ public abstract class ImplementStaticInitializationBase extends NormalizationPas
   }
 
   static Expression createClinitCallExpression(DeclaredTypeDescriptor typeDescriptor) {
-    return MethodCall.Builder.from(typeDescriptor.getClinitMethodDescriptor()).build();
+    return MethodCall.builderFrom(typeDescriptor.getClinitMethodDescriptor()).build();
   }
 
   /**

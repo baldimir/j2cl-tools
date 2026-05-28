@@ -1,0 +1,7 @@
+goog.module('recordclass.RecordClass.RecordWithDeferringConstructor');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const RecordWithDeferringConstructor = goog.require('recordclass.RecordClass.RecordWithDeferringConstructor$impl');
+exports = RecordWithDeferringConstructor;

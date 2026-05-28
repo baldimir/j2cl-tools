@@ -36,9 +36,10 @@ import org.jetbrains.kotlin.ir.expressions.IrSyntheticBodyKind
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.isEnumClass
+import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.statements
-import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
+import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 
 /**
@@ -50,7 +51,7 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
  * call site.
  */
 internal class EnumClassConstructorLowering(private val context: JvmBackendContext) :
-  FileLoweringPass, IrElementVisitorVoid {
+  FileLoweringPass, IrVisitorVoid() {
   override fun lower(irFile: IrFile) {
     visitElement(irFile)
   }
@@ -101,7 +102,7 @@ internal class EnumClassConstructorLowering(private val context: JvmBackendConte
 }
 
 private fun IrConstructor.isEffectivelyEmpty() =
-  valueParameters.isEmpty() && annotations.isEmpty() && body.isEmpty()
+  nonDispatchParameters.isEmpty() && annotations.isEmpty() && body.isEmpty()
 
 private fun IrBody?.isEmpty() = this == null || statements.all { it is IrBlock && it.isEmpty() }
 

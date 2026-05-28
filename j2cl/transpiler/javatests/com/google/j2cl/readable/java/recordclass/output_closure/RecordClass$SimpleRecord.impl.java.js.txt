@@ -1,0 +1,51 @@
+goog.module('recordclass.RecordClass.SimpleRecord$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class SimpleRecord extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {number} @nodts*/
+  this.f_value__recordclass_RecordClass_SimpleRecord_ = 0;
+ }
+ /** @nodts @return {!SimpleRecord} */
+ static $create__int(/** number */ value) {
+  SimpleRecord.$clinit();
+  let $instance = new SimpleRecord();
+  $instance.$ctor__recordclass_RecordClass_SimpleRecord__int__void(value);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_SimpleRecord__int__void(/** number */ value) {
+  this.$ctor__java_lang_Record__void();
+  this.f_value__recordclass_RecordClass_SimpleRecord_ = value;
+  $J2CL_PRESERVE$(this.f_value__recordclass_RecordClass_SimpleRecord_);
+ }
+ /** @nodts @return {number} */
+ m_value__int() {
+  return this.f_value__recordclass_RecordClass_SimpleRecord_;
+ }
+ /** @nodts */
+ static $clinit() {
+  SimpleRecord.$clinit = () =>{};
+  SimpleRecord.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof SimpleRecord;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(SimpleRecord, 'recordclass.RecordClass$SimpleRecord');
+
+exports = SimpleRecord;
+
+//# sourceMappingURL=RecordClass$SimpleRecord.js.map

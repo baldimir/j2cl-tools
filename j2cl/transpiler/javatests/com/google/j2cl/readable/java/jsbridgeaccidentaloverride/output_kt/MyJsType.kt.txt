@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package jsbridgeaccidentaloverride
 
@@ -29,15 +30,15 @@ fun interface OtherInterface {
 @JsType
 open class MyJsType: OtherInterface {
  internal constructor()
-
+ 
  open fun foo(a: Int): Int {
   return a
  }
-
+ 
  open fun bar(a: Int): Int {
   return a + 1
  }
-
+ 
  override fun f(a: Int): Int {
   return a - 1
  }
@@ -45,10 +46,11 @@ open class MyJsType: OtherInterface {
 
 interface MyInterface {
  fun foo(a: Int): Int
-
+ 
  fun bar(a: Int): Int
 }
 
+@Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
 open class SubJsType internal constructor(): MyJsType(), MyInterface {
  override fun bar(a: Int): Int {
   return a + 2

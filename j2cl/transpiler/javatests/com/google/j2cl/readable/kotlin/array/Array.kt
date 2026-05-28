@@ -16,7 +16,7 @@
 package array
 
 import java.io.Serializable
-import javaemul.internal.annotations.Wasm
+import java.lang.Cloneable
 import jsinterop.annotations.JsPackage
 import jsinterop.annotations.JsType
 
@@ -179,8 +179,7 @@ class Arrays {
 
   @JsType(isNative = true, namespace = JsPackage.GLOBAL, name = "String") private class NativeType
 
-  @Wasm("nop") // TODO(b/261079024) Remove when arrays of native types are supported.
-  private fun testNativeArray() {
+  fun testNativeArray() {
     // Creation
     var nativeObjects = arrayOfNulls<NativeType>(100)
     nativeObjects = arrayOfNulls(0)
@@ -211,7 +210,9 @@ class Arrays {
 
   // Note: Array is not Cloneable and Serializable in Kotlin Native.
   fun testArraysSupertypeClosureTypes() {
-    consumesCloneable(arrayOfNulls<Any?>(10))
+    // TODO(b/458612609): `kotlin.Cloneable` is not supported and Kotlin Arrays do not implement
+    // `java.lang.Cloneable`.
+    // consumesCloneable(arrayOfNulls<Any?>(10))
     consumesSerializable(arrayOfNulls<Any?>(10))
   }
 

@@ -52,8 +52,8 @@ public class Main {
     testUnbox_byOperator();
     testUnbox_byOperator_throwsNPE();
     testUnbox_byOperator_throwsCCE();
-    testUnbox_fromTypeVariable();
-    testUnbox_fromIntersectionType();
+    testUnbox_fromTypeVariable(0L);
+    testUnbox_fromIntersectionType(0L);
     testUnbox_conditionals();
     testUnbox_switchExpression();
     testAutoboxing_arithmetic();
@@ -545,7 +545,15 @@ public class Main {
     assertTrue(zero == boxedMinusZero);
 
     // Object semantics.
-    assertTrue(boxedZero != boxedMinusZero);
+    // TODO(b/462136113): Remove the introduced variables and use `boxedZero` and `boxedMinusZero`
+    // instead when the bug is fixed. In J2KT the above code emits `boxedZero!!` and
+    // `boxedMinusZero!!` as part of the previous comparisons which due to smart casts which turns
+    // the boxed comparison `boxedZero !== boxedMinusZero` into a primitive comparison.
+    // wrong.
+    Double boxedZero2 = Double.valueOf(0.0);
+    Double boxedMinusZero2 = Double.valueOf(-0.0);
+    assertTrue(boxedZero2 != boxedMinusZero2);
+
     assertTrue(asObjectZero != asObjectMinusZero);
 
     assertTrue(undefinedDouble == nullDouble);
@@ -732,7 +740,7 @@ public class Main {
     assertTrue(boxI == 6);
   }
 
-  private static <T extends Long> void testUnbox_fromTypeVariable() {
+  private static <T extends Long> void testUnbox_fromTypeVariable(T unusedForInference) {
     T n = (T) (Long) 10L;
     // Auto unboxing from variable n.
     long l = n;
@@ -752,7 +760,8 @@ public class Main {
     assertTrue(l == 11L);
   }
 
-  private static <T extends Long & Comparable<Long>> void testUnbox_fromIntersectionType() {
+  private static <T extends Long & Comparable<Long>> void testUnbox_fromIntersectionType(
+      T unusedForInference) {
     T n = (T) (Long) 10L;
     // Auto unboxing from variable n.
     long l = n;

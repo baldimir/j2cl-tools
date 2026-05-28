@@ -16,6 +16,7 @@
 package javakotlininterop;
 
 import static com.google.j2cl.integration.testing.Asserts.assertEquals;
+import static com.google.j2cl.integration.testing.Asserts.assertTrue;
 import static com.google.j2cl.integration.testing.TestUtils.getUndefined;
 import static com.google.j2cl.integration.testing.TestUtils.isJvm;
 import static javakotlininterop.KotlinClassKt.testJavaKotlinMixedHierarchyFromKotlinWithExplicitOverride;
@@ -38,6 +39,11 @@ public class Main {
     testJavaKotlinMixedHierarchyFromKotlinWithoutExplicitOverride();
     testDefaultArguments();
     testDefaultArgumentsWithVarargs();
+    testJsTypeClass();
+    testDataClass();
+    testJsTypeDataClass();
+    testJvmRecordDataClass();
+    testJsTypeJvmRecordDataClass();
   }
 
   private static void testTopLevelDeclarations() {
@@ -210,5 +216,42 @@ public class Main {
     assertEquals(
         new int[] {20, 4, 5, 6},
         KotlinOptionalVarargs.optionalVarargsWithLeadingOptional(20, new int[] {4, 5, 6}));
+  }
+
+  private static void testJsTypeClass() {
+    JsTypeClass jsTypeClass = new JsTypeClass(1, "foo");
+    // TODO(b/499370830): Uncomment when the bug is fixed.
+    // assertEquals(1, jsTypeClass.getX());
+    // assertEquals("foo", jsTypeClass.getY());
+  }
+
+  private static void testDataClass() {
+    DataClass data = new DataClass(2, "bar");
+    assertEquals(2, data.getX());
+    assertEquals("bar", data.getY());
+    assertEquals(new DataClass(2, "bar"), data);
+  }
+
+  private static void testJsTypeDataClass() {
+    JsTypeDataClass data = new JsTypeDataClass(2, "bar");
+    // TODO(b/499370830): Uncomment when the bug is fixed.
+    // assertEquals(2, data.getX());
+    // assertEquals("bar", data.getY());
+    assertEquals(new JsTypeDataClass(2, "bar"), data);
+  }
+
+  private static void testJvmRecordDataClass() {
+    MyRecord record = new MyRecord(1, "foo");
+    assertEquals(1, record.x());
+    assertEquals("foo", record.y());
+    assertEquals(new MyRecord(1, "foo"), record);
+    assertTrue(record instanceof MyRecord(int i, String s) && s.equals("foo"));
+  }
+
+  private static void testJsTypeJvmRecordDataClass() {
+    MyJsTypeRecord record = new MyJsTypeRecord(1, "foo");
+    // TODO(b/499370830): Uncomment when the bug is fixed.
+    // assertEquals(1, record.x());
+    // assertEquals("foo", record.y());
   }
 }

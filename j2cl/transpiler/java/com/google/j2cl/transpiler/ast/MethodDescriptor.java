@@ -76,16 +76,13 @@ public abstract class MethodDescriptor extends MemberDescriptor {
 
     public abstract Builder toBuilder();
 
-    public static Builder newBuilder() {
+    public static Builder builder() {
       return new AutoValue_MethodDescriptor_ParameterDescriptor.Builder()
           .setVarargs(false)
           .setAnnotations(ImmutableList.of())
           .setOptional(false)
           .setJsOptional(false);
     }
-
-    private static final ThreadLocalInterner<ParameterDescriptor> interner =
-        new ThreadLocalInterner<>();
 
     /** A Builder for ParameterDescriptor. */
     @AutoValue.Builder
@@ -117,6 +114,9 @@ public abstract class MethodDescriptor extends MemberDescriptor {
             !isOptional() || !isJsOptional(), "Parameters cannot be both optional and JsOptional");
         return interner.intern(autoBuild());
       }
+
+      private static final ThreadLocalInterner<ParameterDescriptor> interner =
+          new ThreadLocalInterner<>();
     }
   }
 
@@ -137,6 +137,11 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     SYNTHETIC_SYSTEM_PROPERTY_GETTER_OPTIONAL,
     SYNTHETIC_SYSTEM_PROPERTY_GETTER_REQUIRED,
     SYNTHETIC_INSTANCE_OF_SUPPORT_METHOD,
+    SYNTHETIC_WASM_ENTRY_POINT,
+    SYNTHETIC_WASM_JS_METHOD_EXPORT,
+    SYNTHETIC_WASM_JS_CONSTRUCTOR_EXPORT,
+    SYNTHETIC_WASM_JS_GETTER_EXPORT,
+    SYNTHETIC_WASM_JS_SETTER_EXPORT,
     GENERALIZING_BRIDGE, // Bridges a more general signature to a more specific one.
     SPECIALIZING_BRIDGE, // Bridges a more specific signature to a more general one.
     DEFAULT_METHOD_BRIDGE, // Bridges to a default method interface.
@@ -182,6 +187,14 @@ public abstract class MethodDescriptor extends MemberDescriptor {
 
         case SYNTHETIC_PROPERTY_SETTER, SYNTHETIC_PROPERTY_GETTER -> FieldOrigin.SOURCE.getPrefix();
 
+        case SYNTHETIC_WASM_ENTRY_POINT -> "export_";
+
+        case SYNTHETIC_WASM_JS_METHOD_EXPORT, SYNTHETIC_WASM_JS_CONSTRUCTOR_EXPORT -> "js_export_";
+
+        case SYNTHETIC_WASM_JS_GETTER_EXPORT -> "js_export_get_";
+
+        case SYNTHETIC_WASM_JS_SETTER_EXPORT -> "js_export_set_";
+
         // Don't prefix the rest, they all start with "$"
         default -> "";
       };
@@ -214,6 +227,35 @@ public abstract class MethodDescriptor extends MemberDescriptor {
 
     public boolean isRequiredSystemGetPropertyGetter() {
       return this == SYNTHETIC_SYSTEM_PROPERTY_GETTER_REQUIRED;
+    }
+
+    /** True if the method is a bridge generated for access from JavaScript. */
+    public boolean isWasmJsExport() {
+      return isWasmEntryPoint()
+          || isWasmJsMethodExport()
+          || isWasmJsGetterExport()
+          || isWasmJsSetterExport()
+          || isWasmJsConstructorExport();
+    }
+
+    public boolean isWasmEntryPoint() {
+      return this == SYNTHETIC_WASM_ENTRY_POINT;
+    }
+
+    public boolean isWasmJsMethodExport() {
+      return this == SYNTHETIC_WASM_JS_METHOD_EXPORT;
+    }
+
+    public boolean isWasmJsConstructorExport() {
+      return this == SYNTHETIC_WASM_JS_CONSTRUCTOR_EXPORT;
+    }
+
+    public boolean isWasmJsGetterExport() {
+      return this == SYNTHETIC_WASM_JS_GETTER_EXPORT;
+    }
+
+    public boolean isWasmJsSetterExport() {
+      return this == SYNTHETIC_WASM_JS_SETTER_EXPORT;
     }
   }
 
@@ -291,6 +333,8 @@ public abstract class MethodDescriptor extends MemberDescriptor {
 
   /** Return true if the underlying method represent a Kotlin suspend function. */
   public abstract boolean isSuspendFunction();
+
+  public abstract boolean isRecordComponentAccessor();
 
   public boolean isBridge() {
     return getBridgeOrigin() != null;
@@ -378,7 +422,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
 
   public abstract TypeDescriptor getReturnTypeDescriptor();
 
-  public abstract ImmutableList<TypeDescriptor> getExceptionTypeDescriptors();
+  public abstract ImmutableList<TypeDescriptor> getThrownTypeDescriptors();
 
   /** Type parameters declared in the method. */
   public abstract ImmutableList<TypeVariable> getTypeParameterTypeDescriptors();
@@ -443,6 +487,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
   // the details.
   abstract MethodDescriptor getDeclarationDescriptorOrNullIfSelf();
 
+  @Override
   @Memoized
   public MethodDescriptor toRawMemberDescriptor() {
     return toBuilder()
@@ -463,12 +508,12 @@ public abstract class MethodDescriptor extends MemberDescriptor {
   public MethodDescriptor withoutTypeParameters() {
 
     Set<TypeVariable> typeParameters = new HashSet<>(getTypeParameterTypeDescriptors());
-    return Builder.from(
-            specializeTypeVariables(
-                p ->
-                    typeParameters.contains(p)
-                        ? TypeVariable.createWildcardWithUpperBound(p.getUpperBoundTypeDescriptor())
-                        : p))
+    return specializeTypeVariables(
+            p ->
+                typeParameters.contains(p)
+                    ? TypeVariable.createWildcardWithUpperBound(p.getUpperBoundTypeDescriptor())
+                    : p)
+        .toBuilder()
         .setDeclarationDescriptor(
             isDeclaration() ? null : getDeclarationDescriptor().withoutTypeParameters())
         .setTypeParameterTypeDescriptors(ImmutableList.of())
@@ -538,9 +583,6 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     return true;
   }
 
-  @Nullable
-  abstract KtObjcInfo getKtObjcInfo();
-
   /** Compute the KtInfo of the function by traversing its overriding chain. */
   @Override
   @Memoized
@@ -555,13 +597,22 @@ public abstract class MethodDescriptor extends MemberDescriptor {
       KtInfo overriddenKtInfo =
           overriddenMethodDescriptor.getDeclarationDescriptor().getOriginalKtInfo();
       ktInfo =
-          KtInfo.newBuilder()
+          KtInfo.builder()
               .setProperty(ktInfo.isProperty() || overriddenKtInfo.isProperty())
               .setName(ktInfo.getName() == null ? overriddenKtInfo.getName() : ktInfo.getName())
               .build();
     }
 
     return ktInfo;
+  }
+
+  @Override
+  public JsInfo getDeclarationJsInfo() {
+    // The original JsInfo for a record component is present only in the corresponding field.
+    JsInfo inheritedRecordAccessorJsInfo = getInheritedRecordAccessorJsInfo();
+    return inheritedRecordAccessorJsInfo != null
+        ? inheritedRecordAccessorJsInfo
+        : getOriginalJsInfo();
   }
 
   /** Compute the JsInfo of the function by traversing its overriding chain. */
@@ -573,26 +624,32 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     }
 
     checkState(isDeclaration());
-    JsInfo originalJsInfo = getOriginalJsInfo();
+    JsInfo declarationJsInfo = getDeclarationJsInfo();
 
     // Make the implicit constructor of an anonymous class extending a JsType with JsConstructor
     // automatically a JsConstructor.
     if (getEnclosingTypeDescriptor().getTypeDeclaration().isAnonymous()
         && isConstructor()
         && getEnclosingTypeDescriptor().getSuperTypeDescriptor().hasJsConstructor()) {
-      return JsInfo.Builder.from(originalJsInfo).setJsMemberType(JsMemberType.CONSTRUCTOR).build();
+      return declarationJsInfo.toBuilder().setJsMemberType(JsMemberType.CONSTRUCTOR).build();
     }
 
-    if (originalJsInfo.isJsOverlay()
-        || originalJsInfo.getJsName() != null
-        || originalJsInfo.getJsNamespace() != null) {
+    // The original JsInfo for a record component is present only in the corresponding field.
+    JsInfo inheritedRecordAccessorJsInfo = getInheritedRecordAccessorJsInfo();
+    if (inheritedRecordAccessorJsInfo != null) {
+      declarationJsInfo = inheritedRecordAccessorJsInfo;
+    }
+
+    if (declarationJsInfo.isJsOverlay()
+        || declarationJsInfo.getJsName() != null
+        || declarationJsInfo.getJsNamespace() != null) {
       // Do not examine overridden methods if the method is marked as JsOverlay or it has a JsMember
       // annotation that customizes the name.
-      return originalJsInfo;
+      return declarationJsInfo;
     }
 
-    boolean hasExplicitJsMemberAnnotation = originalJsInfo.getHasJsMemberAnnotation();
-    JsInfo defaultJsInfo = originalJsInfo;
+    boolean hasExplicitJsMemberAnnotation = declarationJsInfo.getHasJsMemberAnnotation();
+    JsInfo defaultJsInfo = declarationJsInfo;
 
     for (MethodDescriptor overriddenMethodDescriptor : getJavaOverriddenMethodDescriptors()) {
       if (!isNative() && !canInheritsJsInfoFrom(overriddenMethodDescriptor)) {
@@ -607,7 +664,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
       }
 
       if (hasExplicitJsMemberAnnotation
-          && originalJsInfo.getJsMemberType() != inheritedJsInfo.getJsMemberType()) {
+          && declarationJsInfo.getJsMemberType() != inheritedJsInfo.getJsMemberType()) {
         // If they are inconsistent preserve the explicit annotation on the member so that the
         // restriction checker can report the error.
         continue;
@@ -617,10 +674,10 @@ public abstract class MethodDescriptor extends MemberDescriptor {
         // Found an overridden method of the same JsMember type one that customizes the name, done.
         // If there are any conflicts with other overrides they will be reported by
         // JsInteropRestrictionsChecker.
-        return JsInfo.Builder.from(inheritedJsInfo).setJsAsync(originalJsInfo.isJsAsync()).build();
+        return inheritedJsInfo.toBuilder().setJsAsync(declarationJsInfo.isJsAsync()).build();
       }
 
-      if (defaultJsInfo == originalJsInfo && !hasExplicitJsMemberAnnotation) {
+      if (defaultJsInfo == declarationJsInfo && !hasExplicitJsMemberAnnotation) {
         // The original method does not have a JsMember annotation and traversing the list of
         // overridden methods we found the first that has an explicit JsMember annotation.
         // Keep it as the one to be used if none is found that customizes the name.
@@ -636,13 +693,41 @@ public abstract class MethodDescriptor extends MemberDescriptor {
       // This is a Java override of a method that does not have the same signature and its
       // JsMethod annotation does not specify a name; in this case the method will not be considered
       // a JsMethod but instead it will be the target of a JsMethod bridge.
-      return JsInfo.Builder.from(JsInfo.NONE).setJsAsync(originalJsInfo.isJsAsync()).build();
+      return JsInfo.NONE.toBuilder().setJsAsync(declarationJsInfo.isJsAsync()).build();
     }
 
     // Don't inherit @JsAsync annotation from overridden methods.
-    return JsInfo.Builder.from(defaultJsInfo)
-        .setJsAsync(originalJsInfo.isJsAsync())
+    return defaultJsInfo.toBuilder()
+        .setJsAsync(declarationJsInfo.isJsAsync())
         .setHasJsMemberAnnotation(hasExplicitJsMemberAnnotation)
+        .build();
+  }
+
+  /**
+   * Returns the JsInfo of the method if it is a record component accessor. Otherwise returns null.
+   */
+  @Nullable
+  private JsInfo getInheritedRecordAccessorJsInfo() {
+    if (!isRecordComponentAccessor()) {
+      return null;
+    }
+
+    FieldDescriptor fieldDescriptor = getEnclosingTypeDescriptor().getFieldDescriptor(getName());
+    if (fieldDescriptor == null) {
+      // This should never happen except kotlin header jar that hides private fields (b/508481530).
+      return null;
+    }
+    JsInfo fieldJsInfo = fieldDescriptor.getOriginalJsInfo();
+    if (fieldJsInfo.getJsMemberType() != JsMemberType.PROPERTY) {
+      return null;
+    }
+
+    return fieldJsInfo.toBuilder()
+        .setJsMemberType(JsMemberType.GETTER)
+        // For inheritance purposes, we should consider always always as having a JsMember
+        // annotation even if the component was not originally annotated since we don't want to
+        // inherit from the parent JsMember type.
+        .setHasJsMemberAnnotation(true)
         .build();
   }
 
@@ -684,6 +769,62 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     return isJsPropertySetter() || getOrigin() == MethodOrigin.SYNTHETIC_PROPERTY_SETTER;
   }
 
+  /**
+   * Returns true if the method is a getter for a J2ObjC property.
+   *
+   * <p>This is a getter if it is a declaration, has no parameters, has a non-void return type, and
+   * either it has a {@code com.google.j2objc.annotations.Property} annotation or it overrides a
+   * method that has a {@code com.google.j2objc.annotations.Property} annotation.
+   *
+   * <p>Note that the annotation is ignored in overrides.
+   */
+  public boolean isJ2ObjCPropertyGetter() {
+    if (!isDeclaration()) {
+      return getDeclarationDescriptor().isJ2ObjCPropertyGetter();
+    }
+
+    if (isConstructor()) {
+      return false;
+    }
+
+    if (!getParameterDescriptors().isEmpty()) {
+      return false;
+    }
+
+    if (TypeDescriptors.isPrimitiveVoid(getReturnTypeDescriptor())) {
+      return false;
+    }
+
+    return getJavaOverriddenMethodDescriptors().isEmpty()
+        ? hasJ2ObjCPropertyAnnotation()
+        : getJavaOverriddenMethodDescriptors().stream()
+            .filter(m -> m.getJavaOverriddenMethodDescriptors().isEmpty())
+            .anyMatch(m -> m.hasJ2ObjCPropertyAnnotation());
+  }
+
+  /**
+   * Returns true if the method has a {@code com.google.j2objc.annotations.Property} annotation
+   * either on the method itself or on the enclosing type, unless the method is annotated with
+   * {@code com.google.j2objc.annotations.Property.Suppress}.
+   */
+  private boolean hasJ2ObjCPropertyAnnotation() {
+    if (hasAnnotation("com.google.j2objc.annotations.Property.Suppress")) {
+      return false;
+    }
+
+    if (hasAnnotation("com.google.j2objc.annotations.Property")) {
+      return true;
+    }
+
+    if (getEnclosingTypeDescriptor()
+        .getTypeDeclaration()
+        .hasAnnotation("com.google.j2objc.annotations.Property")) {
+      return true;
+    }
+
+    return false;
+  }
+
   public abstract boolean isEnumSyntheticMethod();
 
   @Override
@@ -691,12 +832,6 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     return getOrigin() == MethodOrigin.SOURCE
         && getParameterDescriptors().size() == 1
         && getName().equals(IS_INSTANCE_METHOD_NAME);
-  }
-
-  @Nullable
-  public String getObjectiveCName() {
-    KtObjcInfo ktObjcInfo = getKtObjcInfo();
-    return ktObjcInfo != null ? ktObjcInfo.getObjectiveCName() : null;
   }
 
   /** Returns true if this descriptor and {@code other} refer to the same method declaration. */
@@ -737,39 +872,58 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     return getOrigin().getName() == null ? getName() : getOrigin().getName();
   }
 
-  @Memoized
   @Override
   public String getMangledName() {
-    if (getManglingDescriptor() != this) {
-      return getManglingDescriptor().getMangledName();
+    if (!useClosureManglingPatterns()) {
+      // Do not use JsInfo when producing mangled names for wasm.
+      return getStandardMangledName();
     }
 
-    // Do not use JsInfo when producing mangled names for wasm.
-    if (useClosureManglingPatterns()) {
-      if (isJsConstructor() || getOrigin() == MethodOrigin.SYNTHETIC_NOOP_JAVASCRIPT_CONSTRUCTOR) {
-        return "constructor";
-      }
+    return getClosureMangledName();
+  }
 
-      if (isPropertyGetter()) {
-        return "get " + computePropertyMangledName();
-      }
+  /**
+   * Returns the name for this method descriptor using Closure-style mangling patterns which takes
+   * into account JS members.
+   */
+  @Memoized
+  public String getClosureMangledName() {
+    if (getManglingDescriptor() != this) {
+      return getManglingDescriptor().getClosureMangledName();
+    }
 
-      if (isPropertySetter()) {
-        return "set " + computePropertyMangledName();
-      }
+    if (isJsConstructor() || getOrigin() == MethodOrigin.SYNTHETIC_NOOP_JAVASCRIPT_CONSTRUCTOR) {
+      return "constructor";
+    }
 
-      if (isJsMethod()) {
-        return getSimpleJsName();
-      }
+    if (isPropertyGetter()) {
+      return "get$$" + computePropertyMangledName();
+    }
 
-      if (getOrigin().isSyntheticInstanceOfSupportMember() || isCustomIsInstanceMethod()) {
-        // Class support methods, like $isInstance and $markImplementor, should not be mangled.
-        return getName();
-      }
+    if (isPropertySetter()) {
+      return "set$$" + computePropertyMangledName();
+    }
+
+    if (isJsMethod()) {
+      return getSimpleJsName();
+    }
+
+    if (getOrigin().isSyntheticInstanceOfSupportMember() || isCustomIsInstanceMethod()) {
+      // Class support methods, like $isInstance and $markImplementor, should not be mangled.
+      return getName();
     }
 
     // All special cases have been handled. Go ahead and construct the mangled name for a plain
     // Java method.
+    return getStandardMangledName();
+  }
+
+  @Memoized
+  String getStandardMangledName() {
+    if (getManglingDescriptor() != this) {
+      return getManglingDescriptor().getStandardMangledName();
+    }
+
     String suffix = "";
     if (isInstanceMember()) {
       // Only use suffixes for instance methods. Static methods are always called through the
@@ -892,7 +1046,25 @@ public abstract class MethodDescriptor extends MemberDescriptor {
       return false;
     }
 
-    return isSameSignature(that);
+    SourceLanguage overrideSemanticsLanguages = getOverrideSemanticsLanguage(this, that);
+    return getSignature(overrideSemanticsLanguages)
+        .equals(that.getSignature(overrideSemanticsLanguages));
+  }
+
+  /**
+   * Returns the semantics used to determine overrides; if any method is written in Kotlin, kotlin
+   * semantics are used.
+   */
+  private static SourceLanguage getOverrideSemanticsLanguage(
+      MethodDescriptor overridenMethod, MethodDescriptor overridingMethod) {
+    var overridenMethodLang =
+        overridenMethod.getEnclosingTypeDescriptor().getTypeDeclaration().getSourceLanguage();
+    var overridingMethodLang =
+        overridingMethod.getEnclosingTypeDescriptor().getTypeDeclaration().getSourceLanguage();
+    return overridenMethodLang == SourceLanguage.KOTLIN
+            || overridingMethodLang == SourceLanguage.KOTLIN
+        ? SourceLanguage.KOTLIN
+        : SourceLanguage.JAVA;
   }
 
   /** Returns {@code true} is {@code this} has the same signature as {@code that}. */
@@ -994,19 +1166,19 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     return builder.build();
   }
 
-  abstract Builder toBuilder();
+  public abstract Builder toBuilder();
 
-  public static Builder newBuilder() {
+  public static Builder builder() {
     return new AutoValue_MethodDescriptor.Builder()
         // Default values.
         .setVisibility(Visibility.PUBLIC)
         .setOriginalJsInfo(JsInfo.NONE)
-        .setOriginalKtInfo(KtInfo.NONE)
         .setAnnotations(ImmutableList.of())
         .setAbstract(false)
         .setSynchronized(false)
         .setConstructor(false)
         .setDefaultMethod(false)
+        .setRecordComponentAccessor(false)
         .setNative(false)
         .setStatic(false)
         .setFinal(false)
@@ -1016,7 +1188,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
         .setOrigin(MethodOrigin.SOURCE)
         .setParameterDescriptors(ImmutableList.of())
         .setReturnTypeDescriptor(PrimitiveTypes.VOID)
-        .setExceptionTypeDescriptors(ImmutableList.of())
+        .setThrownTypeDescriptors(ImmutableList.of())
         .setTypeParameterTypeDescriptors(ImmutableList.of())
         .setTypeArgumentTypeDescriptors(ImmutableList.of());
   }
@@ -1101,7 +1273,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
         // interface methods never override class methods.
         .filter(t -> !(getEnclosingTypeDescriptor().isInterface() && isJavaLangObject(t)))
         .flatMap(t -> t.getPolymorphicMethods().stream())
-        .filter(m -> m.getMangledName().equals(getMangledName()))
+        .filter(m -> m.getClosureMangledName().equals(getClosureMangledName()))
         .forEach(m -> overriddenMethodsBuilder.add(m).addAll(m.getJsOverriddenMethodDescriptors()));
 
     return overriddenMethodsBuilder.build();
@@ -1115,10 +1287,17 @@ public abstract class MethodDescriptor extends MemberDescriptor {
    * Whether it is valid to emit a JsDoc @override annotations for methods that override methods in
    * this type.
    */
-  private boolean isJsOverrideable() {
+  boolean isJsOverrideable() {
     return !isJsOverlay()
         && !getEnclosingTypeDescriptor().isStarOrUnknown()
         && !getEnclosingTypeDescriptor().isJsFunctionInterface();
+  }
+
+  @Override
+  public boolean isKtProperty() {
+    return getKtInfo().isProperty()
+        || getEnclosingTypeDescriptor().isAnnotation()
+        || isJ2ObjCPropertyGetter();
   }
 
   @Override
@@ -1196,7 +1375,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
       return this;
     }
 
-    return MethodDescriptor.Builder.from(this)
+    return toBuilder()
         .setDeclarationDescriptor(getDeclarationDescriptor())
         .setTypeArgumentTypeDescriptors(specializedTypeArgumentDescriptors)
         .setReturnTypeDescriptor(specializedReturnTypeDescriptor)
@@ -1266,7 +1445,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     // The bound was specialized, introduce a new type variable and add it to the replacement
     // function.
     TypeVariable replacementTypeVariable =
-        TypeVariable.newBuilder()
+        TypeVariable.builder()
             .setName(typeVariable.getName())
             .setUniqueKey(
                 typeVariable.getUniqueKey()
@@ -1292,6 +1471,22 @@ public abstract class MethodDescriptor extends MemberDescriptor {
   }
 
   /**
+   * Returns the mapping between all the type variables in the type arguments.
+   *
+   * <p>Note: It does not include the mapping for wildcards; hence this parameterization is not
+   * enough to recreate a method descriptor from its declaration.
+   */
+  @Memoized
+  public Map<TypeVariable, TypeDescriptor> getLocalParameterization() {
+    Map<TypeVariable, TypeDescriptor> parameterization = new LinkedHashMap<>();
+    Streams.forEachPair(
+        getDeclarationDescriptor().getTypeParameterTypeDescriptors().stream(),
+        getTypeArgumentTypeDescriptors().stream(),
+        parameterization::put);
+    return parameterization;
+  }
+
+  /**
    * Returns the mapping between all the type variables in the enclosing context and the type
    * arguments.
    *
@@ -1300,11 +1495,8 @@ public abstract class MethodDescriptor extends MemberDescriptor {
    */
   @Memoized
   public Map<TypeVariable, TypeDescriptor> getParameterization() {
-    Map<TypeVariable, TypeDescriptor> parameterization = new LinkedHashMap<>();
-    Streams.forEachPair(
-        getDeclarationDescriptor().getTypeParameterTypeDescriptors().stream(),
-        getTypeArgumentTypeDescriptors().stream(),
-        parameterization::put);
+    Map<TypeVariable, TypeDescriptor> parameterization =
+        new LinkedHashMap<>(getLocalParameterization());
     if (!isStatic()) {
       parameterization.putAll(getEnclosingTypeDescriptor().getParameterization());
     }
@@ -1369,6 +1561,8 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     public abstract Builder setStatic(boolean isStatic);
 
     public abstract Builder setConstructor(boolean isConstructor);
+
+    public abstract Builder setRecordComponentAccessor(boolean isRecordComponentAccessor);
 
     public abstract Builder setAbstract(boolean isAbstract);
 
@@ -1457,9 +1651,12 @@ public abstract class MethodDescriptor extends MemberDescriptor {
 
     public abstract Builder setOriginalJsInfo(JsInfo jsInfo);
 
-    public abstract Builder setOriginalKtInfo(KtInfo ktInfo);
+    abstract Builder setOriginalKtInfoInternal(KtInfo ktInfo);
 
-    public abstract Builder setKtObjcInfo(KtObjcInfo ktObjcInfo);
+    @CanIgnoreReturnValue
+    public Builder setOriginalKtInfo(KtInfo ktInfo) {
+      return setOriginalKtInfoInternal(ktInfo);
+    }
 
     public abstract Builder setAnnotations(List<Annotation> annotations);
 
@@ -1526,8 +1723,8 @@ public abstract class MethodDescriptor extends MemberDescriptor {
     }
 
     @CanIgnoreReturnValue
-    public abstract Builder setExceptionTypeDescriptors(
-        ImmutableList<TypeDescriptor> exceptionTypeDescriptors);
+    public abstract Builder setThrownTypeDescriptors(
+        ImmutableList<TypeDescriptor> thrownTypeDescriptors);
 
     public abstract ImmutableList<TypeDescriptor> getTypeArgumentTypeDescriptors();
 
@@ -1546,7 +1743,7 @@ public abstract class MethodDescriptor extends MemberDescriptor {
       return parameterTypeDescriptors.stream()
           .map(
               typeDescriptor ->
-                  ParameterDescriptor.newBuilder().setTypeDescriptor(typeDescriptor).build())
+                  ParameterDescriptor.builder().setTypeDescriptor(typeDescriptor).build())
           .collect(toImmutableList());
     }
 
@@ -1708,10 +1905,6 @@ public abstract class MethodDescriptor extends MemberDescriptor {
       checkState(
           !methodDescriptor.isGeneralizingBridge()
               || methodDescriptor.isJsMethod() == methodDescriptor.getBridgeOrigin().isJsMethod());
-    }
-
-    public static Builder from(MethodDescriptor methodDescriptor) {
-      return methodDescriptor.toBuilder();
     }
 
     private static final ThreadLocalInterner<MethodDescriptor> interner =

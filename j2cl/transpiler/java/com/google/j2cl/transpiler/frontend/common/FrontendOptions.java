@@ -16,22 +16,30 @@
 package com.google.j2cl.transpiler.frontend.common;
 
 import com.google.common.collect.ImmutableList;
+import com.google.j2cl.common.OutputUtils.Output;
 import com.google.j2cl.common.SourceUtils.FileInfo;
+import java.nio.file.Path;
 import javax.annotation.Nullable;
 
 /** Configuration for frontend. */
 public interface FrontendOptions {
   ImmutableList<FileInfo> getSources();
 
+  Output getOutput();
+
   @Nullable
   String getTargetLabel();
 
-  ImmutableList<String> getClasspaths();
+  ImmutableList<Path> getClasspaths();
+
+  Path getSourceGenPath();
 
   @Nullable
-  ImmutableList<String> getDirectDeps();
+  Path getSystem();
 
-  String getSystem();
+  ImmutableList<String> getAnnotationProcessors();
+
+  ImmutableList<Path> getAnnotationProcessorPath();
 
   boolean getGenerateKytheIndexingMetadata();
 
@@ -40,6 +48,12 @@ public interface FrontendOptions {
   ImmutableList<String> getJavacOptions();
 
   ImmutableList<String> getKotlincOptions();
+
+  boolean getEnableKlibs();
+
+  ImmutableList<Path> getDependencyKlibs();
+
+  ImmutableList<Path> getFriendKlibs();
 
   ImmutableList<String> getForbiddenAnnotations();
 }

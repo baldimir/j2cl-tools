@@ -17,67 +17,84 @@ package com.google.j2cl.tools.gwtincompatible;
 
 import static org.junit.Assert.assertEquals;
 
-import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import java.util.ArrayList;
+import com.sun.source.util.JavacTask;
+import java.io.IOException;
+import java.net.URI;
+import java.util.HashSet;
 import java.util.List;
-import org.eclipse.jdt.core.dom.AST;
-import org.eclipse.jdt.core.dom.ASTParser;
-import org.eclipse.jdt.core.dom.CompilationUnit;
-import org.eclipse.jdt.core.dom.ImportDeclaration;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
+import javax.tools.ToolProvider;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Tests for {@link UnusedImportsNodeCollector}. TODO(stalcup): Consider moving this test to an
- * integration test.
- */
+/** Tests for {@link UnusedImportsNodeCollector}. */
 @RunWith(JUnit4.class)
 public class UnusedImportsNodeCollectorTest {
 
   @Test
-  public void testGetUnusedImports() {
+  public void testGetUnusedImports() throws Exception {
     String source =
-        Joiner.on("\n")
-            .join(
-                "package a.b.c;",
-                "import x1.y1.z1.*;",
-                "import x1.y2.z1.A;",
-                "import x1.y2.z1.B;",
-                "import x1.y2.z1.C;",
-                "import x1.y2.z1.D;",
-                "import x1.y2.z1.E;",
-                "import x1.y2.z1.F;",
-                "import x1.y2.z1.G;",
-                "import x2.H;",
-                "import x2.I;",
-                "import static x2.L;",
-                "import x2.M;",
-                "/** See {@link M}.**/ ",
-                "public class Foo extends A {",
-                "  @I",
-                "  public void m(B b) {",
-                "    C c = new D();",
-                "    return E.r() + F.e + L;",
-                "  }",
-                "}");
+        """
+        @Q
+        package a.b.c;
+
+        import static x1.y1.z1.A.m;
+        import static x1.y1.z1.A.n;
+        import static x2.L;
+
+        import x1.y1.z1.*;
+        import x1.y2.z1.A;
+        import x1.y2.z1.B;
+        import x1.y2.z1.C;
+        import x1.y2.z1.D;
+        import x1.y2.z1.E;
+        import x1.y2.z1.F;
+        import x1.y2.z1.G;
+        import x2.H;
+        import x2.I;
+        import x2.M;
+        import x2.O;
+        import x2.P;
+        import x2.Q;
+        import x2.R;
+        import x2.S;
+
+        /** See {@link M}.**/
+        public class Foo extends A {
+          @I
+          public void m(B b) {
+            C c = new D(O::x);
+
+            return E.r() + F.e + L + n() + P.R.S.s;
+          }
+        }
+        """;
     List<String> imports = getUnusedImports(source);
-    assertEquals(Lists.newArrayList("x1.y2.z1.G", "x2.H", "x2.M"), imports);
+    assertEquals(
+        Lists.newArrayList("x1.y1.z1.A.m", "x1.y2.z1.G", "x2.H", "x2.M", "x2.R", "x2.S"), imports);
   }
 
-  private List<String> getUnusedImports(String source) {
-    ASTParser parser = ASTParser.newParser(AST.JLS8);
-    parser.setSource(source.toCharArray());
-    CompilationUnit compilationUnit = (CompilationUnit) parser.createAST(null);
+  private List<String> getUnusedImports(String source) throws IOException {
+    JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
 
-    UnusedImportsNodeCollector importsCollector = new UnusedImportsNodeCollector();
-    compilationUnit.accept(importsCollector);
-    List<ImportDeclaration> unusedImportsDeclarations = importsCollector.getUnusedImports();
-    List<String> unusedImports = new ArrayList<>();
-    for (ImportDeclaration importDeclaration : unusedImportsDeclarations) {
-      unusedImports.add(importDeclaration.getName().toString());
-    }
-    return unusedImports;
+    SimpleJavaFileObject fileObject =
+        new SimpleJavaFileObject(URI.create("string:///temp.java"), JavaFileObject.Kind.SOURCE) {
+          @Override
+          public String getCharContent(boolean ignoreEncodingErrors) {
+            return source;
+          }
+        };
+    JavacTask task =
+        (JavacTask) compiler.getTask(null, null, null, null, null, ImmutableList.of(fileObject));
+    UnusedImportsNodeCollector importsCollector = new UnusedImportsNodeCollector(new HashSet<>());
+    importsCollector.scan(Iterables.getOnlyElement(task.parse()), null);
+    return Lists.transform(
+        importsCollector.getUnusedImports(), i -> i.getQualifiedIdentifier().toString());
   }
 }

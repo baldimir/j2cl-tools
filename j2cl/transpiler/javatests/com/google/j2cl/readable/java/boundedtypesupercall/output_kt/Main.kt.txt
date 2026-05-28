@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package boundedtypesupercall
 
@@ -24,15 +25,15 @@ import kotlin.Suppress
 open class Main {
  abstract class Foo<T> {
   constructor(foo: T)
-
+  
   abstract fun foo()
  }
-
+ 
  open class Bar<T: Comparable<*>?> {
   open fun getSomething(): T {
    return null as T
   }
-
+  
   open fun doSomething(): Foo<T>? {
    return object : Foo<T>(
     this@Bar.getSomething(),

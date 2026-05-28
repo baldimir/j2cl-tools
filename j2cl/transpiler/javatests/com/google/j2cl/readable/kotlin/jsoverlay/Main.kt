@@ -42,12 +42,6 @@ class NativeJsTypeWithOverlayConstant {
   }
 }
 
-internal class NativeJsTypeInterfaceWithOverlayImpl : NativeJsTypeInterfaceWithOverlay {
-  override fun m(): Int {
-    return 0
-  }
-}
-
 @JsType(isNative = true, namespace = "test.foo")
 class NativeJsTypeWithOverlay {
   external fun m(): Int
@@ -135,15 +129,16 @@ fun testOverlayInterface(foo: NativeJsTypeInterfaceWithOverlay) {
   foo.callM()
 }
 
-fun testOverlayInterfaceImpl() {
-  val foo: NativeJsTypeInterfaceWithOverlay = NativeJsTypeInterfaceWithOverlayImpl()
-  foo.m()
-  foo.callM()
-}
-
 @JsType(isNative = true, namespace = JsPackage.GLOBAL, name = "?")
 internal interface ParameterizedNativeInterface<T> {
   @JsOverlay fun <T, S> shadowsTypeVariable(param1: T, param2: S) {}
 
   @JsOverlay fun <T, S> shadowsTypeVariable(param1: T, param2: Int) {}
+
+  @JsOverlay fun publicCalleeByPrivate() {}
+
+  @JsOverlay
+  private fun privateCaller(t1: ParameterizedNativeInterface<String>) {
+    t1.publicCalleeByPrivate() // Call with different parameterization.
+  }
 }

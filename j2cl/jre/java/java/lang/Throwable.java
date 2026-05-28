@@ -20,20 +20,21 @@ import static javaemul.internal.InternalPreconditions.checkNotNull;
 import static javaemul.internal.InternalPreconditions.checkState;
 
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
 import javaemul.internal.ThrowableUtils;
 import javaemul.internal.ThrowableUtils.JsObject;
 import javaemul.internal.ThrowableUtils.NativeError;
 import javaemul.internal.annotations.Wasm;
+import jsinterop.annotations.JsFunction;
 import jsinterop.annotations.JsMethod;
 import jsinterop.annotations.JsNonNull;
 import jsinterop.annotations.JsProperty;
 
 /**
- * See <a
- * href="http://java.sun.com/j2se/1.5.0/docs/api/java/lang/Throwable.html">the
- * official Java API doc</a> for details.
+ * See <a href="http://java.sun.com/j2se/1.5.0/docs/api/java/lang/Throwable.html">the official Java
+ * API doc</a> for details.
  */
 public class Throwable implements Serializable {
 
@@ -70,11 +71,11 @@ public class Throwable implements Serializable {
   }
 
   /**
-   * Constructor that allows subclasses disabling exception suppression and stack traces.
-   * Those features should only be disabled in very specific cases.
+   * Constructor that allows subclasses disabling exception suppression and stack traces. Those
+   * features should only be disabled in very specific cases.
    */
-  protected Throwable(String message, Throwable cause, boolean enableSuppression,
-      boolean writableStackTrace) {
+  protected Throwable(
+      String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
     this.cause = cause;
     this.detailMessage = message;
     this.disableStackTrace = !writableStackTrace;
@@ -120,7 +121,7 @@ public class Throwable implements Serializable {
       if (ThrowableUtils.isError(backingJsObject)) {
         // The stack property on Error is lazily evaluated in Chrome, so it is better use
         // captureStackTrace if available.
-        if (NativeError.hasCaptureStackTraceProperty) {
+        if (NativeError.hasCaptureStackTraceProperty()) {
           NativeError.captureStackTrace((NativeError) backingJsObject);
         } else {
           ((NativeError) backingJsObject).stack = new NativeError().stack;
@@ -190,10 +191,19 @@ public class Throwable implements Serializable {
   }
 
   public void printStackTrace(PrintStream out) {
-    printStackTraceImpl(out, "", "");
+    printStackTraceImpl(out::println, "", "");
   }
 
-  private void printStackTraceImpl(PrintStream out, String prefix, String ident) {
+  public void printStackTrace(PrintWriter out) {
+    printStackTraceImpl(out::println, "", "");
+  }
+
+  @JsFunction
+  private interface Printer {
+    void println(String s);
+  }
+
+  private void printStackTraceImpl(Printer out, String prefix, String ident) {
     out.println(ident + prefix + this);
     printStackTraceItems(out, ident);
 
@@ -207,7 +217,7 @@ public class Throwable implements Serializable {
     }
   }
 
-  private void printStackTraceItems(PrintStream out, String ident) {
+  private void printStackTraceItems(Printer out, String ident) {
     for (StackTraceElement element : getStackTrace()) {
       out.println(ident + "\tat " + element);
     }

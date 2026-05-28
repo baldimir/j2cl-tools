@@ -17,6 +17,7 @@ package com.google.j2cl.transpiler.ast;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.common.visitor.Processor;
 import com.google.j2cl.common.visitor.Visitable;
@@ -28,18 +29,12 @@ public class Field extends Member {
 
   @Visitable FieldDescriptor fieldDescriptor;
   @Visitable @Nullable Expression initializer;
-  // TODO(b/112150736): generalize concept of the source position for names to members.
-  private final SourcePosition nameSourcePosition;
- 
+
   private Field(
-      SourcePosition sourcePosition,
-      FieldDescriptor fieldDescriptor,
-      Expression initializer,
-      SourcePosition nameSourcePosition) {
+      SourcePosition sourcePosition, FieldDescriptor fieldDescriptor, Expression initializer) {
     super(sourcePosition);
     this.fieldDescriptor = checkNotNull(fieldDescriptor);
     this.initializer = initializer;
-    this.nameSourcePosition = checkNotNull(nameSourcePosition);
   }
 
   @Override
@@ -49,10 +44,6 @@ public class Field extends Member {
 
   public Expression getInitializer() {
     return initializer;
-  }
-
-  public SourcePosition getNameSourcePosition() {
-    return nameSourcePosition;
   }
 
   public boolean hasInitializer() {
@@ -73,9 +64,28 @@ public class Field extends Member {
     return getDescriptor().isEnumConstant();
   }
 
+  public BinaryExpression infixAssign(Expression value) {
+    return FieldAccess.builderFrom(this).setDefaultInstanceQualifier().build().infixAssign(value);
+  }
+
   @Override
   Node acceptInternal(Processor processor) {
     return Visitor_Field.visit(processor, this);
+  }
+
+  public Builder toBuilder() {
+    return builder()
+        .setDescriptor(this.getDescriptor())
+        .setInitializer(this.getInitializer())
+        .setSourcePosition(this.getSourcePosition());
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builderFrom(FieldDescriptor fieldDescriptor) {
+    return builder().setDescriptor(fieldDescriptor);
   }
 
   /** A Builder for Field. */
@@ -83,55 +93,34 @@ public class Field extends Member {
     private FieldDescriptor fieldDescriptor;
     private Expression initializer;
     private SourcePosition sourcePosition;
-    private SourcePosition nameSourcePosition = SourcePosition.NONE;
 
-    public static Builder from(Field field) {
-      Builder builder = new Builder();
-      builder.fieldDescriptor = field.getDescriptor();
-      builder.initializer = field.getInitializer();
-      builder.sourcePosition = field.getSourcePosition();
-      builder.nameSourcePosition = field.getNameSourcePosition();
-      return builder;
-    }
-
-    public static Builder from(FieldDescriptor fieldDescriptor) {
-      return new Builder().setDescriptor(fieldDescriptor);
-    }
-
+    @CanIgnoreReturnValue
     public Builder setDescriptor(FieldDescriptor fieldDescriptor) {
       this.fieldDescriptor = fieldDescriptor;
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder setInitializer(Expression initializer) {
       this.initializer = initializer;
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder setEnclosingClass(DeclaredTypeDescriptor enclosingTypeDescriptor) {
       this.fieldDescriptor =
-          FieldDescriptor.Builder.from(fieldDescriptor)
-              .setEnclosingTypeDescriptor(enclosingTypeDescriptor)
-              .build();
+          fieldDescriptor.toBuilder().setEnclosingTypeDescriptor(enclosingTypeDescriptor).build();
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder setSourcePosition(SourcePosition sourcePosition) {
       this.sourcePosition = sourcePosition;
       return this;
     }
 
-    public Builder setNameSourcePosition(SourcePosition nameSourcePosition) {
-      this.nameSourcePosition = nameSourcePosition;
-      return this;
-    }
-
     public Field build() {
-      return new Field(
-          sourcePosition,
-          fieldDescriptor,
-          initializer,
-          nameSourcePosition);
+      return new Field(sourcePosition, fieldDescriptor, initializer);
     }
   }
 }

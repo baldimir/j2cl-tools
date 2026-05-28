@@ -13,7 +13,6 @@
  */
 package com.google.j2cl.transpiler.passes;
 
-
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.AbstractVisitor;
@@ -140,7 +139,7 @@ public class OptimizeAnonymousInnerClassesToFunctionExpressions extends Normaliz
               //
               //  gets transformed so that it is JsFunctionInterface.apply instead.
               //
-              return MethodCall.Builder.from(methodCall)
+              return methodCall.toBuilder()
                   .setTarget(
                       targetTypeDescriptor
                           .getFunctionalInterface()
@@ -178,7 +177,7 @@ public class OptimizeAnonymousInnerClassesToFunctionExpressions extends Normaliz
     Method jsFunctionMethodImplementation = getSingleDeclaredMethod(type);
     DeclaredTypeDescriptor jsFunctionTypeDescriptor =
         type.getTypeDescriptor().getFunctionalInterface();
-    return FunctionExpression.newBuilder()
+    return FunctionExpression.builder()
         .setTypeDescriptor(jsFunctionTypeDescriptor)
         .setParameters(jsFunctionMethodImplementation.getParameters())
         .setStatements(jsFunctionMethodImplementation.getBody().getStatements())
@@ -193,7 +192,7 @@ public class OptimizeAnonymousInnerClassesToFunctionExpressions extends Normaliz
   }
 
   /**
-   * Determines whether an inner class that implements a funcitonal interface can be optimized into
+   * Determines whether an inner class that implements a functional interface can be optimized into
    * a function expression (lambda).
    */
   private static boolean canBeOptimized(Type type) {
@@ -207,7 +206,7 @@ public class OptimizeAnonymousInnerClassesToFunctionExpressions extends Normaliz
       return false;
     }
 
-    if (!typeDeclaration.getInterfaceTypeDescriptors().get(0).isFunctionalInterface()) {
+    if (!typeDeclaration.getInterfaceTypeDescriptors().getFirst().isFunctionalInterface()) {
       return false;
     }
 

@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 /** An array type. */
 @Visitable
 @AutoValue
-public abstract class ArrayTypeDescriptor extends TypeDescriptor {
+public abstract non-sealed class ArrayTypeDescriptor extends TypeDescriptor {
 
   public abstract TypeDescriptor getComponentTypeDescriptor();
 
@@ -77,6 +77,11 @@ public abstract class ArrayTypeDescriptor extends TypeDescriptor {
   @Override
   public boolean isNativeJsArray() {
     return getLeafTypeDescriptor().toRawTypeDescriptor().isNative();
+  }
+
+  @Override
+  public boolean isNative() {
+    return isNativeJsArray();
   }
 
   /**
@@ -246,9 +251,7 @@ public abstract class ArrayTypeDescriptor extends TypeDescriptor {
   }
 
   public ArrayTypeDescriptor withComponentTypeDescriptor(TypeDescriptor typeDescriptor) {
-    return ArrayTypeDescriptor.Builder.from(this)
-        .setComponentTypeDescriptor(typeDescriptor)
-        .build();
+    return toBuilder().setComponentTypeDescriptor(typeDescriptor).build();
   }
 
   @Override
@@ -264,9 +267,9 @@ public abstract class ArrayTypeDescriptor extends TypeDescriptor {
     return Visitor_ArrayTypeDescriptor.visit(processor, this);
   }
 
-  abstract Builder toBuilder();
+  public abstract Builder toBuilder();
 
-  public static Builder newBuilder() {
+  public static Builder builder() {
     return new AutoValue_ArrayTypeDescriptor.Builder()
         // Default values.
         .setNullable(true)
@@ -276,9 +279,6 @@ public abstract class ArrayTypeDescriptor extends TypeDescriptor {
   /** Builder for an ArrayTypeDescriptor. */
   @AutoValue.Builder
   public abstract static class Builder {
-    public static Builder from(ArrayTypeDescriptor arrayTypeDescriptor) {
-      return arrayTypeDescriptor.toBuilder();
-    }
 
     public abstract Builder setComponentTypeDescriptor(TypeDescriptor leafTypeDescriptor);
 

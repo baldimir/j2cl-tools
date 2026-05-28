@@ -14,7 +14,7 @@
  * the License.
  */
 import XCTest
-import third_party_java_src_j2cl_transpiler_javatests_com_google_j2cl_integration_java_j2ktiosinterop_j2objc
+import third_party_java_src_j2cl_transpiler_javatests_com_google_j2cl_integration_java_j2ktiosinterop_j2ktiosinterop_j2objc
 
 /// J2ObjC interop test for Swift.
 final class J2ObjCSwiftInteropTest: XCTestCase {
@@ -45,19 +45,43 @@ final class J2ObjCSwiftInteropTest: XCTestCase {
     obj.classMethod(with: nil)
     obj.stringIterableMethod(with: nil)
     obj.intStringMethod(with: 1, with: "")
+    obj.customNamesMethod(with: nil)
+    obj.defaultNamesMethod(with: nil)
 
     obj.genericMethod(withId: nil)
-    obj.genericStringMethod(with: "")
+    obj.genericStringMethod(with: nil)
+    obj.genericStringAndComparableStringMethod(with: nil)
+    obj.genericLongMethod(with: nil)
+    obj.genericLongAndComparableLongMethod(with: nil)
 
     obj.overloadedMethod(withId: nil)
-    obj.overloadedMethod(with: 1 as jint)
-    obj.overloadedMethod(withLong: 1 as jlong)
+    obj.overloadedMethod(with: 1 as Int32)
+    obj.overloadedMethod(withLong: 1 as Int64)
 
-    obj.overloadedMethod(with: 1 as jfloat)
-    obj.overloadedMethod(with: 1 as jdouble)
+    obj.overloadedMethod(with: 1 as Float)
+    obj.overloadedMethod(with: 1 as Double)
     obj.overloadedMethod(with: "")
 
     // Fields are not exposed in Swift
+
+    // For methods that throw, J2ObjC generates variants with and without `error:` parameter
+    obj.throwsMethod()
+    obj.throwsMethod(with: "")
+    J2ktiosinteropDefaultNames.staticThrowsMethod()
+    J2ktiosinteropDefaultNames.staticThrowsMethod(with: "")
+
+    let _: Bool = obj.throwsMethodAndReturnError(nil)
+    let _: Bool = obj.throwsMethod(with: "", error: nil)
+    let _: Bool = J2ktiosinteropDefaultNames.staticThrowsMethodAndReturnError(nil)
+    let _: Bool = J2ktiosinteropDefaultNames.staticThrowsMethod(with: "", error: nil)
+  }
+
+  func testOnlyImplicitDefaultConstructor() {
+    let _ = J2ktiosinteropOnlyImplicitDefaultConstructor()
+  }
+
+  func testOnlyExplicitDefaultConstructor() {
+    let _ = J2ktiosinteropOnlyExplicitDefaultConstructor()
   }
 
   func testSpecialNames() {
@@ -94,14 +118,128 @@ final class J2ObjCSwiftInteropTest: XCTestCase {
 
     obj.customLongMethod(withLong: 1)
     obj.customLongStringMethod(withLong: 1, with: "")
+
+    obj.customCustomNamesMethod(with: nil)
+    obj.customDefaultNamesMethod(with: nil)
+
+    obj.customObjectiveCSwiftStringMethod(with: "")
+    obj.customSwiftStringMethod(with: "")
+
+    Custom_customStaticMethod()
+    Custom_customStaticIntMethodWithIndex_(1)
+    Custom_customStaticIntStringMethodWithIndex_name_(1, "")
+    Custom_customStaticLongMethod(1)
+    Custom_customStaticLongStringMethod(2, "")
+
+    obj.lowercase("")
+    Custom_staticlowercase_("")
   }
 
   func testEnumNames() {
     let _ = J2ktiosinteropEnumNames_get_ONE()
     let _ = J2ktiosinteropEnumNames_get_TWO()
 
-    // Not exposed on Swift
+    // Not exposed in Swift
+    // let _ = J2ktiosinteropEnumNames_fromOrdinal(J2ktiosinteropEnumNames_Enum_ONE)
+    // let _ = J2ktiosinteropEnumNames_fromOrdinal(J2ktiosinteropEnumNames_Enum_TWO)
+
     // let _ = J2ktiosinteropEnumNames_Enum_ONE
     // let _ = J2ktiosinteropEnumNames_Enum_TWO
+
+    let _ = J2ktiosinteropEnumNames.valueOf(with: "ONE")
+    let _ = J2ktiosinteropEnumNames.valueOf(with: "TWO")
+
+    let values = J2ktiosinteropEnumNames.values()!
+    let _ = values[0]
+    let _ = values[1]
+  }
+
+  func testEnumComparison() {
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() === J2ktiosinteropEnumNames_get_ONE())
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() !== J2ktiosinteropEnumNames_get_TWO())
+
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() == J2ktiosinteropEnumNames_get_ONE())
+    XCTAssertTrue(J2ktiosinteropEnumNames_get_ONE() != J2ktiosinteropEnumNames_get_TWO())
+
+    XCTAssertEqual(
+      J2ktiosinteropEnumNames_get_ONE().compareTo(withId: J2ktiosinteropEnumNames_get_ONE()), 0)
+    XCTAssertEqual(
+      J2ktiosinteropEnumNames_get_ONE().compareTo(withId: J2ktiosinteropEnumNames_get_TWO()), -1)
+    XCTAssertEqual(
+      J2ktiosinteropEnumNames_get_TWO().compareTo(withId: J2ktiosinteropEnumNames_get_ONE()), 1)
+  }
+
+  func testNativeDefaultName() {
+    let obj = J2ktiosinteropNativeDefaultName()
+    let _ = obj.nativeInstanceMethod()
+    let _ = J2ktiosinteropNativeDefaultName.nativeStaticMethod()
+    J2ktiosinteropNativeDefaultName.nativeParameter(with: obj)
+    let _ = J2ktiosinteropNativeDefaultName.nativeReturnType()
+  }
+
+  func testNativeCustomName() {
+    let obj = CustomNativeClass()
+    let _ = obj.nativeInstanceMethod()
+    let _ = CustomNativeClass.nativeStaticMethod()
+    CustomNativeClass.nativeParameter(with: obj)
+    let _ = CustomNativeClass.nativeReturnType()
+  }
+
+  func testPlatform() {
+    XCTAssertEqual(J2ktiosinteropPlatform_get_NAME(), "J2ObjC")
+  }
+
+  func testNullability() {
+    J2ktiosinteropNullability_acceptNullableWithId_(nil)
+    J2ktiosinteropNullability_acceptNullableWithNonNullBoundWithId_(nil)
+    J2ktiosinteropNullability_acceptWithNullableBoundWithId_(nil)
+    J2ktiosinteropNullability_acceptNullableWithNullableBoundWithId_(nil)
+  }
+
+  func testOverrides() {
+    let parent = J2ktiosinteropObjectiveCNameOverrides_Parent()
+    XCTAssertEqual(parent.parent(), "parent")
+    let child = J2ktiosinteropObjectiveCNameOverrides_Child()
+    XCTAssertEqual(child.parent(), "parent/child")
+    XCTAssertEqual(child.child(), "child")
+  }
+
+  func testDataClassRecord() {
+    let record = J2ktiosinteropDataClassRecord(int: 123, with: "foo")
+    XCTAssertTrue(record is JavaLangRecord)
+    XCTAssertEqual(record.a(), 123)
+    XCTAssertEqual(record.b(), "foo")
+    XCTAssertTrue(record.description.contains("DataClassRecord"))
+    XCTAssertTrue(record.description.contains("1"))
+    XCTAssertTrue(record.description.contains("foo"))
+
+    let record2 = J2ktiosinteropDataClassRecord(int: 123, with: "foo")
+    XCTAssertEqual(record, record2)
+    XCTAssertEqual(record.hash, record2.hash)
+  }
+
+  func testNonDataClassRecord() {
+    let record = J2ktiosinteropNonDataClassRecord(int: 123, with: "foo")
+    XCTAssertTrue(record is JavaLangRecord)
+    XCTAssertEqual(record.a(), 124)
+    XCTAssertEqual(record.b(), "foo")
+    XCTAssertTrue(record.description.contains("NonDataClassRecord"))
+    XCTAssertTrue(record.description.contains("1"))
+    XCTAssertTrue(record.description.contains("foo"))
+
+    let record2 = J2ktiosinteropNonDataClassRecord(int: 123, with: "foo")
+    XCTAssertEqual(record, record2)
+    XCTAssertEqual(record.hash, record2.hash)
+  }
+
+  func testRecordImplementingAccessors() {
+    let record: J2ktiosinteropRecordImplementingAccessors =
+      J2ktiosinteropRecordImplementingAccessors(int: 123, with: "foo")
+    XCTAssertEqual(record.i(), 124)
+    XCTAssertEqual(record.s(), "foo")
+
+    let accessors: J2ktiosinteropRecordAccessors = record
+    XCTAssertEqual(accessors.i(), 124)
+    XCTAssertEqual(accessors.s(), "foo")
   }
 }

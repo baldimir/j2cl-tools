@@ -7,7 +7,7 @@ This is an experimental tool and should not be used.
 load("@rules_java//java:defs.bzl", "JavaPluginInfo")
 load("//build_defs/internal_do_not_use:provider.bzl", "J2wasmInfo")
 load(":j2cl_js_common.bzl", "JsInfo")
-load(":j2wasm_common.bzl", "J2WASM_TOOLCHAIN_ATTRS", "j2wasm_common")
+load(":j2wasm_common.bzl", "J2WASM_FEATURE_SET", "J2WASM_TOOLCHAIN_ATTRS", "j2wasm_common")
 
 J2WASM_LIB_ATTRS = {
     "srcs": attr.label_list(allow_files = [".java", ".srcjar", ".jar", ".js"]),
@@ -26,7 +26,7 @@ def _impl_j2wasm_library_rule(ctx):
     if ctx.attr.optimize_autovalue:
         extra_javacopts.append("-Acom.google.auto.value.OmitIdentifiers")
 
-    return [j2wasm_common.compile(
+    j2wasm_provider = j2wasm_common.compile(
         ctx = ctx,
         name = ctx.label.name,
         srcs = ctx.files.srcs,
@@ -34,9 +34,17 @@ def _impl_j2wasm_library_rule(ctx):
         exports = _j2wasm_or_js_providers_of(ctx.attr.exports),
         plugins = [p[JavaPluginInfo] for p in ctx.attr.plugins],
         exported_plugins = [p[JavaPluginInfo] for p in ctx.attr.exported_plugins],
-        output_jar = ctx.outputs.jar,
         javac_opts = extra_javacopts + ctx.attr.javacopts,
-    )]
+    )
+
+    # Declare default outputs so that bazel build <wasm_target> triggers the compiler and outputs
+    # the artifact.
+    outputs = [ctx.outputs.jar]
+    default_feature_output = j2wasm_provider._private_.feature_set_map[J2WASM_FEATURE_SET.DEFAULT]._private_.output
+    if default_feature_output:
+        outputs.append(default_feature_output)
+
+    return [DefaultInfo(files = depset(outputs)), j2wasm_provider]
 
 def _j2wasm_or_js_providers_of(deps):
     return [_j2wasm_or_js_provider_of(d) for d in deps]
@@ -44,7 +52,7 @@ def _j2wasm_or_js_providers_of(deps):
 def _j2wasm_or_js_provider_of(dep):
     return dep[J2wasmInfo] if J2wasmInfo in dep else dep[JsInfo]
 
-j2wasm_library = rule(
+_j2wasm_library_rule = rule(
     implementation = _impl_j2wasm_library_rule,
     attrs = J2WASM_LIB_ATTRS,
     toolchains = ["@bazel_tools//tools/jdk:toolchain_type"],
@@ -54,3 +62,14 @@ j2wasm_library = rule(
         "srcjar": "lib%{name}-src.jar",
     },
 )
+
+# buildifier: disable=function-docstring-args
+def j2wasm_library(name, **kwargs):
+    args = dict(kwargs)
+    target_name = "//" + native.package_name() + ":" + name
+
+    # If this is JRE itself, don't synthesize the JRE dep.
+    if args.get("srcs") and target_name != "//jre/java:jre-j2wasm":
+        args["deps"] = args.get("deps", []) + [Label("//:jre-j2wasm")]
+
+    _j2wasm_library_rule(name = name, **args)

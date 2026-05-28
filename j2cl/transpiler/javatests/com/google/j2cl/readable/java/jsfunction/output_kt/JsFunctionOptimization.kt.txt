@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package jsfunction
 
@@ -88,15 +89,15 @@ open class JsFunctionOptimization {
    },
   )
  }
-
+ 
  @JsFunction
  fun interface F {
   fun m(s: String?): String?
  }
-
+ 
  open inner class Holder<T> {
   internal constructor(value: T)
-
+  
   internal constructor(i: Int, vararg value: T) {
    val value_1: Array<T>? = value as Array<T>?
   }

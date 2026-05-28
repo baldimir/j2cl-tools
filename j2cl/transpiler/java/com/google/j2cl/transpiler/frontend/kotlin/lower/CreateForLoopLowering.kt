@@ -17,6 +17,7 @@ package com.google.j2cl.transpiler.frontend.kotlin.lower
 
 import org.jetbrains.kotlin.backend.common.BodyLoweringPass
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
+import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
@@ -35,8 +36,10 @@ import org.jetbrains.kotlin.ir.expressions.IrSetValue
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.IrWhen
 import org.jetbrains.kotlin.ir.expressions.IrWhileLoop
+import org.jetbrains.kotlin.ir.expressions.impl.IrBlockImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrCompositeImpl
 import org.jetbrains.kotlin.ir.util.getSimpleFunction
+import org.jetbrains.kotlin.ir.util.nonDispatchArguments
 import org.jetbrains.kotlin.ir.util.overrides
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
@@ -154,20 +157,21 @@ private class LoopTransformer(
 ) : IrElementTransformerVoidWithContext() {
 
   private val iterableIteratorFunction: IrSimpleFunction by lazy {
-    context.ir.symbols.iterable.getSimpleFunction("iterator")!!.owner
+    context.symbols.iterable.getSimpleFunction("iterator")!!.owner
   }
 
   private val iteratorHasNextFunction: IrSimpleFunction by lazy {
-    context.ir.symbols.iterator.getSimpleFunction("hasNext")!!.owner
+    context.symbols.iterator.getSimpleFunction("hasNext")!!.owner
   }
 
   override fun visitBlock(expression: IrBlock): IrExpression {
+    expression.transformChildrenVoid(this)
     // The psi2ir transformer wraps all `for` loop into an `IrBlock` with origin `FOR_LOOP`.
     // After this check, we are sure that we are manipulating `while` and `do while` loop that has
     // been created by the Kotlin compiler to represent a for loop. We can make assumption on them
     // because we will never match a `while` or `do while` loop written by the user.
     if (expression.origin != IrStatementOrigin.FOR_LOOP || expression.statements.size < 2) {
-      return super.visitBlock(expression)
+      return expression
     }
 
     // Extract the different component of the for loop. If we are unable to extract one of the
@@ -178,8 +182,15 @@ private class LoopTransformer(
       extractAndSplitInnerLoopBody(expression) ?: return super.visitBlock(expression)
     val oldLoop = getInnerLoop(expression)
 
+    val extraTempVariables = mutableListOf<IrVariable>()
+
     val newLoop =
       if (isForEachLoop(initializers)) {
+        // Only the FOR_LOOP_ITERATOR variable is relevant for the for-in loop structure.
+        // Other initializers are temporary variables that can be kept outside the new loop.
+        extraTempVariables.addAll(
+          initializers.filter { it.origin != IrDeclarationOrigin.FOR_LOOP_ITERATOR }
+        )
         createForInLoop(expression, initializers, condition, innerLoopBody, oldLoop)
           ?: return super.visitBlock(expression)
       } else {
@@ -189,25 +200,25 @@ private class LoopTransformer(
           this.condition = condition
           this.initializers = initializers
           updates = mutableListOf(inductionVariableUpdate)
-          body =
-            IrCompositeImpl(
-              innerLoopBody.originalLoopBody.startOffset,
-              innerLoopBody.originalLoopBody.endOffset,
-              innerLoopBody.originalLoopBody.type,
-              innerLoopBody.originalLoopBody.origin,
-              innerLoopBody.loopVariablesDefinitions + innerLoopBody.originalLoopBody.statements,
-            )
+          body = innerLoopBody.createForLoopBody()
         }
       }
 
     // Update mapping from old to new loop, so we can later update references in break/continue.
     oldLoopToNewLoop[oldLoop] = newLoop
 
-    return visitLoop(newLoop)
+    // Wrap the new loop into a new block to not break the IR structure.
+    return IrBlockImpl(
+      startOffset = expression.startOffset,
+      endOffset = expression.endOffset,
+      type = expression.type,
+      statements = extraTempVariables + listOf(newLoop),
+    )
   }
 
-  private fun isForEachLoop(initializers: List<IrVariable>) =
-    initializers.singleOrNull()?.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR
+  private fun isForEachLoop(initializers: List<IrVariable>) = initializers.any {
+    it.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR
+  }
 
   private fun createForInLoop(
     originalExpression: IrBlock,
@@ -226,7 +237,10 @@ private class LoopTransformer(
       return null
     }
 
-    val iterableExpression = extractIterableExpression(initializers[0].initializer) ?: return null
+    val iterableExpression =
+      extractIterableExpression(
+        initializers.single { it.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR }.initializer
+      ) ?: return null
 
     // Pop off the first variable definition. This should be the loop variable. Any other
     // variable definitions would be from destructuring the loop variable, which can be moved
@@ -241,14 +255,7 @@ private class LoopTransformer(
         condition = iterableExpression,
       )
       .apply {
-        body =
-          IrCompositeImpl(
-            innerLoopBody.originalLoopBody.startOffset,
-            innerLoopBody.originalLoopBody.endOffset,
-            innerLoopBody.originalLoopBody.type,
-            innerLoopBody.originalLoopBody.origin,
-            innerLoopBody.loopVariablesDefinitions + innerLoopBody.originalLoopBody.statements,
-          )
+        body = innerLoopBody.createForLoopBody()
         label = oldLoop.label
       }
   }
@@ -266,6 +273,7 @@ private class LoopTransformer(
       val variable =
         (blockStatements[i] as? IrVariable)?.takeIf {
           it.origin == IrDeclarationOrigin.IR_TEMPORARY_VARIABLE ||
+            it.origin == IrDeclarationOrigin.IR_TEMPORARY_VARIABLE_FOR_INLINED_PARAMETER ||
             it.origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR
         }
       if (variable == null) {
@@ -302,16 +310,16 @@ private class LoopTransformer(
       first !is IrCall ||
         second !is IrCall ||
         first.symbol != second.symbol ||
-        first.valueArgumentsCount != second.valueArgumentsCount
+        first.arguments.size != second.arguments.size
     ) {
       return false
     }
 
     // The conditions created by Kotlin compiler are function calls that take either a variable
     // reference (induction variable, last item of the progression) or a constant as arguments.
-    for (i in 0 until first.valueArgumentsCount) {
-      val firstCallArg = first.getValueArgument(i)!!
-      val secondCallArg = second.getValueArgument(i)!!
+    for (i in 0 until first.nonDispatchArguments.size) {
+      val firstCallArg = first.nonDispatchArguments[i]!!
+      val secondCallArg = second.nonDispatchArguments[i]!!
 
       when (firstCallArg) {
         is IrGetValue -> {
@@ -341,8 +349,17 @@ private class LoopTransformer(
   private data class InnerLoopBody(
     val loopVariablesDefinitions: MutableList<IrVariable>,
     val inductionVariableUpdate: IrSetValue?,
-    val originalLoopBody: IrContainerExpression,
+    val originalLoopBody: IrStatement,
   )
+
+  private fun InnerLoopBody.createForLoopBody() =
+    IrCompositeImpl(
+      originalLoopBody.startOffset,
+      originalLoopBody.endOffset,
+      context.irBuiltIns.unitType,
+      null,
+      loopVariablesDefinitions + listOf(originalLoopBody),
+    )
 
   private fun extractAndSplitInnerLoopBody(enclosingBlock: IrBlock): InnerLoopBody? {
     val innerLoopBody = getInnerLoop(enclosingBlock).body as IrContainerExpression
@@ -382,9 +399,7 @@ private class LoopTransformer(
       }
     }
 
-    val originalLoopBody = statements.last() as? IrContainerExpression ?: return null
-
-    return InnerLoopBody(loopVariablesDefinitions, inductionVariableUpdate, originalLoopBody)
+    return InnerLoopBody(loopVariablesDefinitions, inductionVariableUpdate, statements.last())
   }
 
   private fun getInnerLoop(enclosingBlock: IrBlock): IrLoop {

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -22,7 +23,11 @@ import kotlin.Any
 import kotlin.Suppress
 
 open class ExplicitNotNullable {
- open class DependentTypeParameters<E: Any, T: E?> internal constructor() {
+ internal open fun testDependentWildcards_pp_j2kt(x: DependentTypeParameters<*, *>): DependentTypeParameters<*, *> {
+  return x.getThis_pp_j2kt()
+ }
+ 
+ internal open class DependentTypeParameters<E: Any, T: E?> internal constructor() {
   internal open fun getThis_pp_j2kt(): DependentTypeParameters<E, T> {
    return this
   }

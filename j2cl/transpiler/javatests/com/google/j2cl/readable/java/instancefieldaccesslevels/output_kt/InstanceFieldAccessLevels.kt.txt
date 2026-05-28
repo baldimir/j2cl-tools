@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package instancefieldaccesslevels
 
@@ -27,12 +28,12 @@ import kotlin.jvm.JvmField
 open class InstanceFieldAccessLevels {
  @JvmField
  var a: Int = 0
-
+ 
  private var b: Boolean = false
-
+ 
  @JvmField
  var c: Any? = null
-
+ 
  @JvmField
  internal var d_pp_instancefieldaccesslevels: Int = 0
 }

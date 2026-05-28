@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -40,20 +41,20 @@ open class VoidType {
    val nullableVoidConsumer: Consumer<Void?> = Consumer { v_1: Void? ->
     v_1!!.hashCode()
    }
-   val nonNullVoidConsumerWildcard: Consumer<*> = Consumer { v_2: Void ->
-    v_2.hashCode()
+   val nonNullVoidConsumerWildcard: Consumer<*> = Consumer { v_2: Void? ->
+    v_2!!.hashCode()
    }
    val nullableVoidConsumerWildcard: Consumer<*> = Consumer { v_3: Void? ->
     v_3!!.hashCode()
    }
   }
  }
-
- interface NullableBounds<T>
-
- interface NonNullBounds<T: Any>
-
- fun interface Consumer<V: Void?> {
+ 
+ internal interface NullableBounds<T>
+ 
+ internal interface NonNullBounds<T: Any>
+ 
+ internal fun interface Consumer<V: Void?> {
   fun accept(v: V)
  }
 }

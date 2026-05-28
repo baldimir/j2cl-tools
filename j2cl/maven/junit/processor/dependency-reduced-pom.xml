@@ -3,7 +3,7 @@
   <parent>
     <artifactId>j2cl-parent</artifactId>
     <groupId>org.kie.j2cl.tools</groupId>
-    <version>v20250822-1</version>
+    <version>v20260527-1</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>

@@ -2,7 +2,13 @@
 
 JVM_FLAGS = [
     "-XX:+TieredCompilation",
-    "-Xss3M",
+    # This should match the javac constant since we compile the same files.
+    "-Xss7M",
     # Disable bytecode verification to save from class-loading time.
-    "-Xverify:none",
+    "-XX:+UnlockDiagnosticVMOptions",
+    "-XX:-BytecodeVerificationLocal",
+    "-XX:-BytecodeVerificationRemote",
+    # Disable UL logging to stdout, which would break the worker protocol.
+    "-Xlog:disable",
+    "-Xlog:all=warning:stderr",
 ]

@@ -1,0 +1,61 @@
+goog.module('recordclass.RecordClass.RecordWithCompactConstructor$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class RecordWithCompactConstructor extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {number} @nodts*/
+  this.f_a__recordclass_RecordClass_RecordWithCompactConstructor_ = 0;
+  /**@type {number} @nodts*/
+  this.f_b__recordclass_RecordClass_RecordWithCompactConstructor_ = 0;
+ }
+ /** @nodts @return {!RecordWithCompactConstructor} */
+ static $create__int__int(/** number */ a, /** number */ b) {
+  RecordWithCompactConstructor.$clinit();
+  let $instance = new RecordWithCompactConstructor();
+  $instance.$ctor__recordclass_RecordClass_RecordWithCompactConstructor__int__int__void(a, b);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_RecordWithCompactConstructor__int__int__void(/** number */ a, /** number */ b) {
+  this.$ctor__java_lang_Record__void();
+  if (a < 0) {
+   a = 0;
+  }
+  this.f_a__recordclass_RecordClass_RecordWithCompactConstructor_ = a;
+  this.f_b__recordclass_RecordClass_RecordWithCompactConstructor_ = b;
+  $J2CL_PRESERVE$(this.f_a__recordclass_RecordClass_RecordWithCompactConstructor_, this.f_b__recordclass_RecordClass_RecordWithCompactConstructor_);
+ }
+ /** @nodts @return {number} */
+ m_a__int() {
+  return this.f_a__recordclass_RecordClass_RecordWithCompactConstructor_;
+ }
+ /** @nodts @return {number} */
+ m_b__int() {
+  return this.f_b__recordclass_RecordClass_RecordWithCompactConstructor_;
+ }
+ /** @nodts */
+ static $clinit() {
+  RecordWithCompactConstructor.$clinit = () =>{};
+  RecordWithCompactConstructor.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof RecordWithCompactConstructor;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(RecordWithCompactConstructor, 'recordclass.RecordClass$RecordWithCompactConstructor');
+
+exports = RecordWithCompactConstructor;
+
+//# sourceMappingURL=RecordClass$RecordWithCompactConstructor.js.map

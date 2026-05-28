@@ -1,0 +1,4 @@
+
+(type $emptyinterface.EmptyInterface.vtable (sub (struct
+ ))
+)

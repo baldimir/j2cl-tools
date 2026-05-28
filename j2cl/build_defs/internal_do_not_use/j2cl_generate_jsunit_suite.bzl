@@ -63,8 +63,18 @@ def j2cl_generate_jsunit_suite(name, test_class, deps, tags = []):
             # Disable error prone checks since this is a generated code.
             "-Xep:PackageLocation:OFF",
         ],
-        tags = tags,
+        tags = ["j2cl_generate_jsunit_suite"] + (tags or []),
         generate_build_test = False,
+        generate_j2wasm_library = False,
+    )
+
+    native.filegroup(
+        name = name + "_test_artifacts",
+        srcs = [":%s_lib" % name],
+        output_group = "test_artifacts",
+        testonly = True,
+        tags = tags,
+        visibility = ["//visibility:private"],
     )
 
     # The Java annotation processor on the above target generates jsunit suites
@@ -76,20 +86,24 @@ def j2cl_generate_jsunit_suite(name, test_class, deps, tags = []):
     # TODO(goktug): use j2cl_library directly from jsunit_test instead of
     # extracting files from jar (output js zip can include all the required
     # files.)
-    out_jar = ":lib" + name + "_lib.jar"
     native.genrule(
         name = name,
+        srcs = [":%s_test_artifacts" % name],
         outs = [name + ".js.zip"],
-        cmd = "\n".join([
-            "TMP=$$(mktemp -d)",
-            "WD=$$(pwd)",
-            "unzip -q $(location %s) *.testsuite *.json -d $$TMP" % out_jar,
-            "cd $$TMP",
-            "for f in $$(find . -name *.testsuite); do mv $$f $${f/.testsuite/.js}; done",
-            "zip -q -r $$WD/$@ .",
-            "rm -rf $$TMP",
-        ]),
+        cmd = """
+            set -u
+            TMP=$$(mktemp -d)
+            OUTPUT_ZIP="$$(pwd)/$@"
+            unzip -q $< "*.testsuite" "*.json" -d $$TMP
+            (
+              cd $$TMP
+              for f in $$(find . -name "*.testsuite"); do
+                mv $$f $${f/.testsuite/.js}
+              done
+              zip -q -r "$$OUTPUT_ZIP" .
+            )
+            rm -rf $$TMP
+        """,
         testonly = 1,
         tags = ["manual", "notap"],
-        tools = [out_jar],
     )

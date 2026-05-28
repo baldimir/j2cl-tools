@@ -30,35 +30,10 @@ public class AnonymousClassWithNullableTypeArgument {
     public abstract V get();
   }
 
-  public static class Holder<V extends @Nullable Object> {
-    public Holder(V value) {}
-
-    public V get() {
-      throw new RuntimeException();
-    }
-  }
-
-  public static Supplier<@Nullable Object> testExplicitTypeArguments() {
-    return new Supplier<@Nullable Object>() {
-      @Override
-      public @Nullable Object get() {
-        return null;
-      }
-    };
-  }
-
-  public static Supplier<@Nullable Object>
-      testImplicitTypeArguments_inferredFromMembersAndReturnType() {
-    return new Supplier<>() {
-      @Override
-      public @Nullable Object get() {
-        return null;
-      }
-    };
-  }
-
   // TODO(b/440316295): J2KT renders `new Supplier<Object>`.
   public static void testImplicitTypeArguments_inferredFromMembers() {
+    // repro for b/408237089
+    // In javac frontend it's inferred as Supplier<Object>
     new Supplier<>() {
       @Override
       public @Nullable Object get() {
@@ -69,6 +44,8 @@ public class AnonymousClassWithNullableTypeArgument {
 
   // TODO(b/440316295): J2KT renders `new AbstractSupplier<String>`.
   public static void testImplicitTypeArguments_inferredFromMembersAndArgument() {
+    // repro for b/408237089
+    // In javac frontend it's inferred as AbstractHolder<String>
     new AbstractHolder<>("Supplier") {
       @Override
       public @Nullable String get() {
@@ -77,16 +54,4 @@ public class AnonymousClassWithNullableTypeArgument {
     };
   }
 
-  public static void testImplicitTypeArguments_inferredFromArgument() {
-    new Holder<>(nullableString()) {};
-  }
-
-  public static Holder<@Nullable String>
-      testImplicitTypeArguments_inferredFromArgumentAndReturnType() {
-    return new Holder<>("Supplier") {};
-  }
-
-  public static @Nullable String nullableString() {
-    return null;
-  }
 }

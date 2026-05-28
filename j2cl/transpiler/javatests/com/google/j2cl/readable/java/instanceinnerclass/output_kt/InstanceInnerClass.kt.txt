@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package instanceinnerclass
 
@@ -25,20 +26,20 @@ import kotlin.jvm.JvmField
 open class InstanceInnerClass {
  @JvmField
  var instanceField: Int = 0
-
+ 
  open fun funOuter() {}
-
+ 
  open fun test() {
   InstanceInnerClass().InnerClass()
  }
-
+ 
  open inner class InnerClass {
   @JvmField
   var field: Int = this@InstanceInnerClass.instanceField + this@InstanceInnerClass.instanceField
-
+  
   @JvmField
   var enclosingInstance: InstanceInnerClass? = this@InstanceInnerClass
-
+  
   open fun funInner() {
    this@InstanceInnerClass.funOuter()
    this@InstanceInnerClass.funOuter()

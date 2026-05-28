@@ -1,0 +1,173 @@
+/*
+ * Copyright 2022 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+package com.google.j2cl.transpiler.backend.kotlin
+
+import com.google.j2cl.transpiler.ast.Field
+import com.google.j2cl.transpiler.ast.FieldDescriptor
+import com.google.j2cl.transpiler.ast.MemberDescriptor
+import com.google.j2cl.transpiler.ast.Method
+import com.google.j2cl.transpiler.ast.MethodDescriptor
+import com.google.j2cl.transpiler.ast.TypeDeclaration
+import com.google.j2cl.transpiler.backend.kotlin.AnnotationSources.Companion.annotationTargetSource
+import com.google.j2cl.transpiler.backend.kotlin.KotlinSource.annotation
+import com.google.j2cl.transpiler.backend.kotlin.KotlinSource.annotationName
+import com.google.j2cl.transpiler.backend.kotlin.KotlinSource.assignment
+import com.google.j2cl.transpiler.backend.kotlin.KotlinSource.literal
+import com.google.j2cl.transpiler.backend.kotlin.ast.CompanionObject
+import com.google.j2cl.transpiler.backend.kotlin.source.Source
+import com.google.j2cl.transpiler.backend.kotlin.source.Source.Companion.source
+import com.google.j2cl.transpiler.backend.kotlin.source.orEmpty
+
+/**
+ * ObjC name sources.
+ *
+ * @property nameSources underlying name sources
+ */
+internal class ObjCNameSources(val nameSources: NameSources) {
+
+  private val environment: Environment
+    get() = nameSources.environment
+
+  private val isJ2ObjCInteropEnabled: Boolean
+    get() = nameSources.environment.isJ2ObjCInteropEnabled
+
+  fun objectiveCNameAnnotationSource(name: String): Source =
+    annotation(
+      nameSources.topLevelQualifiedNameSource("com.google.j2objc.annotations.ObjectiveCName"),
+      literal(name),
+    )
+
+  fun objectiveCAnnotationSource(typeDeclaration: TypeDeclaration): Source =
+    when {
+      !isJ2ObjCInteropEnabled -> Source.EMPTY
+      needsObjCNameAnnotation(typeDeclaration) ->
+        objectiveCNameAnnotationSource(typeDeclaration.objCNameWithoutPrefix)
+      else -> Source.EMPTY
+    }
+
+  fun swiftNameAnnotationSource(name: String): Source =
+    annotation(
+      nameSources.topLevelQualifiedNameSource("com.google.j2objc.annotations.SwiftName"),
+      Source.emptyIf(name.isEmpty()) { literal(name) },
+    )
+
+  fun swiftNameAnnotationSource(typeDeclaration: TypeDeclaration): Source =
+    when {
+      !isJ2ObjCInteropEnabled -> Source.EMPTY
+      else -> typeDeclaration.swiftName?.let { swiftNameAnnotationSource(it) }.orEmpty()
+    }
+
+  fun hiddenFromObjCAnnotationSource(memberDescriptor: MemberDescriptor): Source =
+    annotation(
+      annotationName(
+        annotationTargetSource(memberDescriptor),
+        nameSources.sourceWithOptInQualifiedName("kotlin.experimental.ExperimentalObjCRefinement") {
+          topLevelQualifiedNameSource("kotlin.native.HiddenFromObjC")
+        },
+      )
+    )
+
+  fun objCEnumAnnotationSource(name: String, swiftName: String? = null): Source =
+    annotation(
+      nameSources.topLevelQualifiedNameSource("javaemul.lang.ObjCEnum"),
+      literal(name),
+      swiftName?.let { parameterSource("swiftName", literal(it)) }.orEmpty(),
+    )
+
+  fun objCNameAnnotationSource(
+    name: String,
+    swiftName: String? = null,
+    exact: Boolean? = null,
+  ): Source =
+    annotation(
+      nameSources.sourceWithOptInQualifiedName("kotlin.experimental.ExperimentalObjCName") {
+        topLevelQualifiedNameSource("kotlin.native.ObjCName")
+      },
+      literal(name),
+      swiftName?.let { parameterSource("swiftName", literal(it)) }.orEmpty(),
+      exact?.let { parameterSource("exact", literal(it)) }.orEmpty(),
+    )
+
+  // We append "_" to the enum type name because the @ObjcEnum annotation does not insert an
+  // underscore between the type name and the literal name. We use a typedef to remove it again.
+  fun objCEnumAnnotationSource(typeDeclaration: TypeDeclaration): Source =
+    when {
+      !isJ2ObjCInteropEnabled -> Source.EMPTY
+      typeDeclaration.isEnumWithNonEmptyValues ->
+        objCEnumAnnotationSource("${typeDeclaration.objCNameWithoutPrefix}_Enum_")
+      else -> Source.EMPTY
+    }
+
+  fun objCAnnotationSource(method: Method): Source =
+    when {
+      !isJ2ObjCInteropEnabled -> Source.EMPTY
+      method.descriptor.isConstructor -> Source.EMPTY
+      isHiddenFromObjC(method.descriptor) -> hiddenFromObjCAnnotationSource(method.descriptor)
+      else -> Source.EMPTY
+    }
+
+  fun objCAnnotationSource(field: Field): Source =
+    when {
+      !isJ2ObjCInteropEnabled -> Source.EMPTY
+      isHiddenFromObjC(field.descriptor) -> hiddenFromObjCAnnotationSource(field.descriptor)
+      needsObjCNameAnnotation(field.descriptor) ->
+        objCNameAnnotationSource(field.descriptor.objCName)
+      else -> Source.EMPTY
+    }
+
+  private fun needsObjCNameAnnotation(
+    typeDeclaration: TypeDeclaration,
+    forceObjCNameAnnotation: Boolean = false,
+  ): Boolean =
+    environment.ktVisibility(typeDeclaration).needsObjCNameAnnotation &&
+      !typeDeclaration.isLocal &&
+      !typeDeclaration.isAnonymous &&
+      (forceObjCNameAnnotation ||
+        typeDeclaration.objectiveCName != null ||
+        typeDeclaration.objectiveCNamePrefix != null)
+
+  private fun needsObjCNameAnnotation(companionObject: CompanionObject): Boolean =
+    needsObjCNameAnnotation(companionObject.enclosingTypeDeclaration)
+
+  private fun needsObjCNameAnnotation(method: Method): Boolean =
+    method.descriptor.enclosingTypeDescriptor.typeDeclaration.let { enclosingTypeDeclaration ->
+      !enclosingTypeDeclaration.isLocal &&
+        !enclosingTypeDeclaration.isAnonymous &&
+        environment.ktVisibility(method.descriptor).needsObjCNameAnnotation &&
+        !method.isJavaOverride &&
+        method.descriptor.objectiveCName != null
+    }
+
+  private fun needsObjCNameAnnotation(fieldDescriptor: FieldDescriptor): Boolean =
+    fieldDescriptor.enclosingTypeDescriptor.typeDeclaration.let { enclosingTypeDeclaration ->
+      needsObjCNameAnnotation(enclosingTypeDeclaration, forceObjCNameAnnotation = true) &&
+        environment.ktVisibility(fieldDescriptor).needsObjCNameAnnotation
+    }
+
+  private fun isHiddenFromObjC(methodDescriptor: MethodDescriptor): Boolean =
+    hasHiddenFromObjCAnnotation(methodDescriptor)
+
+  private fun isHiddenFromObjC(fieldDescriptor: FieldDescriptor): Boolean =
+    hasHiddenFromObjCAnnotation(fieldDescriptor)
+
+  companion object {
+    private fun parameterSource(name: String, valueSource: Source): Source =
+      assignment(source(name), valueSource)
+
+    private fun hasHiddenFromObjCAnnotation(memberDescriptor: MemberDescriptor): Boolean =
+      memberDescriptor.hasAnnotation("com.google.j2kt.annotations.HiddenFromObjC")
+  }
+}

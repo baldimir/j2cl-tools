@@ -16,7 +16,6 @@
 package com.google.j2cl.transpiler.backend;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.j2cl.common.EntryPointPattern;
 import com.google.j2cl.common.OutputUtils.Output;
 import com.google.j2cl.common.SourceUtils.FileInfo;
@@ -31,14 +30,15 @@ public interface BackendOptions {
   @Nullable
   Path getLibraryInfoOutput();
 
-  ImmutableList<FileInfo> getNativeSources();
+  Path getSourceGenPath();
 
-  @Nullable
-  ImmutableMap<String, String> getDefinesForWasm();
+  ImmutableList<FileInfo> getNativeSources();
 
   ImmutableList<EntryPointPattern> getWasmEntryPointPatterns();
 
   boolean getEnableWasmCustomDescriptors();
+
+  boolean getEnableWasmCustomDescriptorsJsInterop();
 
   boolean getOptimizeAutoValue();
 

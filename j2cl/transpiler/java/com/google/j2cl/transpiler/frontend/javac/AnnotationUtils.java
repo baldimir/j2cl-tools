@@ -15,19 +15,17 @@
  */
 package com.google.j2cl.transpiler.frontend.javac;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
-import static com.google.j2cl.transpiler.frontend.javac.J2ktInteropAnnotationUtils.getSuppressWarningsAnnotation;
 
 import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableList;
 import com.google.j2cl.transpiler.frontend.common.Nullability;
-import java.util.List;
+import com.sun.tools.javac.code.Symbol;
 import java.util.Map.Entry;
 import javax.annotation.Nullable;
 import javax.lang.model.AnnotatedConstruct;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 
 /** Utility functions to process annotations. */
@@ -35,6 +33,9 @@ public final class AnnotationUtils {
 
   @Nullable
   static AnnotationMirror findAnnotationByName(AnnotatedConstruct annotatedConstruct, String name) {
+    if (!shouldReadAnnotations(annotatedConstruct)) {
+      return null;
+    }
     return getAnnotation(annotatedConstruct, a -> getAnnotationName(a).equals(name));
   }
 
@@ -55,20 +56,7 @@ public final class AnnotationUtils {
   }
 
   @Nullable
-  static ImmutableList<?> getAnnotationParameterArray(
-      AnnotationMirror annotation, String paramName) {
-    var parameterValue = getAnnotationParameterValue(annotation, paramName);
-
-    return parameterValue instanceof List<?> list
-        ? list.stream()
-            .map(AnnotationValue.class::cast)
-            .map(AnnotationValue::getValue)
-            .collect(toImmutableList())
-        : null;
-  }
-
-  @Nullable
-  static Object getAnnotationParameterValue(AnnotationMirror annotation, String paramName) {
+  private static Object getAnnotationParameterValue(AnnotationMirror annotation, String paramName) {
     if (annotation == null) {
       return null;
     }
@@ -85,15 +73,6 @@ public final class AnnotationUtils {
     return findAnnotationByName(construct, annotationSourceName) != null;
   }
 
-  public static boolean isWarningSuppressed(AnnotatedConstruct annotatedConstruct, String warning) {
-    var annotation = getSuppressWarningsAnnotation(annotatedConstruct);
-    if (annotation == null) {
-      return false;
-    }
-
-    var suppressions = getAnnotationParameterArray(annotation, "value");
-    return suppressions.contains(warning);
-  }
 
   @Nullable
   public static AnnotationMirror getAnnotation(
@@ -106,10 +85,27 @@ public final class AnnotationUtils {
   }
 
   public static boolean hasNullMarkedAnnotation(AnnotatedConstruct annotatedConstruct) {
+    if (!shouldReadAnnotations(annotatedConstruct)) {
+      return false;
+    }
+
     AnnotationMirror annotation =
         getAnnotation(
             annotatedConstruct, a -> Nullability.isNullMarkedAnnotation(getAnnotationName(a)));
     return annotation != null;
+  }
+
+  static boolean shouldReadAnnotations(AnnotatedConstruct annotatedConstruct) {
+    // TODO(b/399417397) Determine if we should handle annotations on all annotation types. Remove
+    // this method if necessary.
+
+    // Not all annotations are present in all compilations; in particular, Kotlin annotations
+    // that on JsInterop annotations are only present when compiling their sources. As a
+    // workaround here, annotations on annotations are only populated when compiling their
+    // sources.
+    return !(annotatedConstruct instanceof Symbol.ClassSymbol classSymbol)
+        || classSymbol.getKind() != ElementKind.ANNOTATION_TYPE
+        || classSymbol.sourcefile != null;
   }
 
   private AnnotationUtils() {}

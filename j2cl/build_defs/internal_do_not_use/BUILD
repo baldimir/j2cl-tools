@@ -35,9 +35,30 @@ package(
 # ***************************************************
 
 config_setting(
-    name = "j2kt_web_enabled",
+    name = "j2kt_web_production_environment",
     flag_values = {
-        "//:experimental_enable_j2kt_web": "True",
+        "//:j2kt_web_environment": "production",
+    },
+)
+
+config_setting(
+    name = "j2kt_web_experimental_environment",
+    flag_values = {
+        "//:j2kt_web_environment": "experimental",
+    },
+)
+
+config_setting(
+    name = "j2kt_web_staging_environment",
+    flag_values = {
+        "//:j2kt_web_environment": "staging",
+    },
+)
+
+config_setting(
+    name = "j2kt_web_disabled",
+    flag_values = {
+        "//:j2kt_web_environment": "disabled",
     },
 )
 
@@ -50,11 +71,6 @@ string_flag(
 # ***************************************************
 # Standard library related
 # ***************************************************
-
-alias(
-    name = "j2wasm_jre",
-    actual = "//jre/java:jre-j2wasm",
-)
 
 # ***************************************************
 # JUnit related
@@ -115,4 +131,12 @@ alias(
 alias(
     name = "closure_testcase",
     actual = "//third_party:closure_testcase",
+)
+
+TEST_BZL_SRCS = glob(
+    [
+        "*_test*.bzl",
+        "*_suite*.bzl",
+    ],
+    exclude = ["j2cl_library_build_test.bzl"],
 )

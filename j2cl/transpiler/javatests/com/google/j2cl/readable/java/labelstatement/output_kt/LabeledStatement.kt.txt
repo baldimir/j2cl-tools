@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package labelstatement
 
@@ -35,7 +36,7 @@ open class LabeledStatement {
    }
   }
  }
-
+ 
  open fun simpleStatement() {
   this.foo()
   do {
@@ -52,13 +53,13 @@ open class LabeledStatement {
   } while (false)
   return
  }
-
+ 
  open fun block() {}
-
+ 
  open fun ifStatement() {
   if (true) {}
  }
-
+ 
  open fun switchStatement() {
   LABEL@ do {
    CASE@ do {
@@ -79,12 +80,12 @@ open class LabeledStatement {
    } while (false)
   } while (false)
  }
-
+ 
  open fun nestedScopes() {
   object : Any() {
    internal fun m_pp_labelstatement() {}
   }
  }
-
+ 
  private fun foo() {}
 }

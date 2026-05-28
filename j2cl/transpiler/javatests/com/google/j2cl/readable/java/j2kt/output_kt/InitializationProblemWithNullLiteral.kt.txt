@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
@@ -27,15 +28,15 @@ import kotlin.jvm.JvmStatic
 open class InitializationProblemWithNullLiteral {
  @JvmField
  internal val completelyNormalFinalField_pp_j2kt: Int
-
+ 
  @JvmField
  internal var problematicFoo_pp_j2kt: Foo<*> = Foo.with_pp_j2kt<Any?>(null)
-
+ 
  internal constructor() {
   this.completelyNormalFinalField_pp_j2kt = 0
  }
-
- open class Foo<V> internal constructor() {
+ 
+ internal open class Foo<V> internal constructor() {
   companion object {
    @JvmStatic
    internal fun <V> with_pp_j2kt(v: V): Foo<V> {

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package staticfieldaccesslevels
 
@@ -28,16 +29,16 @@ open class StaticFieldAccessLevels {
  open fun test(): Int {
   return if (StaticFieldAccessLevels.b) StaticFieldAccessLevels.a else StaticFieldAccessLevels.d_pp_staticfieldaccesslevels
  }
-
+ 
  companion object {
   @JvmField
   var a: Int = 0
-
+  
   private var b: Boolean = false
-
+  
   @JvmField
   var c: Any? = null
-
+  
   @JvmField
   internal var d_pp_staticfieldaccesslevels: Int = 0
  }

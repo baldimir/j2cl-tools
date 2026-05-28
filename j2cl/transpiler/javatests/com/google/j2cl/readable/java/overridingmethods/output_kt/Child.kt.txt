@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package overridingmethods
 
@@ -26,24 +27,24 @@ fun interface SomeInterface {
 
 open class Parent internal constructor() {
  open fun nonFinal() {}
-
+ 
  open fun finalInChild() {}
-
+ 
  fun finalInParent() {}
 }
 
 open class Child internal constructor(): Parent(), SomeInterface {
  override fun nonFinal() {}
-
+ 
  final override fun finalInChild() {}
-
+ 
  override fun interfaceMethod() {}
 }
 
 class FinalChild internal constructor(): Parent(), SomeInterface {
  override fun nonFinal() {}
-
+ 
  override fun finalInChild() {}
-
+ 
  override fun interfaceMethod() {}
 }

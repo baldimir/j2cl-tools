@@ -1,0 +1,42 @@
+goog.module('autovalue.ArrayField.Builder$impl');
+
+const j_l_Object = goog.require('java.lang.Object$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+let ArrayField = goog.forwardDeclare('autovalue.ArrayField$impl');
+
+/**
+ * @abstract
+ */
+class Builder extends j_l_Object {
+ /** @protected @nodts */
+ constructor() {
+  super();
+ }
+ /** @nodts */
+ $ctor__autovalue_ArrayField_Builder__void() {
+  this.$ctor__java_lang_Object__void();
+ }
+ /** @abstract @nodts @return {Builder} */
+ m_setArrayField__arrayOf_int__autovalue_ArrayField_Builder(/** Array<number> */ arrayField) {}
+ /** @abstract @nodts @return {ArrayField} */
+ m_build_pp_autovalue__autovalue_ArrayField() {}
+ /** @nodts */
+ static $clinit() {
+  Builder.$clinit = () =>{};
+  Builder.$loadModules();
+  j_l_Object.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof Builder;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(Builder, 'autovalue.ArrayField$Builder');
+
+exports = Builder;
+
+//# sourceMappingURL=ArrayField$Builder.js.map

@@ -1,0 +1,51 @@
+goog.module('recordclass.RecordClass.ObjectRecord$impl');
+
+const Record = goog.require('java.lang.Record$impl');
+const $Util = goog.require('nativebootstrap.Util$impl');
+
+/**
+ * @final
+ */
+class ObjectRecord extends Record {
+ /** @protected @nodts */
+ constructor() {
+  super();
+  /**@type {*} @nodts*/
+  this.f_value__recordclass_RecordClass_ObjectRecord_;
+ }
+ /** @nodts @return {!ObjectRecord} */
+ static $create__java_lang_Object(/** * */ value) {
+  ObjectRecord.$clinit();
+  let $instance = new ObjectRecord();
+  $instance.$ctor__recordclass_RecordClass_ObjectRecord__java_lang_Object__void(value);
+  return $instance;
+ }
+ /** @nodts */
+ $ctor__recordclass_RecordClass_ObjectRecord__java_lang_Object__void(/** * */ value) {
+  this.$ctor__java_lang_Record__void();
+  this.f_value__recordclass_RecordClass_ObjectRecord_ = value;
+  $J2CL_PRESERVE$(this.f_value__recordclass_RecordClass_ObjectRecord_);
+ }
+ /** @nodts @return {*} */
+ m_value__java_lang_Object() {
+  return this.f_value__recordclass_RecordClass_ObjectRecord_;
+ }
+ /** @nodts */
+ static $clinit() {
+  ObjectRecord.$clinit = () =>{};
+  ObjectRecord.$loadModules();
+  Record.$clinit();
+ }
+ /** @nodts @return {boolean} */
+ static $isInstance(/** ? */ instance) {
+  return instance instanceof ObjectRecord;
+ }
+ 
+ /** @nodts */
+ static $loadModules() {}
+}
+$Util.$setClassMetadata(ObjectRecord, 'recordclass.RecordClass$ObjectRecord');
+
+exports = ObjectRecord;
+
+//# sourceMappingURL=RecordClass$ObjectRecord.js.map

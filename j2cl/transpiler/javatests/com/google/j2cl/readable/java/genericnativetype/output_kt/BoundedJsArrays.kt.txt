@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package genericnativetype
 
@@ -25,13 +26,13 @@ import kotlin.jvm.JvmStatic
 
 open class BoundedJsArrays {
  private constructor()
-
+ 
  companion object {
   @JvmStatic
   fun <V> create(): BoundedJsArray<V>? {
    return BoundedJsArray.create<V>()
   }
-
+  
   @JvmStatic
   fun <V> createWithSize(size: Int): BoundedJsArray<V>? {
    return BoundedJsArray.create<V>(size)

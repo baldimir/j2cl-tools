@@ -15,7 +15,6 @@
  */
 package com.google.j2cl.transpiler.frontend.common;
 
-
 import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.j2cl.common.InternalCompilerError;
@@ -57,7 +56,7 @@ public abstract class AbstractCompilationUnitBuilder {
   protected <T> T processEnclosedBy(Type type, Supplier<T> supplier) {
     typeStack.add(type);
     T converted = supplier.get();
-    typeStack.remove(typeStack.size() - 1);
+    typeStack.removeLast();
     return converted;
   }
 
@@ -79,9 +78,9 @@ public abstract class AbstractCompilationUnitBuilder {
     }
 
     // Create temporary variables for resources declared outside of the try statement.
-    return VariableDeclarationExpression.newBuilder()
+    return VariableDeclarationExpression.builder()
         .addVariableDeclaration(
-            Variable.newBuilder()
+            Variable.builder()
                 .setName("$resource")
                 .setTypeDescriptor(expression.getTypeDescriptor())
                 .setFinal(true)

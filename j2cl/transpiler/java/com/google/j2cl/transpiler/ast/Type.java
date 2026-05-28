@@ -18,10 +18,12 @@ package com.google.j2cl.transpiler.ast;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
+import com.google.j2cl.common.HasSourcePosition;
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.common.visitor.Context;
 import com.google.j2cl.common.visitor.Processor;
@@ -44,6 +46,7 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
   private final SourcePosition sourcePosition;
   private boolean isAbstract;
   private DeclaredTypeDescriptor superTypeDescriptor;
+  private ImmutableList<DeclaredTypeDescriptor> superInterfaceTypeDescriptors;
   private boolean isOptimizedEnum;
 
   public Type(SourcePosition sourcePosition, TypeDeclaration typeDeclaration) {
@@ -53,6 +56,7 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
     this.typeDeclaration = typeDeclaration;
     this.isAbstract = typeDeclaration.isAbstract();
     this.superTypeDescriptor = typeDeclaration.getSuperTypeDescriptor();
+    this.superInterfaceTypeDescriptors = typeDeclaration.getInterfaceTypeDescriptors();
   }
 
   /**
@@ -102,6 +106,10 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
 
   public boolean isClass() {
     return typeDeclaration.isClass();
+  }
+
+  public boolean isJavaRecord() {
+    return getDeclaration().isJavaRecord();
   }
 
   public TypeDeclaration getOverlaidTypeDeclaration() {
@@ -186,7 +194,7 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
 
   public void addInstanceInitializerBlock(Block instanceInitializer) {
     members.add(
-        InitializerBlock.newBuilder()
+        InitializerBlock.builder()
             .setBody(instanceInitializer)
             .setSourcePosition(instanceInitializer.getSourcePosition())
             .setDescriptor(getTypeDescriptor().getInitMethodDescriptor())
@@ -195,7 +203,7 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
 
   public void addStaticInitializerBlock(Block staticInitializer) {
     members.add(
-        InitializerBlock.newBuilder()
+        InitializerBlock.builder()
             .setBody(staticInitializer)
             .setSourcePosition(staticInitializer.getSourcePosition())
             .setDescriptor(getTypeDescriptor().getClinitMethodDescriptor())
@@ -205,7 +213,7 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
   public void addStaticInitializerBlock(int index, Block staticInitializer) {
     members.add(
         index,
-        InitializerBlock.newBuilder()
+        InitializerBlock.builder()
             .setBody(staticInitializer)
             .setSourcePosition(staticInitializer.getSourcePosition())
             .setDescriptor(getTypeDescriptor().getClinitMethodDescriptor())
@@ -232,8 +240,13 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
     return superTypeDescriptor;
   }
 
+  public void setSuperInterfaceTypeDescriptors(
+      ImmutableList<DeclaredTypeDescriptor> superInterfaceTypeDescriptors) {
+    this.superInterfaceTypeDescriptors = superInterfaceTypeDescriptors;
+  }
+
   public List<DeclaredTypeDescriptor> getSuperInterfaceTypeDescriptors() {
-    return typeDeclaration.getInterfaceTypeDescriptors();
+    return superInterfaceTypeDescriptors;
   }
 
   public Stream<DeclaredTypeDescriptor> getSuperTypesStream() {
@@ -301,6 +314,14 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
         .orElse(null);
   }
 
+  /** Returns the primary constructor if the the type has one. */
+  @Nullable
+  public Method getPrimaryConstructor() {
+    var superDelegatingConstructors =
+        getConstructors().stream().filter(not(AstUtils::hasThisCall)).collect(toImmutableList());
+    return superDelegatingConstructors.size() != 1 ? null : superDelegatingConstructors.getFirst();
+  }
+
   @Override
   public String getSimpleJsName() {
     return typeDeclaration.getSimpleJsName();
@@ -341,7 +362,7 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
 
     // Creates the member that will hold the value.
     addMember(
-        Field.Builder.from(holderFieldDescriptor).setSourcePosition(SourcePosition.NONE).build());
+        Field.builderFrom(holderFieldDescriptor).setSourcePosition(SourcePosition.NONE).build());
 
     // Synthesizes the getter:
     // $get<fieldName>() {
@@ -352,27 +373,25 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
     //   return <fieldName>;
     // }
     addMember(
-        Method.newBuilder()
+        Method.builder()
             .setMethodDescriptor(lazyFieldGetter)
             .addStatements(
-                IfStatement.newBuilder()
+                IfStatement.builder()
                     .setConditionExpression(
-                        FieldAccess.Builder.from(holderFieldDescriptor)
-                            .build()
-                            .infixNotEqualsNull())
+                        FieldAccess.builderFrom(holderFieldDescriptor).build().infixNotEqualsNull())
                     .setThenStatement(
-                        ReturnStatement.newBuilder()
-                            .setExpression(FieldAccess.Builder.from(holderFieldDescriptor).build())
+                        ReturnStatement.builder()
+                            .setExpression(FieldAccess.builderFrom(holderFieldDescriptor).build())
                             .setSourcePosition(SourcePosition.NONE)
                             .build())
                     .setSourcePosition(SourcePosition.NONE)
                     .build(),
-                BinaryExpression.Builder.asAssignmentTo(holderFieldDescriptor)
-                    .setRightOperand(initializationExpression)
+                FieldAccess.builderFrom(holderFieldDescriptor)
                     .build()
+                    .infixAssign(initializationExpression)
                     .makeStatement(SourcePosition.NONE),
-                ReturnStatement.newBuilder()
-                    .setExpression(FieldAccess.Builder.from(holderFieldDescriptor).build())
+                ReturnStatement.builder()
+                    .setExpression(FieldAccess.builderFrom(holderFieldDescriptor).build())
                     .setSourcePosition(SourcePosition.NONE)
                     .build())
             .setSourcePosition(SourcePosition.NONE)
@@ -383,7 +402,7 @@ public class Type extends Node implements HasSourcePosition, HasJsNameInfo, HasR
       DeclaredTypeDescriptor enclosingTypeDescriptor,
       TypeDescriptor fieldTypeDescriptor,
       String name) {
-    return FieldDescriptor.newBuilder()
+    return FieldDescriptor.builder()
         .setName(name)
         .setTypeDescriptor(fieldTypeDescriptor)
         .setEnclosingTypeDescriptor(enclosingTypeDescriptor)

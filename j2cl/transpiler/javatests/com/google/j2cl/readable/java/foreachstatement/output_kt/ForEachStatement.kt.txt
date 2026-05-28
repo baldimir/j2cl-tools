@@ -13,13 +13,15 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package foreachstatement
 
 import javaemul.lang.*
-import javaemul.lang.JavaIterator
+import java.lang.UnsupportedOperationException
 import javaemul.lang.MutableIterableJvm
+import javaemul.lang.MutableIteratorJvm
 import kotlin.Any
 import kotlin.Char
 import kotlin.Exception
@@ -44,7 +46,7 @@ open class ForEachStatement {
    t_1!!.toString()
   }
  }
-
+ 
  @Throws(Exception::class)
  private fun testMulticatch() {
   try {
@@ -70,7 +72,7 @@ open class ForEachStatement {
    }
   }
  }
-
+ 
  private fun <T: MutableIterable<String?>?, U: T, V: MutableIterable<Int?>?> testTypeVariable() {
   val iterable: U? = null
   for (s in iterable!!) {}
@@ -90,7 +92,7 @@ open class ForEachStatement {
    val c_1: Int = c!!.toChar().code
   }
  }
-
+ 
  private fun testSideEffects() {
   val iterable: MutableIterable<Int?>? = null
   val primitiveArray: IntArray? = null
@@ -111,44 +113,50 @@ open class ForEachStatement {
    i_7 = i_7 + 1
   }
  }
-
+ 
  private fun testOverriddenIterator(i: StringIterable?) {
   for (s in i!!) {}
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  open class Exception1 internal constructor(): java.lang.Exception(), MutableIterableJvm<Number?> {
-  override fun iterator(): MutableIterator<Number?> {
-   return null!!
+  override fun iterator(): /* @mutable */ MutableIterator<Number?> {
+   return null!!.asMutableIterator()
   }
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  open class Exception2 internal constructor(): java.lang.Exception(), MutableIterableJvm<Int?> {
-  override fun iterator(): MutableIterator<Int?> {
-   return null!!
+  override fun iterator(): /* @mutable */ MutableIterator<Int?> {
+   return null!!.asMutableIterator()
   }
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  open class Exception3 internal constructor(): java.lang.Exception(), MutableIterableJvm<Int> {
-  override fun iterator(): MutableIterator<Int> {
-   return null!!
+  override fun iterator(): /* @mutable */ MutableIterator<Int> {
+   return null!!.asMutableIterator()
   }
  }
-
+ 
+ @Suppress("INCOMPATIBLE_OBJC_NAME_OVERRIDE")
  open class Exception4 internal constructor(): java.lang.Exception(), MutableIterableJvm<Any?> {
-  override fun iterator(): MutableIterator<Any?> {
-   return null!!
+  override fun iterator(): /* @mutable */ MutableIterator<Any?> {
+   return null!!.asMutableIterator()
   }
  }
-
- open class IterableReturningTypeVariable<U, T: MutableIterator<Int?>> internal constructor(): MutableIterableJvm<Int?> {
-  override fun iterator(): T {
-   return null!!
-  }
- }
-
+ 
+ abstract class IterableReturningTypeVariable<U, T: MutableIterator<Int?>> internal constructor(): MutableIterableJvm<Int?>
+ 
  fun interface StringIterable: MutableIterableJvm<String?> {
   override fun iterator(): StringIterator
  }
-
- interface StringIterator: JavaIterator<String?>
+ 
+ interface StringIterator: MutableIteratorJvm<String?> {
+  override fun remove() {
+   throw UnsupportedOperationException()
+  }
+ }
+ 
+ annotation class J2ktIncompatible
 }

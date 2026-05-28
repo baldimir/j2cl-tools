@@ -15,7 +15,6 @@
  */
 package jsproperties;
 
-import jsinterop.annotations.JsPackage;
 import jsinterop.annotations.JsProperty;
 
 /** Tests for non native static JsProperty. */
@@ -70,13 +69,21 @@ class Bar {
   }
 }
 
-/** Tests for native JsProperty. */
-class NativeFoo {
-  @JsProperty(name = "hasOwnProperty")
-  public native Object getA();
+/** Tests for read only JsProperty. */
+class ReadOnlyJsProperty {
+  public final int a = 1;
 
-  @JsProperty(name = "Math.PI", namespace = JsPackage.GLOBAL)
-  public static native double getB();
+  public static final int b = 2;
+
+  @JsProperty
+  public int getC() {
+    return 3;
+  }
+
+  @JsProperty
+  public static int getD() {
+    return 4;
+  }
 }
 
 interface InterfaceWithDefaultJsProperties {
@@ -93,8 +100,8 @@ class ImplementsInterfaceWithDefaultJsProperties implements InterfaceWithDefault
 
 public class Main {
   public void testNativeJsProperty() {
-    new NativeFoo().getA();
-    NativeFoo.getB();
+    new FooWithNativeProperty().getA();
+    FooWithNativeProperty.getB();
   }
 
   public void testStaticJsProperty() {
@@ -110,5 +117,14 @@ public class Main {
     bar.setA(10);
     bar.getB();
     bar.setB(10);
+  }
+
+  public void testReadOnlyJsProperty() {
+    ReadOnlyJsProperty readOnlyJsProperty = new ReadOnlyJsProperty();
+    int r;
+    r = readOnlyJsProperty.a;
+    r = ReadOnlyJsProperty.b;
+    readOnlyJsProperty.getC();
+    ReadOnlyJsProperty.getD();
   }
 }

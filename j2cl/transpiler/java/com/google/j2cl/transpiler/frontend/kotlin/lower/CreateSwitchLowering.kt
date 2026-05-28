@@ -39,7 +39,7 @@ import org.jetbrains.kotlin.ir.expressions.IrWhen
 import org.jetbrains.kotlin.ir.expressions.impl.IrCompositeImpl
 import org.jetbrains.kotlin.ir.types.getClass
 import org.jetbrains.kotlin.ir.util.dump
-import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
+import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
@@ -246,18 +246,17 @@ private class WhenTransformer(private val context: CommonBackendContext) :
         if (condition.symbol != context.irBuiltIns.eqeqSymbol) {
           return false
         }
-        var firstArgument = condition.getValueArgument(0)
+        var lhs = condition.arguments[0]!!
         // Short and Byte are cast to Int
-        if (firstArgument is IrTypeOperatorCall) {
+        if (lhs is IrTypeOperatorCall) {
           if (
-            firstArgument.operator != IrTypeOperator.CAST &&
-              firstArgument.typeOperand != context.irBuiltIns.intType
+            lhs.operator != IrTypeOperator.CAST && lhs.typeOperand != context.irBuiltIns.intType
           ) {
             return false
           }
-          firstArgument = firstArgument.argument
+          lhs = lhs.argument
         }
-        if (firstArgument !is IrGetValue || firstArgument.symbol != subject.symbol) {
+        if (lhs !is IrGetValue || lhs.symbol != subject.symbol) {
           return false
         }
       }
@@ -376,7 +375,7 @@ private class WhenTransformer(private val context: CommonBackendContext) :
     // At this point we know the irExpression represents the following expression: `subject ==
     // expr`. The case expression is the rhs of the equality.
     check(irExpression is IrCall)
-    return checkNotNull(irExpression.getValueArgument(1))
+    return checkNotNull(irExpression.arguments[1])
   }
 
   private fun addBreakStatement(originalBody: IrExpression): IrExpression {
@@ -393,7 +392,7 @@ private class WhenTransformer(private val context: CommonBackendContext) :
     val enclosedLoops = mutableSetOf<IrLoop>()
     val enclosedBreaks = mutableListOf<IrBreak>()
     irWhen.acceptVoid(
-      object : IrElementVisitorVoid {
+      object : IrVisitorVoid() {
         override fun visitElement(element: IrElement) = element.acceptChildrenVoid(this)
 
         override fun visitLoop(loop: IrLoop) {

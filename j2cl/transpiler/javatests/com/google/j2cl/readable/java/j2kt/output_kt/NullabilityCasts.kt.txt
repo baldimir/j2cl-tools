@@ -13,12 +13,12 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package j2kt
 
 import javaemul.lang.*
-import java.lang.AssertionError
 import java.lang.RuntimeException
 import kotlin.Boolean
 import kotlin.String
@@ -35,21 +35,20 @@ open class NullabilityCasts {
     } else {
      return@AsyncFunction async
     }
-    throw AssertionError("Unreachable")
    },
   )
  }
-
+ 
  companion object {
   @JvmStatic
   internal fun <I, O> tranformAsync_pp_j2kt(async: Async<I>, function: AsyncFunction<in I, out O>): Async<O> {
    throw RuntimeException()
   }
  }
-
- fun interface AsyncFunction<I, O> {
+ 
+ internal fun interface AsyncFunction<I, O> {
   fun apply(i: I): Async<O>
  }
-
- interface Async<V>
+ 
+ internal interface Async<V>
 }

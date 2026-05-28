@@ -1,0 +1,12 @@
+/** @externs */
+
+/**
+ * @constructor
+ */
+var jsproperties_Foo = function() {};
+
+/** @type {number} */
+jsproperties_Foo.a;
+
+/** @type {number} */
+jsproperties_Foo.abc;

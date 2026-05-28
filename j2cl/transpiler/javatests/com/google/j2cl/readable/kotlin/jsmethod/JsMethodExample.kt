@@ -15,6 +15,7 @@
  */
 package jsmethod
 
+import javaemul.internal.annotations.Wasm
 import jsinterop.annotations.JsMethod
 import jsinterop.annotations.JsType
 
@@ -27,10 +28,16 @@ class JsMethodExample {
   //    1. be a @JsMethod
   //    2. return a type variable that is bounded by a generic class that has a constructor.
   // This would better be handled in a unit test.
-  @JsMethod external fun <T : ArrayList<String>> testMethod(): T
+  // TODO(b/371249047): Make this static for consistency with Java readable. Move to the appropriate
+  // test suite.
+  @Wasm("nop") // Native methods cannot return T in Wasm.
+  @JsMethod
+  external fun <T : ArrayList<String>> testMethod(): T
 
   abstract class Base<T> {
     @JsMethod open internal fun m(t: T) {}
+
+    open internal fun o(s: String) {}
   }
 
   interface I {
@@ -41,6 +48,9 @@ class JsMethodExample {
   class Sub internal constructor() : Base<String>(), I {
     // This should not be a JsMethod.
     override fun m(s: String) {}
+
+    // Internal JsMethod overriding a non-JsMethod.
+    @JsMethod override fun o(s: String) {}
   }
 
   @JsType

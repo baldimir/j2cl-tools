@@ -30,7 +30,6 @@ import com.google.j2cl.transpiler.ast.FieldAccess;
 import com.google.j2cl.transpiler.ast.ForEachStatement;
 import com.google.j2cl.transpiler.ast.FunctionExpression;
 import com.google.j2cl.transpiler.ast.InitializerBlock;
-import com.google.j2cl.transpiler.ast.InstanceOfExpression;
 import com.google.j2cl.transpiler.ast.JsConstructorReference;
 import com.google.j2cl.transpiler.ast.JsForInStatement;
 import com.google.j2cl.transpiler.ast.LabeledStatement;
@@ -44,9 +43,12 @@ import com.google.j2cl.transpiler.ast.MethodCall;
 import com.google.j2cl.transpiler.ast.MethodReference;
 import com.google.j2cl.transpiler.ast.MultiExpression;
 import com.google.j2cl.transpiler.ast.NewArray;
+import com.google.j2cl.transpiler.ast.NullLiteral;
 import com.google.j2cl.transpiler.ast.NumberLiteral;
+import com.google.j2cl.transpiler.ast.PatternMatchExpression;
 import com.google.j2cl.transpiler.ast.Statement;
-import com.google.j2cl.transpiler.ast.SwitchCase;
+import com.google.j2cl.transpiler.ast.SwitchCaseExpressions;
+import com.google.j2cl.transpiler.ast.SwitchCasePattern;
 import com.google.j2cl.transpiler.ast.SwitchExpression;
 import com.google.j2cl.transpiler.ast.TryStatement;
 import com.google.j2cl.transpiler.ast.Type;
@@ -63,13 +65,15 @@ import java.util.Map;
 public class VerifyNormalizedUnits extends NormalizationPass {
 
   private final boolean verifyForWasm;
+  private final boolean enableCustomDescriptorsJsInterop;
 
-  public VerifyNormalizedUnits(boolean verifyForWasm) {
+  public VerifyNormalizedUnits(boolean verifyForWasm, boolean enableCustomDescriptorsJsInterop) {
     this.verifyForWasm = verifyForWasm;
+    this.enableCustomDescriptorsJsInterop = enableCustomDescriptorsJsInterop;
   }
 
   public VerifyNormalizedUnits() {
-    this(false);
+    this(false, false);
   }
 
   @Override
@@ -136,7 +140,7 @@ public class VerifyNormalizedUnits extends NormalizationPass {
 
           public void checkMember(Member member) {
             verifyMemberUniqueness(member);
-            if (verifyForWasm) {
+            if (verifyForWasm && !enableCustomDescriptorsJsInterop) {
               boolean isNative =
                   member.isNative()
                       // TODO(b/264676817): Consider refactoring to have MethodDescriptor.isNative
@@ -228,8 +232,9 @@ public class VerifyNormalizedUnits extends NormalizationPass {
           }
 
           @Override
-          public void exitInstanceOfExpression(InstanceOfExpression instanceOfExpression) {
-            checkState(instanceOfExpression.getPatternVariable() == null);
+          public void exitPatternMatchExpression(PatternMatchExpression patternMatchExpression) {
+            // Pattern match expressions are expected to be normalized away.
+            throw new IllegalStateException();
           }
 
           @Override
@@ -247,7 +252,6 @@ public class VerifyNormalizedUnits extends NormalizationPass {
             checkState(
                 !(getParent() instanceof ArrayLiteral)
                     || AstUtils.shouldUseUntypedArray(arrayLiteral.getTypeDescriptor()));
-            if (verifyForWasm) {}
           }
 
           @Override
@@ -305,16 +309,22 @@ public class VerifyNormalizedUnits extends NormalizationPass {
           }
 
           @Override
-          public void exitSwitchCase(SwitchCase switchCase) {
+          public void exitSwitchCaseExpressions(SwitchCaseExpressions switchCase) {
             if (verifyForWasm) {
               for (Expression caseExpression : switchCase.getCaseExpressions()) {
                 // The only expressions allowed in a switch case are strings and number literals.
                 checkState(
-                    switchCase.isDefault()
-                        || TypeDescriptors.isJavaLangString(caseExpression.getTypeDescriptor())
-                        || caseExpression instanceof NumberLiteral);
+                    TypeDescriptors.isJavaLangString(caseExpression.getTypeDescriptor())
+                        || caseExpression instanceof NumberLiteral
+                        || caseExpression instanceof NullLiteral);
               }
             }
+          }
+
+          @Override
+          public void exitSwitchCasePattern(SwitchCasePattern switchCase) {
+            // Switch case patterns are expected to be normalized away.
+            throw new IllegalStateException();
           }
 
           @Override
@@ -354,7 +364,7 @@ public class VerifyNormalizedUnits extends NormalizationPass {
             checkState(!variableDeclarationExpression.getFragments().isEmpty());
             checkState(
                 variableDeclarationExpression.getFragments().stream()
-                    .allMatch(f -> !f.getVariable().isParameter()));
+                    .noneMatch(f -> f.getVariable().isParameter()));
           }
 
           @Override

@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.j2cl.common.SourcePosition;
 import com.google.j2cl.transpiler.ast.AstUtils;
-import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.BooleanLiteral;
 import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import com.google.j2cl.transpiler.ast.Expression;
@@ -93,7 +92,7 @@ public class ImplementInstanceOfs extends NormalizationPass {
 
   private static ExpressionStatement createMarkImplementorCall(
       DeclaredTypeDescriptor implementedInterface, Expression constructor) {
-    return MethodCall.Builder.from(implementedInterface.getMarkImplementorMethodDescriptor())
+    return MethodCall.builderFrom(implementedInterface.getMarkImplementorMethodDescriptor())
         .setArguments(constructor)
         .build()
         .makeStatement(SourcePosition.NONE);
@@ -107,7 +106,7 @@ public class ImplementInstanceOfs extends NormalizationPass {
     }
 
     Variable instanceParameter =
-        Variable.newBuilder()
+        Variable.builder()
             .setName("instance")
             .setTypeDescriptor(TypeDescriptors.get().javaLangObject)
             .setParameter(true)
@@ -118,11 +117,11 @@ public class ImplementInstanceOfs extends NormalizationPass {
     //    return <expression for instanceOf>.
     // }
     type.addMember(
-        Method.newBuilder()
+        Method.builder()
             .setMethodDescriptor(type.getTypeDescriptor().getIsInstanceMethodDescriptor())
             .setParameters(instanceParameter)
             .addStatements(
-                ReturnStatement.newBuilder()
+                ReturnStatement.builder()
                     .setExpression(synthesizeIsInstanceExpression(instanceParameter, type))
                     .setSourcePosition(SourcePosition.NONE)
                     .build())
@@ -144,7 +143,7 @@ public class ImplementInstanceOfs extends NormalizationPass {
   /** Synthesizes the $isInstance method directly using JavaScript instanceof. */
   private static Expression synthesizeInstanceOfClass(Variable instance, Type type) {
     // instance instanceof Type.
-    return InstanceOfExpression.newBuilder()
+    return InstanceOfExpression.builder()
         .setExpression(instance.createReference())
         .setTestTypeDescriptor(type.getUnderlyingTypeDeclaration().toDescriptor())
         .build();
@@ -157,7 +156,7 @@ public class ImplementInstanceOfs extends NormalizationPass {
         .createReference()
         .infixNotEqualsNull()
         .infixAnd(
-            FieldAccess.Builder.from(type.getTypeDescriptor().getIsInstanceMarkerField())
+            FieldAccess.builderFrom(type.getTypeDescriptor().getIsInstanceMarkerField())
                 .setQualifier(instance.createReference())
                 .build()
                 .prefixNot()
@@ -176,7 +175,7 @@ public class ImplementInstanceOfs extends NormalizationPass {
           AstUtils.getJsEnumValueFieldInstanceCheckType(typeDeclaration);
 
       //   ValueType.$isInstance(instance)
-      return MethodCall.Builder.from(instanceOfValueType.getIsInstanceMethodDescriptor())
+      return MethodCall.builderFrom(instanceOfValueType.getIsInstanceMethodDescriptor())
           .setArguments(instance.createReference())
           .build();
     }
@@ -203,14 +202,14 @@ public class ImplementInstanceOfs extends NormalizationPass {
     }
 
     Variable ctorParameter =
-        Variable.newBuilder()
+        Variable.builder()
             .setName("ctor")
             .setTypeDescriptor(TypeDescriptors.get().nativeFunction)
             .setParameter(true)
             .setFinal(true)
             .build();
     Method.Builder methodBuilder =
-        Method.newBuilder()
+        Method.builder()
             .setMethodDescriptor(type.getTypeDescriptor().getMarkImplementorMethodDescriptor())
             .setParameters(ctorParameter)
             .setSourcePosition(SourcePosition.NONE);
@@ -228,12 +227,10 @@ public class ImplementInstanceOfs extends NormalizationPass {
     // And finally add the marker corresponding to the current interface type.
     /** ctor.prototype.$implements_Type = true. */
     methodBuilder.addStatements(
-        BinaryExpression.Builder.asAssignmentTo(
-                FieldAccess.Builder.from(type.getTypeDescriptor().getIsInstanceMarkerField())
-                    .setQualifier(ctorParameter.createReference().getPrototypeFieldAccess())
-                    .build())
-            .setRightOperand(BooleanLiteral.get(true))
+        FieldAccess.builderFrom(type.getTypeDescriptor().getIsInstanceMarkerField())
+            .setQualifier(ctorParameter.createReference().getPrototypeFieldAccess())
             .build()
+            .infixAssign(BooleanLiteral.get(true))
             .makeStatement(SourcePosition.NONE));
 
     type.addMember(methodBuilder.build());

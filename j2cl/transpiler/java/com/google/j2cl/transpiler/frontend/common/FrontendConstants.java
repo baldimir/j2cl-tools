@@ -15,8 +15,6 @@
  */
 package com.google.j2cl.transpiler.frontend.common;
 
-
-
 /** Constants common to all frontends. */
 public final class FrontendConstants {
 
@@ -32,22 +30,7 @@ public final class FrontendConstants {
   public static final String JS_PROPERTY_ANNOTATION_NAME = "jsinterop.annotations.JsProperty";
   public static final String JS_TYPE_ANNOTATION_NAME = "jsinterop.annotations.JsType";
 
-  public static final String J2KT_DISABLED_ANNOTATION_NAME =
-      "javaemul.internal.annotations.KtDisabled";
-  public static final String J2KT_IN_ANNOTATION_NAME = "javaemul.internal.annotations.KtIn";
-  public static final String J2KT_NAME_ANNOTATION_NAME = "javaemul.internal.annotations.KtName";
-  public static final String J2KT_NATIVE_ANNOTATION_NAME = "javaemul.internal.annotations.KtNative";
-  public static final String J2KT_OBJECTIVE_C_ANNOTATION_NAME =
-      "com.google.j2objc.annotations.ObjectiveCName";
-  public static final String J2KT_OUT_ANNOTATION_NAME = "javaemul.internal.annotations.KtOut";
-  public static final String J2KT_PROPERTY_ANNOTATION_NAME =
-      "javaemul.internal.annotations.KtProperty";
-  public static final String J2KT_THROWS_ANNOTATION_NAME = "com.google.j2kt.annotations.Throws";
-  public static final String J2KT_PUBLIC_NATIVE_ANNOTATION_NAME =
-      "com.google.j2kt.annotations.KtNative";
-
   public static final String NULL_MARKED_ANNOTATION_NAME = "org.jspecify.annotations.NullMarked";
-  public static final String SUPPRESS_WARNINGS_ANNOTATION_NAME = "java.lang.SuppressWarnings";
 
   private FrontendConstants() {}
 }

@@ -75,7 +75,7 @@ public final class NormalizePackagedJsEnumVarargsLiterals extends NormalizationP
             Iterables.getLast(invocation.getTarget().getParameterDescriptors()).getTypeDescriptor();
 
     if (!isNonNativeJsEnum(varargsTypeDescriptor.getComponentTypeDescriptor())
-        || !(lastArgument instanceof ArrayLiteral)) {
+        || !(lastArgument instanceof ArrayLiteral arrayLiteral)) {
       return invocation;
     }
 
@@ -93,13 +93,13 @@ public final class NormalizePackagedJsEnumVarargsLiterals extends NormalizationP
         Iterables.getLast(
             invocation.getTarget().getDeclarationDescriptor().getParameterDescriptors());
 
-    return Invocation.Builder.from(invocation)
+    return invocation.toBuilder()
         .replaceVarargsArgument(
-            ArrayLiteral.newBuilder()
+            ArrayLiteral.builder()
                 .setTypeDescriptor(
                     (ArrayTypeDescriptor)
                         varargsParameterDeclaration.getTypeDescriptor().toRawTypeDescriptor())
-                .setValueExpressions(((ArrayLiteral) lastArgument).getValueExpressions())
+                .setValueExpressions(arrayLiteral.getValueExpressions())
                 .build())
         .build();
   }

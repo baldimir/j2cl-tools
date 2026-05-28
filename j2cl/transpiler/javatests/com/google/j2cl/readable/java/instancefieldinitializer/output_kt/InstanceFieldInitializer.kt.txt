@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package instancefieldinitializer
 
@@ -25,7 +26,7 @@ import kotlin.jvm.JvmField
 open class InstanceFieldInitializer {
  @JvmField
  var a: Int = 1
-
+ 
  @JvmField
  var b: Int = this.a * 2
 }

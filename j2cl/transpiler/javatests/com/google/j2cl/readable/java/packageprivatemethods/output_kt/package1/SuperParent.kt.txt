@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package packageprivatemethods.package1
 
@@ -25,15 +26,15 @@ open class SuperParent {
  internal open fun overrideInParentExposedInChild_pp_packageprivatemethods_package1(a: Int): Int {
   return a - 1
  }
-
+ 
  internal open fun exposedInChild_pp_packageprivatemethods_package1(a: Int, b: Int): Int {
   return a + b
  }
-
+ 
  internal open fun exposedInChildWithInterface_pp_packageprivatemethods_package1(a: Int, b: Int): Int {
   return a + b
  }
-
+ 
  internal open fun exposedAbstractInParent_pp_packageprivatemethods_package1(a: Int, b: Int, c: Int): Int {
   return a + b + c
  }

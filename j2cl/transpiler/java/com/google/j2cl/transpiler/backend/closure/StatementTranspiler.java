@@ -34,6 +34,8 @@ import com.google.j2cl.transpiler.ast.Node;
 import com.google.j2cl.transpiler.ast.ReturnStatement;
 import com.google.j2cl.transpiler.ast.Statement;
 import com.google.j2cl.transpiler.ast.SwitchCase;
+import com.google.j2cl.transpiler.ast.SwitchCaseDefault;
+import com.google.j2cl.transpiler.ast.SwitchCaseExpressions;
 import com.google.j2cl.transpiler.ast.SwitchStatement;
 import com.google.j2cl.transpiler.ast.SynchronizedStatement;
 import com.google.j2cl.transpiler.ast.ThrowStatement;
@@ -41,7 +43,6 @@ import com.google.j2cl.transpiler.ast.TryStatement;
 import com.google.j2cl.transpiler.ast.VariableDeclarationExpression;
 import com.google.j2cl.transpiler.ast.WhileStatement;
 import com.google.j2cl.transpiler.backend.common.SourceBuilder;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -157,7 +158,7 @@ public class StatementTranspiler {
             () -> {
               builder.append("for(");
               renderExpression(
-                  VariableDeclarationExpression.newBuilder()
+                  VariableDeclarationExpression.builder()
                       .addVariableDeclarations(jsForInStatement.getLoopVariable())
                       .build());
               builder.append(" in ");
@@ -187,32 +188,16 @@ public class StatementTranspiler {
 
       @Override
       public boolean enterFieldDeclarationStatement(FieldDeclarationStatement declaration) {
-        String typeJsDoc =
-            environment.getClosureTypeString(declaration.getFieldDescriptor().getTypeDescriptor());
-        ArrayList<String> jsDocs = new ArrayList<>();
-        if (!declaration.isPublic()) {
-          jsDocs.add("@private");
-        }
-        if (declaration.isConst()) {
-          jsDocs.add("@const");
-        }
-        if (jsDocs.isEmpty()) {
-          jsDocs.add("@type");
-        }
-        jsDocs.add("{" + typeJsDoc + "}");
-        if (declaration.getFieldDescriptor().hasAnnotation("java.lang.Deprecated")
-            || declaration.getFieldDescriptor().hasAnnotation("kotlin.Deprecated")) {
-          jsDocs.add("@deprecated");
-        }
-        if (!declaration.getFieldDescriptor().canBeReferencedExternally()) {
-          jsDocs.add("@nodts");
-        }
+        String jsDoc =
+            environment.getJsDocForField(
+                declaration.getFieldDescriptor(), /* isPublic= */ declaration.isPublic());
+
         Runnable renderer =
             () ->
                 builder.emitWithMapping(
                     declaration.getSourcePosition(),
                     () -> {
-                      builder.appendln("/**" + String.join(" ", jsDocs) + "*/");
+                      builder.appendln("/**" + jsDoc + "*/");
                       renderExpression(declaration.getExpression());
                       builder.append(";");
                     });
@@ -256,15 +241,30 @@ public class StatementTranspiler {
       }
 
       @Override
-      public boolean enterSwitchCase(SwitchCase switchCase) {
-        if (switchCase.isDefault()) {
-          builder.append("default:");
-        } else {
-          for (Expression expression : switchCase.getCaseExpressions()) {
-            builder.append("case ");
-            renderExpression(expression);
-            builder.append(":");
-          }
+      public boolean enterSwitchCaseDefault(SwitchCaseDefault switchCase) {
+        builder.append("default:");
+        builder.indent();
+        renderStatements(switchCase.getStatements());
+        builder.unindent();
+        return false;
+      }
+
+      @Override
+      public boolean enterSwitchCaseExpressions(SwitchCaseExpressions switchCase) {
+        // Emit the expressions as a sequence of (fallthrough empty) cases. E.g.
+        //
+        //   case 1, 2, 3:
+        //
+        // will be emitted as:
+        //
+        //   case 1:
+        //   case 2:
+        //   case 3:
+
+        for (Expression expression : switchCase.getCaseExpressions()) {
+          builder.append("case ");
+          renderExpression(expression);
+          builder.append(":");
         }
         builder.indent();
         renderStatements(switchCase.getStatements());

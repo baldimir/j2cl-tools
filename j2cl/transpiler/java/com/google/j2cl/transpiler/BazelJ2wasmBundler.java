@@ -15,6 +15,7 @@
  */
 package com.google.j2cl.transpiler;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -23,7 +24,6 @@ import static com.google.j2cl.common.StringUtils.unescapeWtf16;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.LinkedHashMultimap;
@@ -33,6 +33,7 @@ import com.google.common.io.Files;
 import com.google.j2cl.common.Problems;
 import com.google.j2cl.common.Problems.FatalError;
 import com.google.j2cl.common.SourcePosition;
+import com.google.j2cl.common.StringUtils;
 import com.google.j2cl.common.bazel.BazelWorker;
 import com.google.j2cl.common.bazel.FileCache;
 import com.google.j2cl.transpiler.ast.AstUtils;
@@ -50,6 +51,7 @@ import com.google.j2cl.transpiler.ast.TypeDescriptors;
 import com.google.j2cl.transpiler.backend.common.SourceBuilder;
 import com.google.j2cl.transpiler.backend.wasm.ItableAllocator;
 import com.google.j2cl.transpiler.backend.wasm.JsImportsGenerator;
+import com.google.j2cl.transpiler.backend.wasm.JsMemberInfo;
 import com.google.j2cl.transpiler.backend.wasm.SharedSnippet;
 import com.google.j2cl.transpiler.backend.wasm.Summary;
 import com.google.j2cl.transpiler.backend.wasm.SystemPropertyInfo;
@@ -57,10 +59,10 @@ import com.google.j2cl.transpiler.backend.wasm.TypeInfo;
 import com.google.j2cl.transpiler.backend.wasm.WasmConstructsGenerator;
 import com.google.j2cl.transpiler.backend.wasm.WasmGenerationEnvironment;
 import com.google.j2cl.transpiler.backend.wasm.WasmGeneratorStage;
-import com.google.j2cl.transpiler.frontend.jdt.JdtEnvironment;
-import com.google.j2cl.transpiler.frontend.jdt.JdtParser;
+import com.google.j2cl.transpiler.frontend.javac.JavacParser;
 import com.google.j2cl.transpiler.passes.RewriteReferenceEqualityOperations;
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -92,7 +94,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
       new FileCache<>(BazelJ2wasmBundler::readSummary, CACHE_SIZE);
 
   @Argument(required = true, usage = "The list of modular output directories", multiValued = true)
-  List<String> inputs = null;
+  List<Path> inputs = null;
 
   @Option(
       name = "-output",
@@ -113,10 +115,22 @@ final class BazelJ2wasmBundler extends BazelWorker {
       required = true,
       metaVar = "<path>",
       usage = "Specifies where to find all the class files for the application.")
-  String classPath;
+  List<Path> classpaths;
+
+  @Option(
+      name = "-system",
+      metaVar = "<path>",
+      usage = "Specifies the location of the system modules.")
+  Path system;
 
   @Option(name = "-define", handler = MapOptionHandler.class, hidden = true)
   Map<String, String> defines = new HashMap<>();
+
+  @Option(
+      name = "-experimentalEnableWasmCustomDescriptorsJsInterop",
+      usage = "Enables JsInterop with custom descriptors for Wasm.",
+      hidden = true)
+  boolean enableCustomDescriptorsJsInterop = false;
 
   @Override
   protected void run() {
@@ -129,10 +143,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
 
     // Create an environment to initialize the well known type descriptors to be able to synthesize
     // code.
-    // TODO(b/294284380): consider removing JDT and manually synthesizing required types.
-    var classPathEntries = Splitter.on(File.pathSeparatorChar).splitToList(this.classPath);
-    new JdtEnvironment(
-        new JdtParser(problems), classPathEntries, TypeDescriptors.getWellKnownTypeNames());
+    var unused = JavacParser.createEnvironment(classpaths, system, problems);
 
     var referencedSystemProperties =
         getSummaries()
@@ -168,6 +179,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
                 Stream.of(typeGraph.getTopLevelItableStructDeclaration()),
                 typeGraph.getClasses().stream().map(TypeGraph.Type::getItableStructDeclaration),
                 Stream.of(")"),
+                Stream.of(getJsExportsTypes()),
                 streamDedupedValues(Summary::getWasmImportSnippetsList),
                 getModuleParts("imports"),
                 Stream.of(generatorStage.emitToString(WasmConstructsGenerator::emitExceptionTag)),
@@ -178,10 +190,238 @@ final class BazelJ2wasmBundler extends BazelWorker {
                 Stream.of(literalGlobals),
                 literalGetterMethods,
                 Stream.of(typeGraph.getItableInterfaceGetters(generatorStage.getEnvironment())),
+                Stream.of(getJsPrototypes(typeGraph, generatorStage.getEnvironment())),
+                Stream.of(getJsFunctions(typeGraph)),
+                Stream.of(getJsConfigurationDataAndStartFunction(typeGraph)),
                 Stream.of(")"))
             .collect(toImmutableList());
 
     writeToFile(output.toString(), moduleContents, problems);
+  }
+
+  /** Gets basic types and imports needed for configuring JS exports. */
+  private String getJsExportsTypes() {
+    if (!enableCustomDescriptorsJsInterop) {
+      return "";
+    }
+
+    return """
+    (type $js_prototypes_t (array (mut externref)))
+    (type $js_functions_t (array (mut funcref)))
+    (type $js_data_t (array (mut i8)))
+    (type $js_configureAll_t
+      (func (param (ref null $js_prototypes_t))
+            (param (ref null $js_functions_t))
+            (param (ref null $js_data_t))
+            (param externref))
+    )
+
+    (import "wasm:js-prototypes" "configureAll" (func $js_configureAll (type $js_configureAll_t)))
+    (import "env" "constructors" (global $js_constructors externref))
+    """;
+  }
+
+  private String getJsPrototypes(TypeGraph typeGraph, WasmGenerationEnvironment environment) {
+    if (!enableCustomDescriptorsJsInterop) {
+      return "";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("(elem $js_prototypes externref\n");
+    for (var type : typeGraph.getJsTypes()) {
+      sb.append("  (global.get ");
+      sb.append(type.getPrototypeGlobalName(environment));
+      sb.append(")\n");
+    }
+    sb.append(")\n");
+    return sb.toString();
+  }
+
+  private String getJsFunctions(TypeGraph typeGraph) {
+    if (!enableCustomDescriptorsJsInterop) {
+      return "";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    // Generate a dummy constructor for types that don't export one.
+    // If the type has no js constructors, we will use this dummy constructor. We still need to
+    // reference a constructor in the configuration data in order to configure a name for the type
+    // in the constructors list.
+    sb.append("(func $js_constructor_placeholder (result anyref)\n");
+    sb.append("  (unreachable)\n");
+    sb.append(")\n");
+    sb.append("\n");
+
+    // List exported methods for all types.
+    sb.append("(elem $js_functions funcref\n");
+    for (var type : typeGraph.getJsTypes()) {
+      // Constructor
+      if (type.jsConstructor() != null) {
+        sb.append("  (ref.func ");
+        sb.append(type.jsConstructor().getWasmName());
+        sb.append(")\n");
+      } else {
+        sb.append("  (ref.func $js_constructor_placeholder)\n");
+      }
+
+      // All other members.
+      type.streamJsMembersExceptConstructor()
+          .forEach(
+              m -> {
+                sb.append("  (ref.func ");
+                sb.append(m.getWasmName());
+                sb.append(")\n");
+              });
+    }
+    sb.append(")\n");
+    return sb.toString();
+  }
+
+  /**
+   * Gets the configuration data string and start function for JsInterop with custom descriptors.
+   *
+   * <p>Basic format is follows:
+   *
+   * <ol>
+   *   <li>Number of exported types
+   *   <li>For each exported type:
+   *       <ol>
+   *         <li>Number of constructors
+   *         <li>For each constructor: Name of the constructor (name of the type)
+   *         <li>Number of static members
+   *         <li>For each static member: The type (int) and name
+   *         <li>Number of instance members
+   *         <li>For each instance member: The type (int) and name
+   *         <li>Index of the super type
+   *       </ol>
+   *   <li>
+   * </ol>
+   *
+   * <p>Note that the actual references to the prototype and functions are not present. This relies
+   * on the references previously defined in {@code js_prototypes} and {@code js_functions} data
+   * segments generated in {@link #getJsPrototypes} and {@link #getJsFunctions} respectively. They
+   * must be in the same order.
+   */
+  private String getJsConfigurationDataAndStartFunction(TypeGraph typeGraph) {
+    if (!enableCustomDescriptorsJsInterop) {
+      return "";
+    }
+
+    var exportedTypes = typeGraph.getJsTypes();
+    StringBuilder sb = new StringBuilder();
+
+    int configurationDataLength = 0;
+    try (ByteArrayOutputStream configurationData = new ByteArrayOutputStream()) {
+      appendDataUnsignedLeb128(exportedTypes.size(), configurationData);
+      for (var type : exportedTypes) {
+        // Constructors.
+        // Number of constructors:
+        appendDataUnsignedLeb128(1, configurationData);
+        // For the constructor, simply output the name of the type.
+        appendDataStringWithLength(type.qualifiedJsName(), configurationData);
+
+        // Static members.
+        appendDataUnsignedLeb128(type.staticJsMembers().size(), configurationData);
+        for (var staticMember : type.staticJsMembers()) {
+          appendDataUnsignedLeb128(TypeGraph.getJsMethodKind(staticMember), configurationData);
+          appendDataStringWithLength(staticMember.getJsName(), configurationData);
+        }
+
+        // Instance members.
+        appendDataUnsignedLeb128(type.instanceJsMembers().size(), configurationData);
+        for (var instanceMember : type.instanceJsMembers()) {
+          appendDataUnsignedLeb128(TypeGraph.getJsMethodKind(instanceMember), configurationData);
+          appendDataStringWithLength(instanceMember.getJsName(), configurationData);
+        }
+
+        // Index of the super type.
+        appendDataSignedLeb128(
+            type.superType() != null ? type.superType().index() : -1, configurationData);
+      }
+
+      sb.append("(data $js_data \"");
+      for (byte b : configurationData.toByteArray()) {
+        sb.append(StringUtils.escapeAsUtf8(b));
+      }
+      sb.append("\")\n");
+      sb.append("\n");
+
+      configurationDataLength = configurationData.size();
+    } catch (IOException e) {
+      // Should not happen.
+      throw new AssertionError("", e);
+    }
+
+    checkState(configurationDataLength > 0);
+
+    // Output the start function. We use the start function to call configureAll with all the
+    // information about the exported JS types.
+    sb.append("(func $start\n");
+    sb.append("  (call $js_configureAll\n");
+    sb.append("    (array.new_elem $js_prototypes_t $js_prototypes\n");
+    sb.append("      (i32.const 0) (i32.const ");
+    sb.append(exportedTypes.size());
+    sb.append("))\n");
+    sb.append("    (array.new_elem $js_functions_t $js_functions\n");
+    sb.append("      (i32.const 0) (i32.const ");
+    sb.append(exportedTypes.stream().mapToInt(TypeGraph.JsTypeInfo::getJsMemberCount).sum());
+    sb.append("))\n");
+    sb.append("    (array.new_data $js_data_t $js_data\n");
+    sb.append("      (i32.const 0) (i32.const ");
+    sb.append(configurationDataLength);
+    sb.append("))\n");
+    sb.append("    (global.get $js_constructors)\n");
+    sb.append("  )\n");
+    sb.append(")\n");
+    sb.append("(start $start)\n");
+    return sb.toString();
+  }
+
+  private static void appendDataStringWithLength(String string, ByteArrayOutputStream output) {
+    byte[] bytes = string.getBytes(UTF_8);
+    appendDataUnsignedLeb128(bytes.length, output);
+    output.writeBytes(bytes);
+  }
+
+  /** Encodes an integer into an unsigned LEB128 byte sequence. */
+  private static void appendDataUnsignedLeb128(int value, ByteArrayOutputStream output) {
+    checkArgument(value >= 0);
+    do {
+      byte lower7bits = (byte) (value & 0x7F);
+      value >>>= 7;
+      // Any remaining bits? Set continuation bit.
+      if (value != 0) {
+        lower7bits |= 0x80;
+      }
+      output.write(lower7bits);
+    } while (value != 0);
+  }
+
+  /** Encodes an integer into an signed LEB128 byte sequence. */
+  private static void appendDataSignedLeb128(int value, ByteArrayOutputStream output) {
+    boolean more;
+
+    do {
+      byte chunk = (byte) (value & 0x7F);
+      // Arithmetic shift preserves the sign (sign extend).
+      value >>= 7;
+
+      // Check the sign bit of the 7-bit chunk.
+      boolean chunkSignBit = (chunk & 0x40) != 0;
+
+      // The last byte is reached if the remaining bits in 'value' are
+      // all an extension of the sign bit of the current chunk.
+      // - If chunk is positive (sign bit is 0) and value is 0 (b0000...).
+      // - If chunk is negative (sign bit is 1) and value is -1 (b1111...).
+      if (((value == 0) && !chunkSignBit) || ((value == -1) && chunkSignBit)) {
+        more = false;
+      } else {
+        more = true;
+        chunk |= 0x80;
+      }
+
+      output.write(chunk);
+    } while (more);
   }
 
   private Stream<String> streamDedupedValues(
@@ -202,7 +442,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
     var stringLiteralHolder =
         new com.google.j2cl.transpiler.ast.Type(
             SourcePosition.NONE,
-            TypeDeclaration.newBuilder()
+            TypeDeclaration.builder()
                 .setQualifiedSourceName("wasm.stringLiteral.StringLiteralHolder")
                 .setKind(Kind.CLASS)
                 .build());
@@ -266,7 +506,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
 
     // Synthesize the forwarding logic.
     TypeDeclaration typeDeclaration =
-        TypeDeclaration.newBuilder()
+        TypeDeclaration.builder()
             .setQualifiedSourceName(enclosingTypeQualifiedSourceName)
             .setKind(Kind.CLASS)
             .build();
@@ -279,7 +519,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
   private static Method synthesizeForwardingMethod(
       MethodDescriptor literalGetter, TypeDeclaration fromType, String forwardingMethodName) {
     MethodDescriptor forwarderDescriptor =
-        MethodDescriptor.newBuilder()
+        MethodDescriptor.builder()
             .setEnclosingTypeDescriptor(fromType.toDescriptor())
             .setName(forwardingMethodName)
             .setOrigin(MethodOrigin.SYNTHETIC_STRING_LITERAL_GETTER)
@@ -299,11 +539,11 @@ final class BazelJ2wasmBundler extends BazelWorker {
     var typeDeclaration = propertyGetter.getEnclosingTypeDescriptor().getTypeDeclaration();
     com.google.j2cl.transpiler.ast.Type type = getType(typeDeclaration);
     type.addMember(
-        Method.newBuilder()
+        Method.builder()
             .setMethodDescriptor(propertyGetter)
             .setSourcePosition(SourcePosition.NONE)
             .setStatements(
-                ReturnStatement.newBuilder()
+                ReturnStatement.builder()
                     .setExpression(TypeDescriptors.get().javaLangString.getNullValue())
                     .setSourcePosition(SourcePosition.NONE)
                     .build())
@@ -315,7 +555,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
 
   /** Synthetic library all types synthesized at bundling time. */
   private final Library library =
-      Library.newBuilder().setCompilationUnits(ImmutableList.of(compilationUnit)).build();
+      Library.builder().setCompilationUnits(ImmutableList.of(compilationUnit)).build();
 
   private final Map<TypeDeclaration, com.google.j2cl.transpiler.ast.Type> typesByDeclaration =
       new LinkedHashMap<>();
@@ -339,6 +579,9 @@ final class BazelJ2wasmBundler extends BazelWorker {
     // The list of all classes.
     private final List<TypeGraph.Type> interfaces = new ArrayList<>();
     private final Map<String, TypeGraph.Type> typesByName = new LinkedHashMap<>();
+
+    // List of exported JS types.
+    private final List<TypeGraph.JsTypeInfo> jsTypes = new ArrayList<>();
 
     private final ItableAllocator<String> itableAllocator;
 
@@ -390,11 +633,53 @@ final class BazelJ2wasmBundler extends BazelWorker {
           var interfaceType = typesByName.get(interfaceName);
           type.implementedInterfaces.add(interfaceType);
         }
+
+        if (typeInfo.hasJsInfo()) {
+          // Separate out constructors and static and instance members which are handled separately.
+          JsMemberInfo jsConstructor = null;
+          ImmutableList.Builder<JsMemberInfo> staticJsMembers = ImmutableList.builder();
+          ImmutableList.Builder<JsMemberInfo> instanceJsMembers = ImmutableList.builder();
+          for (JsMemberInfo member : typeInfo.getJsInfo().getJsMembersList()) {
+            if (member.getKind() == JsMemberInfo.Kind.CONSTRUCTOR) {
+              jsConstructor = member;
+            } else if (member.getIsStatic()) {
+              staticJsMembers.add(member);
+            } else {
+              instanceJsMembers.add(member);
+            }
+          }
+
+          var exportedType =
+              new TypeGraph.JsTypeInfo(
+                  typeInfo.getJsInfo().getQualifiedJsName(),
+                  /* index= */ jsTypes.size(),
+                  type.getExportedSupertype(),
+                  jsConstructor,
+                  /* staticJsMembers= */ staticJsMembers.build(),
+                  /* instanceJsMembers= */ instanceJsMembers.build());
+
+          jsTypes.add(exportedType);
+          type.exportedType = exportedType;
+        }
       }
     }
 
     List<TypeGraph.Type> getClasses() {
       return classes;
+    }
+
+    List<TypeGraph.JsTypeInfo> getJsTypes() {
+      return jsTypes;
+    }
+
+    static int getJsMethodKind(JsMemberInfo member) {
+      return switch (member.getKind()) {
+        case METHOD -> 0;
+        case GETTER -> 1;
+        case SETTER -> 2;
+        default ->
+            throw new IllegalArgumentException("Unexpected member kind " + member.getKind().name());
+      };
     }
 
     /** Emits the top-level itable struct. */
@@ -442,6 +727,7 @@ final class BazelJ2wasmBundler extends BazelWorker {
       private Type superType;
       private final Set<Type> implementedInterfaces = new HashSet<>();
       private final boolean isAbstract;
+      private TypeGraph.JsTypeInfo exportedType;
 
       public Type(String name, boolean isAbstract) {
         this.name = name;
@@ -545,6 +831,48 @@ final class BazelJ2wasmBundler extends BazelWorker {
         }
         return itableFieldTypes;
       }
+
+      private TypeGraph.JsTypeInfo getExportedSupertype() {
+        TypeGraph.Type currentType = superType;
+        while (currentType != null) {
+          if (currentType.exportedType != null) {
+            return currentType.exportedType;
+          }
+          currentType = currentType.superType;
+        }
+        return null;
+      }
+    }
+
+    private record JsTypeInfo(
+        String qualifiedJsName,
+        int index,
+        JsTypeInfo superType,
+        JsMemberInfo jsConstructor,
+        ImmutableList<JsMemberInfo> staticJsMembers,
+        ImmutableList<JsMemberInfo> instanceJsMembers) {
+
+      String getPrototypeGlobalName(WasmGenerationEnvironment environment) {
+        return environment.getJsPrototypeGlobalName(qualifiedJsName);
+      }
+
+      /**
+       * Streams all members of this type, excluding the constructor. Static members appear first,
+       * followed by instance members. Members should be referenced in the configuration data in the
+       * order they appear in this stream.
+       */
+      Stream<JsMemberInfo> streamJsMembersExceptConstructor() {
+        return Streams.concat(staticJsMembers.stream(), instanceJsMembers.stream());
+      }
+
+      /**
+       * Gets the number of functions in this type. Includes constructors, static methods, and
+       * instance methods.
+       */
+      int getJsMemberCount() {
+        // Note: Adding 1 for the constructor.
+        return 1 + staticJsMembers.size() + instanceJsMembers.size();
+      }
     }
   }
 
@@ -559,7 +887,11 @@ final class BazelJ2wasmBundler extends BazelWorker {
 
     writeToFile(
         jsimportPath.toString(),
-        ImmutableList.of(JsImportsGenerator.generateOutputs(requiredModules, jsImportsContents)),
+        ImmutableList.of(
+            JsImportsGenerator.generateOutputs(
+                requiredModules,
+                jsImportsContents,
+                /* enableJsInterop= */ enableCustomDescriptorsJsInterop)),
         problems);
   }
 

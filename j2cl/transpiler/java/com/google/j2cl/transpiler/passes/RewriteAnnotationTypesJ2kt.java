@@ -15,9 +15,9 @@
  */
 package com.google.j2cl.transpiler.passes;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.j2cl.transpiler.ast.TypeDescriptors.isJavaLangClass;
 
-import com.google.common.collect.ImmutableList;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.ArrayTypeDescriptor;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
@@ -26,7 +26,6 @@ import com.google.j2cl.transpiler.ast.Method;
 import com.google.j2cl.transpiler.ast.MethodDescriptor;
 import com.google.j2cl.transpiler.ast.Node;
 import com.google.j2cl.transpiler.ast.PackageDeclaration;
-import com.google.j2cl.transpiler.ast.TypeDeclaration;
 import com.google.j2cl.transpiler.ast.TypeDescriptor;
 import com.google.j2cl.transpiler.ast.TypeVariable;
 
@@ -53,9 +52,9 @@ public class RewriteAnnotationTypesJ2kt extends NormalizationPass {
               return method;
             }
 
-            return Method.Builder.from(method)
+            return method.toBuilder()
                 .setMethodDescriptor(
-                    MethodDescriptor.Builder.from(methodDescriptor)
+                    methodDescriptor.toBuilder()
                         .setReturnTypeDescriptor(
                             rewriteAnnotationTypeDescriptor(
                                 methodDescriptor.getReturnTypeDescriptor()))
@@ -66,28 +65,29 @@ public class RewriteAnnotationTypesJ2kt extends NormalizationPass {
   }
 
   private static TypeDescriptor rewriteAnnotationTypeDescriptor(TypeDescriptor typeDescriptor) {
-    if (typeDescriptor instanceof DeclaredTypeDescriptor declaredTypeDescriptor) {
-      if (isJavaLangClass(declaredTypeDescriptor)) {
-        return TypeDeclaration.Builder.from(declaredTypeDescriptor.getTypeDeclaration())
-            .setPackage(PackageDeclaration.newBuilder().setName("kotlin.reflect").build())
-            .setClassComponents("KClass")
-            .build()
-            .toDescriptor()
-            .toNonNullable()
-            .withTypeArguments(
-                declaredTypeDescriptor.getTypeArgumentDescriptors().stream()
-                    .map(it -> rewriteAnnotationTypeDescriptor(it))
-                    .collect(ImmutableList.toImmutableList()));
-      }
-    } else if (typeDescriptor instanceof ArrayTypeDescriptor arrayTypeDescriptor) {
-      return arrayTypeDescriptor.withComponentTypeDescriptor(
-          rewriteAnnotationTypeDescriptor(arrayTypeDescriptor.getComponentTypeDescriptor()));
-    } else if (typeDescriptor instanceof TypeVariable typeVariable) {
-      if (typeVariable.isWildcard()) {
-        return typeVariable.withRewrittenBounds(it -> rewriteAnnotationTypeDescriptor(it));
-      }
-    }
+    return switch (typeDescriptor) {
+      case DeclaredTypeDescriptor declaredTypeDescriptor
+          when isJavaLangClass(declaredTypeDescriptor) ->
+          declaredTypeDescriptor.getTypeDeclaration().toBuilder()
+              .setPackage(PackageDeclaration.builder().setName("kotlin.reflect").build())
+              .setClassComponents("KClass")
+              .build()
+              .toDescriptor()
+              .toNonNullable()
+              .withTypeArguments(
+                  declaredTypeDescriptor.getTypeArgumentDescriptors().stream()
+                      .map(RewriteAnnotationTypesJ2kt::rewriteAnnotationTypeDescriptor)
+                      .collect(toImmutableList()));
 
-    return typeDescriptor;
+      case ArrayTypeDescriptor arrayTypeDescriptor ->
+          arrayTypeDescriptor.withComponentTypeDescriptor(
+              rewriteAnnotationTypeDescriptor(arrayTypeDescriptor.getComponentTypeDescriptor()));
+
+      case TypeVariable typeVariable when typeVariable.isWildcard() ->
+          typeVariable.withRewrittenBounds(
+              RewriteAnnotationTypesJ2kt::rewriteAnnotationTypeDescriptor);
+
+      default -> typeDescriptor;
+    };
   }
 }

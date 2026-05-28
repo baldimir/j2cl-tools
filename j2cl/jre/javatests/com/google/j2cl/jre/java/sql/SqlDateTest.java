@@ -15,6 +15,8 @@
  */
 package com.google.j2cl.jre.java.sql;
 
+import static org.junit.Assert.assertThrows;
+
 import java.sql.Date;
 import junit.framework.TestCase;
 
@@ -51,51 +53,21 @@ public class SqlDateTest extends TestCase {
     Date sqlDate = new Date(2000 - 1900, 1 - 1, 1);
     assertEquals("2000-01-01", sqlDate.toString());
   }
-  
+
   public void testUnimplementedFunctions() {
     Date d = new Date(0);
 
-    try {
-      d.getHours();
-      fail("Should have thrown IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      // Expected behavior
-    }
+    assertThrows(IllegalArgumentException.class, () -> d.getHours());
 
-    try {
-      d.getMinutes();
-      fail("Should have thrown IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      // Expected behavior
-    }
+    assertThrows(IllegalArgumentException.class, () -> d.getMinutes());
 
-    try {
-      d.getSeconds();
-      fail("Should have thrown IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      // Expected behavior
-    }
+    assertThrows(IllegalArgumentException.class, () -> d.getSeconds());
 
-    try {
-      d.setHours(0);
-      fail("Should have thrown IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      // Expected behavior
-    }
+    assertThrows(IllegalArgumentException.class, () -> d.setHours(0));
 
-    try {
-      d.setMinutes(0);
-      fail("Should have thrown IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      // Expected behavior
-    }
+    assertThrows(IllegalArgumentException.class, () -> d.setMinutes(0));
 
-    try {
-      d.setSeconds(0);
-      fail("Should have thrown IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      // Expected behavior
-    }
+    assertThrows(IllegalArgumentException.class, () -> d.setSeconds(0));
   }
 
   public void testValueOf() {
@@ -107,18 +79,14 @@ public class SqlDateTest extends TestCase {
 
     Date d2 = Date.valueOf(d.toString());
     assertEquals(d, d2);
-    
+
     // validate that leading zero's don't trigger octal eval
     d = Date.valueOf("2009-08-08");
     assertEquals(109, d.getYear());
     assertEquals(7, d.getMonth());
     assertEquals(8, d.getDate());
-    
+
     // validate 0x isn't a valid prefix
-    try {
-      d = Date.valueOf("2009-0xA-0xB");
-      fail("Should have thrown IllegalArgumentException");
-    } catch (IllegalArgumentException expected) {
-    }
+    assertThrows(IllegalArgumentException.class, () -> Date.valueOf("2009-0xA-0xB"));
   }
 }

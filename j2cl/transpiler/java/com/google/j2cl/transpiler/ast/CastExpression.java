@@ -16,9 +16,13 @@
 package com.google.j2cl.transpiler.ast;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.j2cl.transpiler.ast.TypeDescriptors.isJavaLangString;
+import static com.google.j2cl.transpiler.ast.TypeDescriptors.isPrimitiveFloat;
 
 import com.google.j2cl.common.visitor.Processor;
 import com.google.j2cl.common.visitor.Visitable;
+import javax.annotation.Nullable;
 
 /** Class for Cast expression. */
 @Visitable
@@ -55,6 +59,43 @@ public class CastExpression extends Expression {
   }
 
   @Override
+  public boolean isCompileTimeConstant() {
+    return castTypeDescriptor.isPrimitive() && expression.isCompileTimeConstant();
+  }
+
+  @Override
+  @Nullable
+  public Literal getConstantValue() {
+    if (!isCompileTimeConstant()) {
+      return null;
+    }
+
+    if (castTypeDescriptor instanceof PrimitiveTypeDescriptor primitiveTypeDescriptor) {
+      NumberLiteral compileTimeConstant = (NumberLiteral) expression.getConstantValue();
+      // NumberLiteral stores most literals using a `Number` object of the corresponding type;
+      // except for `floats` that are stored as a `Double` object, and `chars` wich are stored as
+      // `Integer` objects.
+      checkState(
+          !isPrimitiveFloat(primitiveTypeDescriptor)
+              || compileTimeConstant.getValue() instanceof Double);
+
+      // The constructor of `NumberLiteral` will coerce the value to the correct type dictated by
+      // the type descriptor except for floats which are not coerced but are set to the double
+      // value, potentially keeping more precision than 32-bit float permits.
+      Number value =
+          isPrimitiveFloat(primitiveTypeDescriptor)
+              ? compileTimeConstant.getValue().floatValue()
+              : compileTimeConstant.getValue();
+      return new NumberLiteral(primitiveTypeDescriptor, value);
+    }
+
+    // The only other case other that primitive casts possible here would be a spurious String cast
+    // on a string literal.
+    checkState(isJavaLangString(castTypeDescriptor));
+    return expression.getConstantValue();
+  }
+
+  @Override
   public CastExpression clone() {
     return new CastExpression(expression.clone(), castTypeDescriptor);
   }
@@ -64,7 +105,13 @@ public class CastExpression extends Expression {
     return Visitor_CastExpression.visit(processor, this);
   }
 
-  public static Builder newBuilder() {
+  public Builder toBuilder() {
+    return builder()
+        .setExpression(this.getExpression())
+        .setCastTypeDescriptor(this.getCastTypeDescriptor());
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
@@ -72,12 +119,6 @@ public class CastExpression extends Expression {
   public static class Builder {
     private Expression expression;
     private TypeDescriptor castTypeDescriptor;
-
-    public static Builder from(CastExpression cast) {
-      return new Builder()
-          .setExpression(cast.getExpression())
-          .setCastTypeDescriptor(cast.getCastTypeDescriptor());
-    }
 
     public Builder setExpression(Expression expression) {
       this.expression = expression;

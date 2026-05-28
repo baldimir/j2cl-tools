@@ -67,6 +67,7 @@ class Bar(private var f: Int) {
   }
 }
 
+/** Tests for Kotlin properties with JsProperty. */
 class Buzz(@JsProperty val f: Int) {
   val fieldGetter: Int
     @JsProperty get() = 10
@@ -96,18 +97,54 @@ class Buzz(@JsProperty val f: Int) {
     @JsProperty(name = "mismatchedName") set
 }
 
-/** Tests for native JsProperty. */
-class NativeFoo {
-  @JsProperty(name = "hasOwnProperty") external fun getA(): Any
+/** Tests for read only JsProperty. */
+class ReadOnlyJsProperty {
+  @JsProperty val a: Int = 1
 
-  val b: Any
-    @JsProperty(name = "hasOwnProperty") external get
+  @JsProperty
+  fun getB(): Int {
+    return 2
+  }
+}
+
+@JsProperty val c: Int = 3
+
+@JsProperty
+fun getD(): Int {
+  return 4
 }
 
 @JsProperty(name = "Math.PI", namespace = JsPackage.GLOBAL) external fun getNativeB(): Double
 
 val nativeProperty: Double
   @JsProperty(name = "Math.E", namespace = JsPackage.GLOBAL) external get
+
+interface InterfaceWithJsProperties {
+  @JsProperty val x: Int
+  @JsProperty var y: Int
+  @JsProperty(name = "zz") val z: Int
+  @JsProperty(name = "rr") var r: Int
+  @get:JsProperty(name = "ss") val s: Int
+  @get:JsProperty(name = "tt") var t: Int
+
+  val u: Int
+    @JsProperty get
+
+  var v: Int
+    @JsProperty get
+
+  val w: Int
+    @JsProperty(name = "ww") get
+
+  val c: Int
+    @JsProperty(name = "cc") get() = 10
+
+  @get:JsProperty(name = "dd") @set:JsProperty(name = "dd2") var d: Int
+
+  var e: Int
+    @JsProperty get
+    @JsProperty set
+}
 
 interface InterfaceWithDefaultJsProperties {
   @JsProperty
@@ -138,8 +175,8 @@ class HasFieldAndGetterSetterFuns : ValueHolder() {
 
 class Main {
   fun testNativeJsProperty() {
-    NativeFoo().getA()
-    NativeFoo().b
+    FooWithNativeProperty().getA()
+    FooWithNativeProperty().b
     getNativeB()
     nativeProperty
   }

@@ -13,7 +13,8 @@
  "USELESS_CAST",
  "VARIABLE_IN_SINGLETON_WITHOUT_THREAD_LOCAL",
  "VARIABLE_WITH_REDUNDANT_INITIALIZER",
- "REDUNDANT_ELSE_IN_WHEN")
+ "REDUNDANT_ELSE_IN_WHEN",
+ "ACCIDENTAL_OVERRIDE")
 
 package devirtualizedcalls
 
@@ -26,7 +27,7 @@ open class CharSequenceCalls {
  open fun test(cs: CharSequence?) {
   cs!!.get(0)
  }
-
+ 
  open fun main() {
   val s: String = "s"
   this.test(s)

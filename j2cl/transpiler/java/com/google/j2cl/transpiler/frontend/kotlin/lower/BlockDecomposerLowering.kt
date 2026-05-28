@@ -27,17 +27,19 @@ import org.jetbrains.kotlin.ir.util.isElseBranch
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
 import org.jetbrains.kotlin.ir.util.transformFlat
-import org.jetbrains.kotlin.ir.visitors.IrElementTransformer
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
+import org.jetbrains.kotlin.ir.visitors.IrTransformer
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.addIfNotNull
+import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
 /**
  * A pass that transforms statement-like-expression nodes into pure-statement.
  *
- * Copied and modified from org.jetbrains.kotlin.ir.backend.js.lower.BlockDecomposerLowering.kt
+ * Copied and modified from
+ * compiler/ir/backend.js/src/org/jetbrains/kotlin/ir/backend/js/lower/BlockDecomposerLowering.kt
  */
 // MODIFIED BY GOOGLE
 // Replace the reference to JsIrBackendContext by JvmBackendContext. We currently run the koltin
@@ -55,11 +57,11 @@ class BlockDecomposerLowering(val context: JvmBackendContext) :
     // We just need a call to a method that return nothing. This method call will be removed by the
     // cleanup lowering pass.
     return JsIrBuilder.buildCall(
-        context.ir.symbols.throwUnsupportedOperationException,
+        context.symbols.throwUnsupportedOperationException,
         context.irBuiltIns.nothingType,
       )
       .apply {
-        putValueArgument(0, JsIrBuilder.buildString(context.irBuiltIns.stringType, "unreachable"))
+        arguments[0] = JsIrBuilder.buildString(context.irBuiltIns.stringType, "unreachable")
       }
     // END OF MODIFICATIONS
   }
@@ -81,7 +83,7 @@ abstract class AbstractBlockDecomposerLowering(private val context: JvmBackendCo
       // The JS backend lowers all init blocks into the primary constructor so the original version
       // of this lowering never bothered to process them.
       is IrAnonymousInitializer -> {
-        container.accept(decomposerTransformer, null)
+        val unused = container.accept(decomposerTransformer, null)
         irBody.patchDeclarationParents(container.parent)
       }
       // The JS backend lowers all enum classes so that enum entries are regular fields with the
@@ -104,17 +106,13 @@ abstract class AbstractBlockDecomposerLowering(private val context: JvmBackendCo
                 visibility = DescriptorVisibilities.PRIVATE
                 origin = JsIrBuilder.SYNTHESIZED_DECLARATION
               }
-              .apply {
-                parent = container.parent
-                // Make the init function static
-                dispatchReceiverParameter = null
-              }
+              .apply { parent = container.parent }
 
           val newBody = this.toBlockBody(initFunction)
           newBody.patchDeclarationParents(initFunction)
           initFunction.body = newBody
 
-          initFunction.accept(decomposerTransformer, null)
+          val unused = initFunction.accept(decomposerTransformer, null)
 
           val lastStatement = newBody.statements.last()
           if (
@@ -132,7 +130,7 @@ abstract class AbstractBlockDecomposerLowering(private val context: JvmBackendCo
       }
       // END OF MODIFICATIONS
       is IrFunction -> {
-        container.accept(decomposerTransformer, null)
+        val unused = container.accept(decomposerTransformer, null)
         irBody.patchDeclarationParents(container)
       }
       is IrField -> {
@@ -151,7 +149,7 @@ abstract class AbstractBlockDecomposerLowering(private val context: JvmBackendCo
           newBody.patchDeclarationParents(initFunction)
           initFunction.body = newBody
 
-          initFunction.accept(decomposerTransformer, null)
+          val unused = initFunction.accept(decomposerTransformer, null)
 
           val lastStatement = newBody.statements.last()
           val actualParent =
@@ -204,6 +202,13 @@ class BlockDecomposerTransformer(
     get() = JsIrBuilder.buildGetObjectValue(unitType, context.irBuiltIns.unitClass)
 
   private val booleanNotSymbol = context.irBuiltIns.booleanNotSymbol
+
+  // MODIFIED BY GOOGLE
+  // Avoid reference to js backend intrinsics that are not used.
+  // original code:
+  // private val boxIntrinsic = context.inlineClassesUtils.boxIntrinsic
+  // private val unboxIntrinsic = context.inlineClassesUtils.unboxIntrinsic
+  // END OF MODIFICATIONS
 
   override fun visitScript(declaration: IrScript): IrStatement {
     function = declaration
@@ -275,7 +280,7 @@ class BlockDecomposerTransformer(
     (expression as? IrComposite)?.statements ?: listOf(expression)
 
   private inner class BreakContinueUpdater(val breakLoop: IrLoop, val continueLoop: IrLoop) :
-    IrElementTransformer<IrLoop> {
+    IrTransformer<IrLoop>() {
     override fun visitBreak(jump: IrBreak, data: IrLoop) =
       jump.apply { if (loop == data) loop = breakLoop }
 
@@ -685,18 +690,74 @@ class BlockDecomposerTransformer(
             compositesLeft == 0 -> value
             index == 0 && dontDetachFirstArgument -> value
             value == null -> value
-            value.isPure(anyVariable = false) -> value
+            value.isPure(anyVariable = false, symbols = context.symbols) -> value
             else -> {
               // TODO: do not wrap if value is pure (const, variable, etc)
-              val irVar = makeTempVar(value.type, value)
-              newStatements += irVar
-              JsIrBuilder.buildGetValue(irVar.symbol)
+              val (newArg, tempVar) = mapArgument(value)
+              newStatements += tempVar
+              newArg
             }
           }
 
         arguments += newArg
       }
       return arguments
+    }
+
+    /**
+     * Move the passing argument and store it in a temporary variable. However, the box and unbox
+     * intrinsics should be preserved in the call. They can be used later for optimizations, for
+     * example, in [EqualityAndComparisonCallsTransformer]. Example: foo(boxIntrinsic(<expr>))
+     * should be transformed to: var tmp = <expr> foo(boxIntrinsic(tmp))
+     */
+    private fun mapArgument(arg: IrExpression): Pair<IrExpression, IrVariable> {
+
+      var saveToTmp = arg
+      var rootIntrinsicCall: IrCall? = null
+      var lastIntrinsicCall: IrCall? = null
+      // MODIFIED BY GOOGLE
+      // This logic to keep calling the box and unbox intrinsics is needed in J2CL as these
+      // instrinsics do not exist in J2CL.
+      // original code:
+      // while (
+      //   saveToTmp is IrCall &&
+      //     (saveToTmp.symbol == boxIntrinsic || saveToTmp.symbol == unboxIntrinsic)
+      // ) {
+      //   if (lastIntrinsicCall == null) {
+      //     lastIntrinsicCall =
+      //       JsIrBuilder.buildCall(
+      //         saveToTmp.symbol,
+      //         saveToTmp.type,
+      //         saveToTmp.typeArguments.filterNotNull(),
+      //       )
+      //     rootIntrinsicCall = lastIntrinsicCall
+      //   } else {
+      //     val nextCall =
+      //       JsIrBuilder.buildCall(
+      //         saveToTmp.symbol,
+      //         saveToTmp.type,
+      //         saveToTmp.typeArguments.filterNotNull(),
+      //       )
+      //     lastIntrinsicCall.arguments[0] = nextCall
+      //     lastIntrinsicCall = nextCall
+      //   }
+      //   saveToTmp =
+      //     saveToTmp.arguments[0]
+      //       ?: irError("expect passing 1 argument to boxing intrinsic") {
+      //         withIrEntry("arg", arg)
+      //         withIrEntry("saveToTmp", saveToTmp)
+      //       }
+      // }
+      // END OF MODIFICATIONS
+      val irTempVar = makeTempVar(saveToTmp.type, saveToTmp)
+      val irGetTempVar = JsIrBuilder.buildGetValue(irTempVar.symbol)
+      val newArg =
+        lastIntrinsicCall?.let {
+          it.arguments[0] = irGetTempVar
+          rootIntrinsicCall
+        } ?: irGetTempVar
+
+      return newArg to irTempVar
     }
 
     // TODO: remove this when vararg is lowered
@@ -752,9 +813,7 @@ class BlockDecomposerTransformer(
     override fun visitMemberAccess(expression: IrMemberAccessExpression<*>): IrExpression {
       expression.transformChildrenVoid(expressionTransformer)
 
-      val oldArguments = mutableListOf(expression.dispatchReceiver, expression.extensionReceiver)
-      for (i in 0 until expression.valueArgumentsCount) oldArguments +=
-        expression.getValueArgument(i)
+      val oldArguments = expression.arguments
       val compositeCount = oldArguments.count { it is IrComposite }
 
       if (compositeCount == 0) return expression
@@ -762,12 +821,7 @@ class BlockDecomposerTransformer(
       val newStatements = mutableListOf<IrStatement>()
       val newArguments = mapArguments(oldArguments, compositeCount, newStatements)
 
-      expression.dispatchReceiver = newArguments[0]
-      expression.extensionReceiver = newArguments[1]
-
-      for (i in 0 until expression.valueArgumentsCount) {
-        expression.putValueArgument(i, newArguments[i + 2])
-      }
+      expression.arguments.assignFrom(newArguments)
 
       newStatements += expression
 
@@ -889,6 +943,7 @@ class BlockDecomposerTransformer(
     //   tmp
     // ]
     override fun visitTry(aTry: IrTry): IrExpression {
+
       // MODIFIED BY GOOGLE.
       // Do not create a temporary variable if the try has a Unit result type. We can instead just
       // create a composite that executes the try and then returns Unit. This avoids type mismatches
@@ -903,7 +958,7 @@ class BlockDecomposerTransformer(
       val newCatches =
         aTry.catches.memoryOptimizedMap {
           val newCatchBody = wrap(it.result, irVar)
-          IrCatchImpl(it.startOffset, it.endOffset, it.catchParameter, newCatchBody)
+          IrCatchImpl(it.startOffset, it.endOffset, it.catchParameter, newCatchBody, it.origin)
         }
 
       val newTry =

@@ -1,0 +1,7 @@
+goog.module('recordclass.RecordClass.RecordWithCompactConstructor');
+
+goog.require('java.lang.Record');
+goog.require('nativebootstrap.Util');
+
+const RecordWithCompactConstructor = goog.require('recordclass.RecordClass.RecordWithCompactConstructor$impl');
+exports = RecordWithCompactConstructor;

@@ -28,7 +28,6 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Streams;
 import com.google.j2cl.transpiler.ast.AbstractRewriter;
 import com.google.j2cl.transpiler.ast.AbstractVisitor;
-import com.google.j2cl.transpiler.ast.BinaryExpression;
 import com.google.j2cl.transpiler.ast.Block;
 import com.google.j2cl.transpiler.ast.CompilationUnit;
 import com.google.j2cl.transpiler.ast.Expression;
@@ -173,17 +172,13 @@ public class VariableDeclarationHoister extends NormalizationPass {
             ImmutableList<Expression> assignments =
                 variableDeclarationExpression.getFragments().stream()
                     .filter(fragment -> fragment.getInitializer() != null)
-                    .map(
-                        fragment ->
-                            BinaryExpression.Builder.asAssignmentTo(fragment.getVariable())
-                                .setRightOperand(fragment.getInitializer())
-                                .build())
+                    .map(fragment -> fragment.getVariable().infixAssign(fragment.getInitializer()))
                     .collect(toImmutableList());
 
             if (assignments.isEmpty()) {
               return TypeDescriptors.get().javaLangObject.getNullValue();
             }
-            return MultiExpression.newBuilder().addExpressions(assignments).build();
+            return MultiExpression.builder().addExpressions(assignments).build();
           }
         });
 
@@ -202,7 +197,7 @@ public class VariableDeclarationHoister extends NormalizationPass {
               // Note: since we insert all the variables in a single declaration there is no need
               // to adjust insertion points.
               insertionPointInBlock,
-              VariableDeclarationExpression.newBuilder()
+              VariableDeclarationExpression.builder()
                   .addVariableDeclarations(variablesToRelocate)
                   .build()
                   .makeStatement(block.getSourcePosition()));
@@ -224,12 +219,8 @@ public class VariableDeclarationHoister extends NormalizationPass {
       i++;
     }
 
-    if (toTrim.size() == i) {
-      // toTrim is already the common prefix.
-      return;
-    }
-    for (int j = toTrim.size() - 1; j >= i; j--) {
-      toTrim.remove(j);
+    if (toTrim.size() > i) {
+      toTrim.subList(i, toTrim.size()).clear();
     }
   }
 

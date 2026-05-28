@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 /**
- * A pass which inserts casts for boxed type when necessary, to dispatch to the corrent overload.
+ * A pass which inserts casts for boxed type when necessary, to dispatch to the correct overload.
  *
  * <p>In Kotlin, primitive types are indistinguishable from non-null boxed types, which can lead to
  * incorrect method being called in case of overloads.
@@ -88,7 +88,7 @@ public class InsertCastsForBoxedTypes extends NormalizationPass {
                                 inferredParameterTypeDescriptors.get(i),
                                 arguments.get(i)))
                     .collect(toImmutableList());
-            return Invocation.Builder.from(invocation).setArguments(rewrittenArguments).build();
+            return invocation.toBuilder().setArguments(rewrittenArguments).build();
           }
         });
   }
@@ -103,7 +103,7 @@ public class InsertCastsForBoxedTypes extends NormalizationPass {
     return declaredParameterTypeDescriptor instanceof DeclaredTypeDescriptor
             && isBoxed(argumentTypeDescriptor)
             && !argumentTypeDescriptor.equals(inferredParameterTypeDescriptor)
-        ? CastExpression.newBuilder()
+        ? CastExpression.builder()
             .setExpression(argument)
             .setCastTypeDescriptor(inferredParameterTypeDescriptor)
             .build()

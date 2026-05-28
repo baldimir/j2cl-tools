@@ -27,7 +27,7 @@ import java.util.stream.Stream;
 
 /** Class representing a library, which is the collection of compilation units compiled together. */
 @Visitable
-public class Library extends Node {
+public class Library extends Node implements AutoCloseable {
   @Visitable List<CompilationUnit> compilationUnits;
   private final DisposableListener disposableListener;
 
@@ -38,12 +38,6 @@ public class Library extends Node {
 
   public List<CompilationUnit> getCompilationUnits() {
     return compilationUnits;
-  }
-
-  public void dispose() {
-    if (disposableListener != null) {
-      disposableListener.onDispose();
-    }
   }
 
   public Stream<Type> streamTypes() {
@@ -64,11 +58,22 @@ public class Library extends Node {
     return Visitor_Library.visit(processor, this);
   }
 
-  public static Library newEmpty() {
-    return new Builder().setCompilationUnits(ImmutableList.of()).build();
+  @Override
+  public void close() {
+    if (disposableListener != null) {
+      disposableListener.onDispose();
+    }
   }
 
-  public static Builder newBuilder() {
+  public static Library newEmpty() {
+    return builder().setCompilationUnits(ImmutableList.of()).build();
+  }
+
+  public Builder toBuilder() {
+    return builder().setCompilationUnits(this.getCompilationUnits());
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
@@ -76,10 +81,6 @@ public class Library extends Node {
   public static class Builder {
     private List<CompilationUnit> compilationUnits;
     private DisposableListener disposableListener;
-
-    public static Builder from(Library library) {
-      return newBuilder().setCompilationUnits(library.getCompilationUnits());
-    }
 
     @CanIgnoreReturnValue
     public Builder setCompilationUnits(List<CompilationUnit> compilationUnits) {

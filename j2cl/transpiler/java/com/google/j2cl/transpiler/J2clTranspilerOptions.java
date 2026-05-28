@@ -30,7 +30,6 @@ import com.google.j2cl.transpiler.frontend.Frontend;
 import com.google.j2cl.transpiler.frontend.common.FrontendOptions;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Configuration for the transpiler. */
@@ -41,12 +40,12 @@ public abstract class J2clTranspilerOptions implements FrontendOptions, BackendO
 
   public abstract Backend getBackend();
 
-  public static Builder newBuilder() {
+  public static Builder builder() {
     return new AutoValue_J2clTranspilerOptions.Builder()
-        .setSystem("")
         .setOptimizeAutoValue(false)
         .setNullMarkedSupported(false)
-        .setEnableWasmCustomDescriptors(false);
+        .setEnableWasmCustomDescriptors(false)
+        .setEnableWasmCustomDescriptorsJsInterop(false);
   }
 
   @Override
@@ -64,17 +63,21 @@ public abstract class J2clTranspilerOptions implements FrontendOptions, BackendO
 
     public abstract Builder setNativeSources(List<FileInfo> files);
 
-    public abstract Builder setClasspaths(List<String> entries);
+    public abstract Builder setClasspaths(List<Path> entries);
 
-    public abstract Builder setDirectDeps(List<String> entries);
+    public abstract Builder setSystem(@Nullable Path jdkSystem);
 
-    public abstract Builder setSystem(String jdkSystem);
+    public abstract Builder setAnnotationProcessors(List<String> annotationProcessors);
+
+    public abstract Builder setAnnotationProcessorPath(List<Path> annotationProcessorPath);
 
     public abstract Builder setOutput(Output output);
 
     public abstract Builder setTargetLabel(String targetLabel);
 
     public abstract Builder setLibraryInfoOutput(@Nullable Path path);
+
+    public abstract Builder setSourceGenPath(Path path);
 
     public abstract Builder setEmitReadableLibraryInfo(boolean b);
 
@@ -97,9 +100,10 @@ public abstract class J2clTranspilerOptions implements FrontendOptions, BackendO
 
     abstract Builder setWasmEntryPointPatterns(List<EntryPointPattern> entryPointSpecs);
 
-    public abstract Builder setDefinesForWasm(Map<String, String> definesForWasm);
-
     public abstract Builder setEnableWasmCustomDescriptors(boolean enableWasmCustomDescriptors);
+
+    public abstract Builder setEnableWasmCustomDescriptorsJsInterop(
+        boolean enableWasmCustomDescriptorsJsInterop);
 
     public abstract Builder setNullMarkedSupported(boolean isNullMarkedSupported);
 
@@ -107,13 +111,60 @@ public abstract class J2clTranspilerOptions implements FrontendOptions, BackendO
 
     public abstract Builder setKotlincOptions(List<String> kotlincOptions);
 
+    public abstract Builder setEnableKlibs(boolean enableKlibs);
+
+    public abstract Builder setDependencyKlibs(List<Path> dependencyKlibs);
+
+    public abstract Builder setFriendKlibs(List<Path> friendKlibs);
+
     public abstract Builder setForbiddenAnnotations(List<String> forbiddenAnnotations);
 
     public abstract Builder setObjCNamePrefix(String objCNamePrefix);
 
+    abstract ImmutableList<FileInfo> getSources();
+
+    abstract Output getOutput();
+
+    abstract Backend getBackend();
+
+    abstract boolean getEmitReadableSourceMap();
+
+    abstract boolean getGenerateKytheIndexingMetadata();
+
     abstract J2clTranspilerOptions autoBuild();
 
     public J2clTranspilerOptions build(Problems problems) {
+      boolean readableSourceMaps = getEmitReadableSourceMap();
+      boolean generateKytheIndexingMetadata = getGenerateKytheIndexingMetadata();
+      if (readableSourceMaps && generateKytheIndexingMetadata) {
+        problems.warning(
+            "Readable source maps are not available when generating Kythe indexing metadata.");
+        setEmitReadableSourceMap(false);
+      }
+
+      ImmutableList<FileInfo> allSources = getSources();
+      ImmutableList<FileInfo> allJavaSources =
+          allSources.stream()
+              .filter(p -> p.sourcePath().endsWith(".java"))
+              .collect(toImmutableList());
+
+      ImmutableList<FileInfo> allKotlinSources =
+          allSources.stream()
+              .filter(p -> p.sourcePath().endsWith(".kt"))
+              .collect(toImmutableList());
+
+      if (!allJavaSources.isEmpty() && !allKotlinSources.isEmpty()) {
+        throw new AssertionError(
+            "Transpilation of Java and Kotlin files together is not supported yet.");
+      }
+
+      boolean hasKotlinSources = !allKotlinSources.isEmpty();
+      // Set the sources explicitly since original sources can include non-java/kotlin files.
+      setSources(hasKotlinSources ? allKotlinSources : allJavaSources);
+      setFrontend(hasKotlinSources ? Frontend.KOTLIN : Frontend.JAVAC);
+
+      setSourceGenPath(getOutput().createTempDirectory("_sourcegen"));
+
       J2clTranspilerOptions options = autoBuild();
 
       // Validate the entry point syntax.
