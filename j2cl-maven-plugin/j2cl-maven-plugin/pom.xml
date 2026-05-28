@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.kie.j2cl.tools</groupId>
     <artifactId>j2cl-tools</artifactId>
-    <version>0.23.6</version>
+    <version>0.23.8</version>
   </parent>
   <artifactId>j2cl-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
@@ -181,7 +181,7 @@
             <goal>package -e</goal>
           </goals>
           <environmentVariables>
-            <MAVEN_OPTS>-ea</MAVEN_OPTS>
+            <MAVEN_OPTS>-ea --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</MAVEN_OPTS>
           </environmentVariables>
         </configuration>
       </plugin>

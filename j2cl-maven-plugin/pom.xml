@@ -6,7 +6,7 @@
 
     <groupId>org.kie.j2cl.tools</groupId>
     <artifactId>j2cl-tools</artifactId>
-    <version>0.23.6</version>
+    <version>0.23.8</version>
     <packaging>pom</packaging>
 
     <name>J2CL Build Tools</name>
@@ -87,7 +87,7 @@
         <maven.gpg.plugin.version>1.6</maven.gpg.plugin.version>
 
         <!-- Builder dependencies versions -->
-        <j2cl.version>v20250822-1</j2cl.version>
+        <j2cl.version>v20260527-1</j2cl.version>
         <j2cl.base.version>v20251027-1</j2cl.base.version>
         <closure.compiler.unshaded.version>v20250903-1</closure.compiler.unshaded.version>
         <commons.codec.version>1.9</commons.codec.version>
@@ -102,11 +102,12 @@
         <plexus.utils.version>3.1.0</plexus.utils.version>
         <plexus.classworlds.version>2.5.2</plexus.classworlds.version>
         <plexus.interpolation.version>1.25</plexus.interpolation.version>
-        <guava.version>33.4.0-jre</guava.version>
+        <guava.version>33.3.1-jre</guava.version>
         <error.prone.annotations.version>2.36.0</error.prone.annotations.version>
         <jsr305.version>3.0.2</jsr305.version>
         <commons.lang3.version>3.18.0</commons.lang3.version>
         <google.turbine.version>0.11.0</google.turbine.version>
+        <protobuf.java.version>4.31.0</protobuf.java.version>
         <slf4j.api.version>1.7.5</slf4j.api.version>
 
         <!-- Test goal -->
@@ -205,16 +206,6 @@
                 <groupId>org.kie.j2cl.tools</groupId>
                 <artifactId>backend-libraryinfo</artifactId>
                 <version>${j2cl.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>com.google.protobuf</groupId>
-                        <artifactId>protobuf-java</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.google.protobuf</groupId>
-                        <artifactId>protobuf-java-util</artifactId>
-                    </exclusion>
-                </exclusions>
             </dependency>
 
 
@@ -266,6 +257,12 @@
                 <groupId>com.google.turbine</groupId>
                 <artifactId>turbine</artifactId>
                 <version>${google.turbine.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${protobuf.java.version}</version>
             </dependency>
 
             <dependency>
