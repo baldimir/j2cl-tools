@@ -46,6 +46,16 @@ java_test(
     ],
 )
 
+java_test(
+    name = "InheritedFunctionalInterfaceTest",
+    srcs = ["InheritedFunctionalInterfaceTest.java"],
+    data = [":jre_bundle_files"],
+    deps = [
+        ":tester_lib",
+        "//third_party:junit",
+    ],
+)
+
 java_library(
     name = "test_apt_processor",
     srcs = [

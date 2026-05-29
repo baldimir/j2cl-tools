@@ -91,8 +91,8 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.lang.model.AnnotatedConstruct;
@@ -144,6 +144,9 @@ public class JavaEnvironment {
   private final Map<FieldDescriptorKey, FieldDescriptor> cachedFieldDescriptors = new HashMap<>();
 
   private final Set<ExecutableElement> methodDescriptorsInCreation =
+      Collections.newSetFromMap(new IdentityHashMap<>());
+
+  private final Set<VariableElement> fieldDescriptorsInCreation =
       Collections.newSetFromMap(new IdentityHashMap<>());
 
   JavaEnvironment(
@@ -683,7 +686,13 @@ public class JavaEnvironment {
     if (declarationTypeDescriptor != thisTypeDescriptor || isSpecialized(enclosingTypeDescriptor)) {
       // Field references might be parameterized, and when they are we set the declaration
       // descriptor.
-      declarationFieldDescriptor = createFieldDescriptor(variableElement);
+      if (fieldDescriptorsInCreation.add(variableElement)) {
+        try {
+          declarationFieldDescriptor = createFieldDescriptor(variableElement);
+        } finally {
+          fieldDescriptorsInCreation.remove(variableElement);
+        }
+      }
     }
 
     JsInfo jsInfo = JsInteropUtils.getJsInfo(variableElement);
@@ -1196,7 +1205,7 @@ public class JavaEnvironment {
 
           // Find the parameterized version of the single abstract method in the type.
           return parameterizedFunctionalInterface.getDeclaredMethodDescriptors().stream()
-              .filter(m -> m.getDeclarationDescriptor() == declaration)
+              .filter(m -> m.getDeclarationDescriptor().isSameSignature(declaration))
               .collect(onlyElement());
         };
 

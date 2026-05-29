@@ -210,18 +210,17 @@ public class JavacParser {
     JavacFileManager fileManager =
         (JavacFileManager)
             compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8);
-    if (system != null) {
-      fileManager.setLocationFromPaths(StandardLocation.SYSTEM_MODULES, ImmutableList.of(system));
-    } else {
-      fileManager.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, classPath);
-    }
+    fileManager.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, classPath);
     fileManager.setLocationFromPaths(StandardLocation.CLASS_PATH, classPath);
-    if (!processorPath.isEmpty()) {
-      fileManager.setLocationFromPaths(StandardLocation.ANNOTATION_PROCESSOR_PATH, processorPath);
-    }
     if (sourceGenPath != null) {
       fileManager.setLocationFromPaths(
           StandardLocation.SOURCE_OUTPUT, ImmutableList.of(sourceGenPath));
+    }
+    if (system != null) {
+      fileManager.setLocationFromPaths(StandardLocation.SYSTEM_MODULES, ImmutableList.of(system));
+    }
+    if (!processorPath.isEmpty()) {
+      fileManager.setLocationFromPaths(StandardLocation.ANNOTATION_PROCESSOR_PATH, processorPath);
     }
     return (JavacTaskImpl)
         compiler.getTask(
