@@ -41,6 +41,8 @@ public class GwtIncompatiblePreprocessor {
     }
 
     public void preprocess(List<FileInfo> unprocessedFiles) {
+        ModuleAccess.ensureJdkCompilerAccess();
+
         Problems problems = new Problems();
 
         try (OutputUtils.Output output = OutputUtils.initOutputForBazel(outputDirectory.toPath(), problems)) {
