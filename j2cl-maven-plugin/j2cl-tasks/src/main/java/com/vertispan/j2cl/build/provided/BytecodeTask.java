@@ -22,11 +22,8 @@ import com.vertispan.j2cl.tools.J2CLModuleParser;
 import com.vertispan.j2cl.tools.Javac;
 
 import javax.annotation.Nullable;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
@@ -105,7 +102,7 @@ public class BytecodeTask extends TaskFactory {
                 com.vertispan.j2cl.build.task.Dependency.Scope.COMPILE)
                 .stream()
                 .map(inputs(OutputTypes.BYTECODE))
-                .collect(Collectors.toUnmodifiableList());
+                .toList();
 
         List<Input> inReactorProcessors = scope(project.getDependencies().stream().filter(dependency -> dependency.getProject().hasSourcesMapped()
                         && !dependency.getProject().isJsZip()).collect(Collectors.toSet()),
@@ -113,7 +110,7 @@ public class BytecodeTask extends TaskFactory {
                 .stream()
                 .map(inputs(OutputTypes.BYTECODE))
                 .map(input -> input.filter(APT_PROCESSOR))
-                .collect(Collectors.toUnmodifiableList());
+                .toList();
 
         File bootstrapClasspath = config.getBootstrapClasspath();
         List<File> extraClasspath = new ArrayList<>(config.getExtraClasspath());
@@ -121,7 +118,7 @@ public class BytecodeTask extends TaskFactory {
         Set<String> processors = new HashSet<>();
         project.getDependencies()
                 .stream()
-                .map(d -> d.getProject())
+                .map(Dependency::getProject)
                 .filter(p -> !p.getProcessors().isEmpty())
                 .forEach(p -> {
                     processors.addAll(p.getProcessors());
@@ -137,34 +134,34 @@ public class BytecodeTask extends TaskFactory {
              */
             Set<String> aptProcessors = maybeAddInReactorAptProcessor(inReactorProcessors, processors);
 
-            if (!inputSources.getFilesAndHashes().isEmpty()) {
-                // At least one .java file in sources, compile it (otherwise skip this and just copy resource)
+            List<File> sourcePaths = inputDirs.getParentPaths().stream().map(Path::toFile).toList();
+            List<Path> superSources = J2CLModuleParser.getSuperSourcePaths(sourcePaths);
+            Stream<? extends CachedPath> inputSourcesStream = inputSources.getFilesAndHashes()
+                    .stream();
+
+            // Exclude super-source files from bytecode compilation. They are copied below so later
+            // J2CL source-processing stages can transpile them with their package-relative paths.
+            if(project.hasSourcesMapped() && !superSources.isEmpty()) {
+                inputSourcesStream = inputSourcesStream.filter(p -> !isSuperSource(p, superSources));
+            }
+
+            // TODO convention for mapping to original file paths, provide FileInfo out of Inputs instead of Paths,
+            //      automatically relativized?
+            List<SourceUtils.FileInfo> sources = inputSourcesStream
+                    .map(p -> SourceUtils.FileInfo.create(p.getAbsolutePath().toString(), p.getSourcePath().toString()))
+                    .toList();
+
+            if (!sources.isEmpty()) {
+                // At least one non-super-source .java file remains, compile it (otherwise skip this and just copy resources)
 
                 List<File> classpathDirs = Stream.concat(
                         bytecodeClasspath.stream().map(Input::getParentPaths).flatMap(Collection::stream).map(Path::toFile),
                         extraClasspath.stream()
-                ).collect(Collectors.toUnmodifiableList());
+                ).toList();
 
-                List<File> sourcePaths = inputDirs.getParentPaths().stream().map(Path::toFile).collect(Collectors.toUnmodifiableList());
                 File generatedClassesDir = getGeneratedClassesDir(context);
                 File classOutputDir = context.outputPath().toFile();
                 Javac javac = new Javac(context, generatedClassesDir, sourcePaths, classpathDirs, classOutputDir, bootstrapClasspath, aptProcessors, annotationProcessorsArgs);
-
-                // Find the super-source path, if it exists
-                Optional<Path> superSource = J2CLModuleParser.getSuperSourcePath(sourcePaths);
-                Stream<? extends CachedPath> inputSourcesStream = inputSources.getFilesAndHashes()
-                        .stream();
-
-                // Exclude super-source files from compilation
-                if(project.hasSourcesMapped() && superSource.isPresent()) {
-                    inputSourcesStream = inputSourcesStream.filter(p -> !p.getSourcePath().startsWith(superSource.get()));
-                }
-
-                // TODO convention for mapping to original file paths, provide FileInfo out of Inputs instead of Paths,
-                //      automatically relativized?
-                List<SourceUtils.FileInfo> sources = inputSourcesStream
-                        .map(p -> SourceUtils.FileInfo.create(p.getAbsolutePath().toString(), p.getSourcePath().toString()))
-                        .collect(Collectors.toUnmodifiableList());
 
                 try {
                     if (!javac.compile(sources)) {
@@ -204,5 +201,10 @@ public class BytecodeTask extends TaskFactory {
             }
         }));
        return existingProcessors;
+    }
+
+    private boolean isSuperSource(CachedPath path, List<Path> superSources) {
+        Path sourcePath = path.getSourcePath();
+        return superSources.stream().anyMatch(sourcePath::startsWith);
     }
 }

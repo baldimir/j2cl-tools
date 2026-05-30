@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
+import java.util.concurrent.atomic.AtomicReference;
 
 //TODO factor out the wiring to set this up for reuse
 public class J2cl {
@@ -86,7 +87,15 @@ public class J2cl {
         return file.toPath();
     }
 
+    public boolean transpileSuperSource(List<SourceUtils.FileInfo> sourcesToCompile, List<SourceUtils.FileInfo> nativeSources) {
+        return doTranspile(sourcesToCompile, nativeSources, augmentWithModuleSources(sourcesToCompile));
+    }
+
     public boolean transpile(List<SourceUtils.FileInfo> sourcesToCompile, List<SourceUtils.FileInfo> nativeSources) {
+        return doTranspile(sourcesToCompile, nativeSources, augmentWithModuleSources(sourcesToCompile));
+    }
+
+    private boolean doTranspile(List<SourceUtils.FileInfo> sourcesToCompile, List<SourceUtils.FileInfo> nativeSources, List<String> javacOptions) {
         Problems problems = new Problems();
         try (OutputUtils.Output output = OutputUtils.initOutputForBazel(jsOutDir.toPath(), problems)) {
             J2clTranspilerOptions options = optionsBuilder
@@ -97,7 +106,7 @@ public class J2cl {
                     .setKotlincOptions(ImmutableList.of())
                     .setWasmEntryPointStrings(ImmutableList.of())
                     .setObjCNamePrefix("J2kt")
-                    .setJavacOptions(augmentWithModuleSources(sourcesToCompile))
+                    .setJavacOptions(javacOptions)
                     .setEnableKlibs(false)
                     .setFriendKlibs(List.of())
                     .setDependencyKlibs(List.of())
@@ -107,7 +116,7 @@ public class J2cl {
 
             log.debug(options.toString());
 
-            J2clTranspiler.transpile(options, problems);
+            runTranspiler(options, problems);
         } catch (Problems.Exit e) {
             // Program aborted due to errors recorded in problems, will be logged below
         } finally {
@@ -121,6 +130,38 @@ public class J2cl {
             problems.getInfoMessages().forEach(log::info);
         }
         return !problems.hasErrors();
+    }
+
+    private void runTranspiler(J2clTranspilerOptions options, Problems problems) {
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread thread = new Thread(() -> {
+            try {
+                J2clTranspiler.transpile(options, problems);
+            } catch (Problems.Exit e) {
+                // Program aborted due to errors recorded in problems, will be logged by the caller.
+            } catch (Throwable t) {
+                failure.set(t);
+            } finally {
+                TypeDescriptors.reset();
+            }
+        }, "j2cl-transpiler");
+        thread.start();
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while running J2CL", e);
+        }
+        Throwable thrown = failure.get();
+        if (thrown instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (thrown instanceof Error error) {
+            throw error;
+        }
+        if (thrown != null) {
+            throw new IllegalStateException("Error while running J2CL", thrown);
+        }
     }
 
     private static List<String> buildPatchModuleOptions(Path bootstrapJarPath) {

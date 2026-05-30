@@ -26,10 +26,17 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
 
 public class J2CLModuleParser {
 
@@ -51,36 +58,65 @@ public class J2CLModuleParser {
     }
 
     public static Optional<Path> getSuperSourcePath(Collection<File> files) {
-        for(File file : files) {
-            Optional<Path> superSourcePath = getSuperSourcePath(file.toPath());
-            if(superSourcePath.isPresent()) {
-                return superSourcePath;
-            }
-        }
-        return Optional.empty();
+        return getSuperSourcePaths(files).stream().findFirst();
     }
 
+    public static List<Path> getSuperSourcePaths(Collection<File> files) {
+        Set<Path> superSourcePaths = new LinkedHashSet<>();
+        for(File file : files) {
+            Path sourceRoot = file.toPath();
+            superSourcePaths.addAll(getJ2clModuleSuperSourcePaths(sourceRoot));
+            superSourcePaths.addAll(getGwtModuleSuperSourcePaths(sourceRoot));
+        }
+        return superSourcePaths.stream()
+                .sorted(Comparator.comparingInt(Path::getNameCount).reversed())
+                .toList();
+    }
 
-    private static Optional<Path> getSuperSourcePath(Path p) {
-        Path modulePath = p.resolve("META-INF").resolve("module.j2cl.xml");
+    private static List<Path> getJ2clModuleSuperSourcePaths(Path sourceRoot) {
+        Path modulePath = sourceRoot.resolve("META-INF").resolve("module.j2cl.xml");
+        return getSuperSourcePaths(modulePath, Paths.get(""));
+    }
+
+    private static List<Path> getGwtModuleSuperSourcePaths(Path sourceRoot) {
+        if (!Files.isDirectory(sourceRoot)) {
+            return List.of();
+        }
+        List<Path> superSourcePaths = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(sourceRoot)) {
+            files.filter(path -> path.getFileName().toString().endsWith(".gwt.xml"))
+                    .forEach(path -> {
+                        Path modulePackage = sourceRoot.relativize(path).getParent();
+                        if (modulePackage == null) {
+                            modulePackage = Paths.get("");
+                        }
+                        superSourcePaths.addAll(getSuperSourcePaths(path, modulePackage));
+                    });
+        } catch (IOException ignored) {
+            return List.of();
+        }
+        return superSourcePaths;
+    }
+
+    private static List<Path> getSuperSourcePaths(Path modulePath, Path modulePackage) {
         Document doc;
         try {
-            doc = db.parse(modulePath.toFile());
+            synchronized (db) {
+                doc = db.parse(modulePath.toFile());
+            }
         } catch (SAXException | IOException e) {
-            return Optional.empty();
+            return List.of();
         }
         doc.getDocumentElement().normalize();
-        NodeList modules = doc.getElementsByTagName("module");
-        for (int i = 0; i < modules.getLength(); i++) {
-            Node module = modules.item(i);
-            for (int j = 0; j < module.getChildNodes().getLength(); j++) {
-                Node node = module.getChildNodes().item(j);
-                if(node.getNodeName().equals("super-source")) {
-                    String path = node.getAttributes().getNamedItem("path").getNodeValue();
-                    return Optional.of(Paths.get(path));
-                }
+        List<Path> superSourcePaths = new ArrayList<>();
+        NodeList nodes = doc.getElementsByTagName("super-source");
+        for (int i = 0; i < nodes.getLength(); i++) {
+            Node node = nodes.item(i);
+            Node pathAttribute = node.getAttributes().getNamedItem("path");
+            if (pathAttribute != null) {
+                superSourcePaths.add(modulePackage.resolve(pathAttribute.getNodeValue()).normalize());
             }
         }
-        return Optional.empty();
+        return superSourcePaths;
     }
 }

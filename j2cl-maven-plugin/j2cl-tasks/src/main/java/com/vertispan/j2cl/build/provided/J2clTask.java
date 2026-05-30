@@ -18,13 +18,13 @@ package com.vertispan.j2cl.build.provided;
 import com.google.auto.service.AutoService;
 import com.google.j2cl.common.SourceUtils;
 import com.vertispan.j2cl.build.task.*;
+import com.vertispan.j2cl.tools.J2CLModuleParser;
 import com.vertispan.j2cl.tools.J2cl;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -52,53 +52,107 @@ public class J2clTask extends TaskFactory {
 
     @Override
     public Task resolve(Project project, Config config) {
-        // J2CL is only interested in .java and .native.js files in our own sources
         Input ownJavaSources = input(project, OutputTypes.STRIPPED_SOURCES).filter(JAVA_SOURCES, NATIVE_JS_SOURCES);
         List<Input> ownNativeJsSources = Collections.singletonList(input(project, OutputTypes.BYTECODE).filter(NATIVE_JS_SOURCES));
 
-        // From our classpath, j2cl is only interested in our compile classpath's bytecode
         List<Input> classpathHeaders = scope(project.getDependencies().stream()
                 .filter(dep -> dep.getProject().getProcessors().isEmpty())
-                .collect(Collectors.toSet()), com.vertispan.j2cl.build.task.Dependency.Scope.COMPILE)
+                .collect(Collectors.toSet()), Dependency.Scope.COMPILE)
                 .stream()
                 .map(inputs(OutputTypes.STRIPPED_BYTECODE_HEADERS))
-                // we only want bytecode _changes_, but we'll use the whole dir
                 .map(input -> input.filter(JAVA_BYTECODE))
-                .collect(Collectors.toUnmodifiableList());
+                .toList();
 
         File bootstrapClasspath = config.getBootstrapClasspath();
         List<File> extraClasspath = config.getExtraClasspath();
+        Input inputDirs = input(project, OutputTypes.INPUT_SOURCES);
+
         return context -> {
             if (ownJavaSources.getFilesAndHashes().isEmpty()) {
-                return;// nothing to do
+                return;
             }
+
             List<File> classpathDirs = Stream.concat(
                     classpathHeaders.stream().flatMap(i -> i.getParentPaths().stream().map(Path::toFile)),
                     extraClasspath.stream()
-            )
-                    .collect(Collectors.toUnmodifiableList());
+            ).toList();
+
+            List<File> sourcePaths = inputDirs.getParentPaths().stream().map(Path::toFile).toList();
+            List<Path> superSourcePaths = J2CLModuleParser.getSuperSourcePaths(sourcePaths);
+
+            List<? extends CachedPath> allJava = collectByMatcher(ownJavaSources);
+            List<? extends CachedPath> allNative = collectByMatcher(ownNativeJsSources);
+
+            Map<Boolean, List<CachedPath>> javaSplit = partitionBySuperSource(allJava, superSourcePaths);
+            Map<Boolean, List<CachedPath>> nativeSplit = partitionBySuperSource(allNative, superSourcePaths);
+
+            List<SourceUtils.FileInfo> javaSources = toFileInfos(javaSplit.get(false));
+            List<SourceUtils.FileInfo> nativeSources = toFileInfos(nativeSplit.get(false));
 
             J2cl j2cl = new J2cl(classpathDirs, bootstrapClasspath, context.outputPath().toFile(), context);
-
-            // TODO convention for mapping to original file paths, provide FileInfo out of Inputs instead of Paths,
-            //      automatically relativized?
-            List<SourceUtils.FileInfo> javaSources = ownJavaSources.getFilesAndHashes()
-                    .stream()
-                    .filter(e -> JAVA_SOURCES.matches(e.getSourcePath()))
-                    .map(p -> SourceUtils.FileInfo.create(p.getAbsolutePath().toString(), p.getSourcePath().toString()))
-                    .collect(Collectors.toUnmodifiableList());
-            List<SourceUtils.FileInfo> nativeSources = ownNativeJsSources.stream().flatMap(i ->
-                    i.getFilesAndHashes()
-                            .stream())
-                    .filter(e -> NATIVE_JS_SOURCES.matches(e.getSourcePath()))
-                    .map(p -> SourceUtils.FileInfo.create(p.getAbsolutePath().toString(), p.getSourcePath().toString()))
-                    .collect(Collectors.toUnmodifiableList());
-
-            // TODO when we make j2cl incremental we'll consume the provided sources and hashes (the "values" in the
-            //      maps above), and diff them against the previous compile
             if (!j2cl.transpile(javaSources, nativeSources)) {
                 throw new IllegalStateException("Error while running J2CL");
             }
+
+            List<SourceUtils.FileInfo> superJava = toFileInfosStripped(javaSplit.get(true), superSourcePaths);
+            List<SourceUtils.FileInfo> superNative = toFileInfosStripped(nativeSplit.get(true), superSourcePaths);
+
+            if (!superJava.isEmpty()) {
+                List<File> superClasspath = new ArrayList<>(classpathDirs);
+                superClasspath.add(context.outputPath().toFile());
+
+                j2cl = new J2cl(superClasspath, bootstrapClasspath, context.outputPath().toFile(), context);
+                if (!j2cl.transpileSuperSource(superJava, superNative)) {
+                    throw new IllegalStateException("Error while running J2CL");
+                }
+            }
         };
+    }
+
+    private static List<? extends CachedPath> collectByMatcher(Input input) {
+        return input.getFilesAndHashes().stream()
+                .filter(e -> J2clTask.JAVA_SOURCES.matches(e.getSourcePath()))
+                .toList();
+    }
+
+    private static List<? extends CachedPath> collectByMatcher(List<Input> inputs) {
+        return inputs.stream()
+                .flatMap(i -> i.getFilesAndHashes().stream())
+                .filter(e -> J2clTask.NATIVE_JS_SOURCES.matches(e.getSourcePath()))
+                .toList();
+    }
+
+    private static Map<Boolean, List<CachedPath>> partitionBySuperSource(
+            List<? extends CachedPath> paths, List<Path> superSourcePaths) {
+        if (superSourcePaths.isEmpty()) {
+            return Map.of(false, new ArrayList<>(paths), true, List.of());
+        }
+        Map<Boolean, List<CachedPath>> result = new HashMap<>();
+        result.put(false, new ArrayList<>());
+        result.put(true, new ArrayList<>());
+        for (CachedPath p : paths) {
+            boolean isSuper = superSourcePaths.stream().anyMatch(p.getSourcePath()::startsWith);
+            result.get(isSuper).add(p);
+        }
+        return result;
+    }
+
+    private static List<SourceUtils.FileInfo> toFileInfos(List<CachedPath> paths) {
+        return paths.stream()
+                .map(p -> SourceUtils.FileInfo.create(p.getAbsolutePath().toString(), p.getSourcePath().toString()))
+                .toList();
+    }
+
+    private static List<SourceUtils.FileInfo> toFileInfosStripped(List<CachedPath> paths, List<Path> superSourcePaths) {
+        return paths.stream()
+                .map(p -> {
+                    Path superRoot = superSourcePaths.stream()
+                            .filter(p.getSourcePath()::startsWith)
+                            .findFirst()
+                            .orElseThrow();
+                    String targetPath = superRoot.relativize(p.getSourcePath()).toString();
+                    return SourceUtils.FileInfo.create(p.getAbsolutePath().toString(), targetPath);
+                })
+                .toList();
     }
 }

@@ -17,4 +17,7 @@
 package example.helloworld;
 
 public class Test {
+    public static void main(String[] args) {
+        NoSuchMethodException exception = new NoSuchMethodException();
+    }
 }
