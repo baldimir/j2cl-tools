@@ -2804,7 +2804,7 @@ if (!COMPILED && goog.DEPENDENCIES_ENABLED) {
      * @param {string} key
      * @param {...?} var_args
      * @private
-     * @suppress {unusedPrivateMembers}
+     * @suppress {visibility}
      */
     goog.Dependency.callback_ = function(key, var_args) {
         if (key in goog.Dependency.callbackMap_) {
