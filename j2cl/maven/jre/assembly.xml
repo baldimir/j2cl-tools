@@ -10,5 +10,12 @@
         <fileSet>
             <directory>../../bazel-bin/jre/java/jre.js</directory>
         </fileSet>
+        <fileSet>
+            <directory>../../jre/java</directory>
+            <includes>
+                <include>java/lang/externs.js</include>
+            </includes>
+            <outputDirectory>bazel-bin/jre/java/jre.js</outputDirectory>
+        </fileSet>
     </fileSets>
 </assembly>

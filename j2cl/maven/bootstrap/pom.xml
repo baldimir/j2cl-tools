@@ -6,7 +6,7 @@
     <groupId>org.kie.j2cl.tools</groupId>
     <artifactId>bootstrap</artifactId>
     <packaging>pom</packaging>
-    <version>v20251027-1</version>
+    <version>v20260527-1</version>
 
     <name>J2CL Backend Bootstrap</name>
     <description>

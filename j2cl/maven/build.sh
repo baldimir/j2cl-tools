@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
-BAZEL=${BAZEL:-bazel}
+BAZEL=${BAZEL:-bazelisk}
 
 ${BAZEL} build //transpiler/java/...:*
 
