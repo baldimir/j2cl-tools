@@ -15,7 +15,6 @@
  */
 package com.vertispan.j2cl.mojo;
 
-import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.google.common.io.CharStreams;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -52,6 +51,7 @@ import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.resource.Resource;
+import org.htmlunit.BrowserVersion;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -390,7 +390,11 @@ public class TestMojo extends AbstractBuildMojo {
             throw new MojoExecutionException("Error reading test_summary.json", ex);
         }
 
+        WebDriver driver = null;
         try {
+            if (!skipTests) {
+                driver = createBrowser();
+            }
             //TODO manage the includes/excludes and manually specified test
             for (String generatedTest : generatedTests) {
                 // this is pretty hacky, TODO clean this up, put the intermediate js file somewhere nicer
@@ -463,37 +467,36 @@ public class TestMojo extends AbstractBuildMojo {
                     throw new UncheckedIOException(ex);
                 }
 
-                // Start a webserver TODO start just once for all tests
-                Server server = new Server(0);
-
-                // Tell jetty how to serve our compiled content
-                ResourceHandler resourceHandler = new ResourceHandler();
-                resourceHandler.setDirectoriesListed(true);//enabled for easier debugging, if we introduce a "manual" mode
-                resourceHandler.setBaseResource(Resource.newResource(webappDirectory));
-
-                server.setHandler(resourceHandler);
-                server.start();
-
-                // With the server started, start a browser too so they work in parallel
-                WebDriver driver = createBrowser();
-
-                // Wait until server is ready
-                if (!server.isStarted()) {
-                    CountDownLatch started = new CountDownLatch(1);
-                    server.addLifeCycleListener(new AbstractLifeCycle.AbstractLifeCycleListener() {
-                        @Override
-                        public void lifeCycleStarted(LifeCycle event) {
-                            started.countDown();
-                        }
-                    });
-                    started.await();
-                }
-                int port = ((ServerConnector) server.getConnectors()[0]).getLocalPort();
-
+                Server server = null;
                 try {
+                    // Start a webserver TODO start just once for all tests
+                    server = new Server(0);
+
+                    // Tell jetty how to serve our compiled content
+                    ResourceHandler resourceHandler = new ResourceHandler();
+                    resourceHandler.setDirectoriesListed(true);//enabled for easier debugging, if we introduce a "manual" mode
+                    resourceHandler.setBaseResource(Resource.newResource(webappDirectory));
+
+                    server.setHandler(resourceHandler);
+                    server.start();
+
+                    // Wait until server is ready
+                    if (!server.isStarted()) {
+                        CountDownLatch started = new CountDownLatch(1);
+                        server.addLifeCycleListener(new AbstractLifeCycle.AbstractLifeCycleListener() {
+                            @Override
+                            public void lifeCycleStarted(LifeCycle event) {
+                                started.countDown();
+                            }
+                        });
+                        started.await();
+                    }
+                    int port = ((ServerConnector) server.getConnectors()[0]).getLocalPort();
+
                     String path = startupHtmlFile.toString().replaceAll(Pattern.quote(File.separator), "/");
                     String url = "http://localhost:" + port + "/" + path;
                     getLog().info("fetching " + url);
+                    resetBrowser(driver);
                     driver.get(url);
 
                     // Loop and poll if tests are done
@@ -517,12 +520,22 @@ public class TestMojo extends AbstractBuildMojo {
                     getLog().error("Test failed!");
                     getLog().error(cleanForMavenLog(ex.getMessage()));
                 } finally {
-                    driver.quit();
+                    if (server != null) {
+                        try {
+                            server.stop();
+                        } catch (Exception stopException) {
+                            getLog().warn("Failed to stop test webserver", stopException);
+                        }
+                    }
                 }
 
             }
         } catch (Exception exception) {
             throw new MojoExecutionException("Failed to run tests", exception);
+        } finally {
+            if (driver != null) {
+                driver.quit();
+            }
         }
 
         if (failedTests.isEmpty()) {
@@ -537,7 +550,7 @@ public class TestMojo extends AbstractBuildMojo {
     private WebDriver createBrowser() throws MojoExecutionException {
         if ("chrome".equalsIgnoreCase(webdriver)) {
             ChromeOptions chromeOptions = new ChromeOptions();
-            chromeOptions.setHeadless(true);
+            chromeOptions.addArguments("--headless", "--window-size=1920,1200");
             LoggingPreferences loggingPreferences = new LoggingPreferences();
             loggingPreferences.enable(LogType.BROWSER, Level.ALL);
             chromeOptions.setCapability("goog:loggingPrefs", loggingPreferences);
@@ -546,7 +559,6 @@ public class TestMojo extends AbstractBuildMojo {
         } else if ("htmlunit".equalsIgnoreCase(webdriver)){
             HtmlUnitDriver driver = new HtmlUnitDriver(BrowserVersion.BEST_SUPPORTED, true);
             driver.getWebClient().getOptions().setFetchPolyfillEnabled(true);
-            driver.getWebClient().getOptions().setProxyPolyfillEnabled(true);
             return driver;
         }
 
@@ -563,6 +575,20 @@ public class TestMojo extends AbstractBuildMojo {
                 }
             });
         }
+    }
+
+    private void resetBrowser(WebDriver driver) {
+        try {
+            driver.manage().logs().get(LogType.BROWSER).getAll();
+        } catch (RuntimeException ignored) {
+            // Browser log support varies by driver; clearing logs is only a best-effort isolation step.
+        }
+        try {
+            driver.manage().deleteAllCookies();
+        } catch (RuntimeException ignored) {
+            // Some drivers only allow cookie operations after visiting an HTTP page.
+        }
+        driver.get("about:blank");
     }
 
     /**
