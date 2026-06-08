@@ -88,7 +88,7 @@
 
         <!-- Builder dependencies versions -->
         <j2cl.version>v20260527-1</j2cl.version>
-        <j2cl.base.version>v20251027-1</j2cl.base.version>
+        <j2cl.base.version>v20260527-1</j2cl.base.version>
         <closure.compiler.unshaded.version>v20250903-1</closure.compiler.unshaded.version>
         <commons.codec.version>1.9</commons.codec.version>
         <commons.io.version>2.20.0</commons.io.version>
@@ -106,13 +106,14 @@
         <error.prone.annotations.version>2.36.0</error.prone.annotations.version>
         <jsr305.version>3.0.2</jsr305.version>
         <commons.lang3.version>3.18.0</commons.lang3.version>
-        <google.turbine.version>0.11.0</google.turbine.version>
+        <google.turbine.version>1.15.0</google.turbine.version>
         <protobuf.java.version>4.31.0</protobuf.java.version>
         <slf4j.api.version>1.7.5</slf4j.api.version>
 
         <!-- Test goal -->
-        <selenium.version>3.141.59</selenium.version>
-        <selenium.htmlunit.version>2.65.0</selenium.htmlunit.version>
+        <selenium.version>4.44.0</selenium.version>
+        <selenium.htmlunit.version>4.44.0</selenium.htmlunit.version>
+        <netty.version>4.1.128.Final</netty.version>
         <jsoup.version>1.14.2</jsoup.version>
         <jetty.version>9.4.43.v20210629</jetty.version>
 
@@ -128,6 +129,14 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <dependency>
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-core</artifactId>
@@ -282,7 +291,7 @@
             </dependency>
             <dependency>
                 <groupId>org.seleniumhq.selenium</groupId>
-                <artifactId>htmlunit-driver</artifactId>
+                <artifactId>htmlunit3-driver</artifactId>
                 <version>${selenium.htmlunit.version}</version>
                 <exclusions>
                     <!-- let j2cl control the version of these -->
