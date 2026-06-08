@@ -113,6 +113,7 @@ public abstract class DiskCache {
      * A thread to monitor for changes, notify waiting work as necessary.
      */
     private final Thread watchThread = new Thread(this::checkForWork, "DiskCacheThread");
+    private volatile boolean closing;
     private Map<Path, TaskOutput> knownOutputs = new ConcurrentHashMap<>();
     private Map<Input, TaskOutput> lastSuccessfulOutputs = new ConcurrentHashMap<>();
 
@@ -186,8 +187,8 @@ public abstract class DiskCache {
             // disaster, can't interact with the cache, stop and give up
             // TODO mark all pending work as canceled?
         } catch (ClosedWatchServiceException e) {
-            if(!livenessThread.getState().equals(Thread.State.TERMINATED)) {
-                 throw new Error(e);
+            if (!closing) {
+                throw new Error(e);
             }
 
             // This is purely noise in the log and doesn't indicate an actual
@@ -353,6 +354,7 @@ public abstract class DiskCache {
     }
 
     public void close() throws IOException, InterruptedException {
+        closing = true;
         livenessThread.interrupt();
         watchThread.interrupt();
         service.close();
