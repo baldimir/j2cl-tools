@@ -44,8 +44,7 @@
         <webappdir>${project.build.directory}/webapp</webappdir>
         <webapp.libdir>${webappdir}/WEB-INF/lib</webapp.libdir>
 
-        <google.jsinterop.version>1.0.0</google.jsinterop.version>
-        <j2cl.platform.version>20251001-1</j2cl.platform.version>
+        <j2cl.platform.version>20260527-1</j2cl.platform.version>
 
         <maven.compiler.plugin.version>3.8.0</maven.compiler.plugin.version>
         <maven.source.plugin.version>3.0.1</maven.source.plugin.version>
@@ -68,12 +67,12 @@
         <dependency>
             <groupId>org.kie.j2cl.tools.yaml.mapper</groupId>
             <artifactId>common</artifactId>
-            <version>0.7</version>
+            <version>0.8</version>
         </dependency>
         <dependency>
             <groupId>org.kie.j2cl.tools.yaml.mapper</groupId>
             <artifactId>processor</artifactId>
-            <version>0.7</version>
+            <version>0.8</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -113,6 +112,7 @@
             <plugin>
                 <groupId>org.kie.j2cl.tools</groupId>
                 <artifactId>j2cl-maven-plugin</artifactId>
+                <version>0.23.8</version>
                 <executions>
                     <execution>
                         <id>build-js</id>
