@@ -5,7 +5,7 @@
 
   <groupId>org.kie.j2cl.tools.processors</groupId>
   <artifactId>exports-bundle_jar</artifactId>
-  <version>0.9</version>
+  <version>0.10</version>
   <packaging>jar</packaging>
 
   <name>GWT3 Processors GWTExports javascript env Tests BUNDLE_JAR mode</name>
@@ -52,7 +52,7 @@
     <maven.license.plugin>3.0</maven.license.plugin>
 
     <selenium.chrome.driver.version>4.12.1</selenium.chrome.driver.version>
-    <j2cl.platform.version>20251001-1</j2cl.platform.version>
+    <j2cl.platform.version>20260527-1</j2cl.platform.version>
   </properties>
 
   <dependencyManagement>

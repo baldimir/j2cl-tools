@@ -18,7 +18,6 @@ package org.kie.j2cl.tools.processors.generator;
 
 import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
-import com.google.j2cl.transpiler.ast.DeclaredTypeDescriptor;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
@@ -40,7 +39,6 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import jsinterop.annotations.JsMethod;
@@ -157,7 +155,7 @@ public class GWT3ExportGenerator extends AbstractGenerator {
     checkClazz(parent);
     TypeMirror type = context.getProcessingEnv().getTypeUtils().erasure(parent.asType());
     String name = getExportName(parent);
-    String nameCtor = utils.getDefaultConstructor(parent).getMangledName();
+    String nameCtor = utils.getDefaultConstructorMangledName(parent);
     boolean isNative = parent.getAnnotation(JsType.class) != null;
     return new ExportDTO(name, type.toString(), type.toString(), nameCtor, isNative);
   }
@@ -166,17 +164,13 @@ public class GWT3ExportGenerator extends AbstractGenerator {
     ExecutableElement method = checkMethod(m);
     String methodName = getSimpleName(method);
 
-    DeclaredType declaredType = MoreTypes.asDeclared(parent.asType());
-    DeclaredTypeDescriptor enclosingTypeDescriptor =
-        utils.createDeclaredTypeDescriptor(declaredType);
     String mangleName;
 
     if (method.getEnclosingElement().getAnnotation(JsType.class) != null
         || method.getAnnotation(JsMethod.class) != null) {
       mangleName = method.getSimpleName().toString();
     } else {
-      mangleName =
-          utils.createDeclarationMethodDescriptor(method, enclosingTypeDescriptor).getMangledName();
+      mangleName = utils.getMethodMangledName(method, parent);
     }
     return new MethodDTO(methodName, mangleName, m.getModifiers().contains(Modifier.STATIC));
   }
@@ -184,7 +178,7 @@ public class GWT3ExportGenerator extends AbstractGenerator {
   private PropertyDTO getPropertyDTO(Element method) {
     VariableElement variableElement = checkProperty(method);
     String name = getSimpleName(variableElement);
-    String mangleName = utils.createFieldDescriptor(variableElement).getMangledName();
+    String mangleName = utils.getVariableMangledName(variableElement);
 
     return new PropertyDTO(name, mangleName);
   }

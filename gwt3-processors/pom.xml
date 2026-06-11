@@ -5,7 +5,7 @@
 
     <groupId>org.kie.j2cl.tools.processors</groupId>
     <artifactId>parent</artifactId>
-    <version>0.9</version>
+    <version>0.10</version>
     <packaging>pom</packaging>
 
     <name>GWT3 processors parent</name>
@@ -66,9 +66,10 @@
         <commons.text.version>1.2</commons.text.version>
 
         <j2cl.version>v20250822-1</j2cl.version>
-        <j2cl.platform.version>20251001-1</j2cl.platform.version>
+        <j2cl.platform.version>20260527-1</j2cl.platform.version>
         <closure.compiler.version>v20250820</closure.compiler.version>
         <junit.version>4.13.1</junit.version>
+        <compile.testing.version>0.21.0</compile.testing.version>
     </properties>
 
     <modules>

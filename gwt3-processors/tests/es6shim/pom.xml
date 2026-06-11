@@ -5,7 +5,7 @@
 
   <groupId>org.kie.j2cl.tools.processors</groupId>
   <artifactId>es6shim-tests</artifactId>
-  <version>0.9</version>
+  <version>0.10</version>
   <packaging>jar</packaging>
 
   <name>GWT3 Processors ES6SHIM Tests</name>
@@ -52,7 +52,7 @@
     <maven.license.plugin>3.0</maven.license.plugin>
     <maven.jasmine.plugin.version>3.0-beta-02</maven.jasmine.plugin.version>
 
-    <j2cl.platform.version>20251001-1</j2cl.platform.version>
+    <j2cl.platform.version>20260527-1</j2cl.platform.version>
   </properties>
 
   <dependencyManagement>

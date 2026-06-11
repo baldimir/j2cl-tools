@@ -5,7 +5,7 @@
 
     <groupId>org.kie.j2cl.tools.processors</groupId>
     <artifactId>translation-default</artifactId>
-    <version>0.9</version>
+    <version>0.10</version>
     <packaging>jar</packaging>
 
     <name>GWT3 Processors translation test EN</name>
@@ -54,7 +54,7 @@
         <maven.j2cl.version>v20241110-1</maven.j2cl.version>
         <maven.jasmine.plugin.version>3.0-beta-02</maven.jasmine.plugin.version>
 
-        <j2cl.platform.version>20251001-1</j2cl.platform.version>
+        <j2cl.platform.version>20260527-1</j2cl.platform.version>
     </properties>
 
     <dependencyManagement>

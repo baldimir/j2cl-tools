@@ -5,15 +5,15 @@
     <parent>
         <artifactId>parent</artifactId>
         <groupId>org.kie.j2cl.tools.processors</groupId>
-        <version>0.9</version>
+        <version>0.10</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>utils</artifactId>
     <packaging>jar</packaging>
 
-    <name>J2CL generation utils</name>
-    <description>J2CL generation utils</description>
+    <name>GWT3 Processor generation utils</name>
+    <description>GWT3 Processor generation utils</description>
     <url>https://github.com/kiegroup/j2cl-tools</url>
 
     <organization>
@@ -43,18 +43,20 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.google.auto</groupId>
-            <artifactId>auto-common</artifactId>
-            <version>${auto.common.version}</version>
+            <groupId>com.google.jsinterop</groupId>
+            <artifactId>jsinterop-annotations</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.kie.j2cl.tools</groupId>
-            <artifactId>frontend-common</artifactId>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
         </dependency>
-
         <dependency>
-            <groupId>org.kie.j2cl.tools</groupId>
-            <artifactId>frontend-javac</artifactId>
+            <groupId>com.google.testing.compile</groupId>
+            <artifactId>compile-testing</artifactId>
+            <version>${compile.testing.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

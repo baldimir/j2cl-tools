@@ -17,11 +17,15 @@ public class GWT3EntryPointTest {
     options.addArguments("--headless", "--window-size=1920,1200");
 
     ChromeDriver driver = new ChromeDriver(options);
-    Path path = Path.of("target", "j2cl", "launcherDir", "index.html");
+    try {
+      Path path = Path.of("target", "j2cl", "launcherDir", "index.html");
 
-    driver.get(path.toUri().toURL().toString());
-    assertEquals("J2CL", driver.getTitle());
-    Boolean result = (Boolean) driver.executeScript("return window.started");
-    assertTrue(result);
+      driver.get(path.toUri().toURL().toString());
+      assertEquals("J2CL", driver.getTitle());
+      Boolean result = (Boolean) driver.executeScript("return window.started");
+      assertTrue(result);
+    } finally {
+      driver.quit();
+    }
   }
 }
