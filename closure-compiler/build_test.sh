@@ -16,8 +16,8 @@
 # Script that can be used by CI server for testing JsCompiler builds.
 set -e
 
-bazel build :all
+bazelisk build :all
 
-bazel test :compiler_unshaded_content_test --test_output=errors
+bazelisk test :compiler_unshaded_content_test --test_output=errors
 
 ./license_check/third_party_license_test.sh

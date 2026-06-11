@@ -6,11 +6,26 @@ set -e
 # read revision from the file
 revision=$(cat revision.txt)
 
+# build closure-compiler (bazel + maven)
+echo "Building closure-compiler"
+cd closure-compiler
+./build_test.sh
+cd maven
+mvn clean install
+cd ../..
+
+# build j2cl (bazel + maven)
+echo "Building j2cl"
+cd j2cl
+./build_test.sh
+cd maven
+./build.sh
+mvn clean install
+cd ../..
+
 modules=(
       j2cl-maven-plugin
       gwt3-processors
-      gwt-nio
-      jakarta-spec
       mapper-xml
       mapper-json
       mapper-yaml

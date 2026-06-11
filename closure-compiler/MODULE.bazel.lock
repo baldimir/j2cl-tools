@@ -529,7 +529,7 @@
     },
     "@@bazel_jar_jar+//internal:non_module_deps.bzl%non_module_deps": {
       "general": {
-        "bzlTransitiveDigest": "cJtZZXJqNlzZ1IowLonvacbtC3XhkZlL1M4DTBVBgeI=",
+        "bzlTransitiveDigest": "LD2LRyIWxv9YdDGOeLAj+GMqoPgWoPzoELM2abWitTQ=",
         "usagesDigest": "HJL6GyFowubzmmrohMXHBnA2r9a8hXbiBGnZMbIKzSU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -861,7 +861,7 @@
     },
     "@@rules_rust+//rust:extensions.bzl%rust": {
       "general": {
-        "bzlTransitiveDigest": "itaKy70FKfpUbltF85tQxrlvqiCaXUAeS/4cW7fCsT4=",
+        "bzlTransitiveDigest": "7+PaQ+OMKFzt89XpJFQe/0Clrp0iVTQ/jIUGpi8TpCk=",
         "usagesDigest": "ozx08ZbgRXTJw0zCaO/xtMUzgGLvwaQkZGnUo6tlyHM=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
