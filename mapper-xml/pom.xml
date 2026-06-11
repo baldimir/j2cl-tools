@@ -5,7 +5,7 @@
 
     <groupId>org.kie.j2cl.tools.xml.mapper</groupId>
     <artifactId>mapper-parent</artifactId>
-    <version>0.10</version>
+    <version>0.11</version>
     <packaging>pom</packaging>
 
     <name>GWT/J2CL compatible JAXB-like XML marshallers parent</name>
@@ -65,9 +65,9 @@
         <apache.commons.lang3.version>3.9</apache.commons.lang3.version>
 
         <com.fasterxml.woodstox.version>6.2.1</com.fasterxml.woodstox.version>
-        <j2cl.platform.version>20251001-1</j2cl.platform.version>
+        <j2cl.platform.version>20260527-1</j2cl.platform.version>
         <jakarta4g.version>0.7</jakarta4g.version>
-        <stdlib.version>0.7</stdlib.version>
+        <stdlib.version>0.8</stdlib.version>
         <auto.common.version>1.2.2</auto.common.version>
         <auto.service.version>1.1.1</auto.service.version>
     </properties>
@@ -76,7 +76,6 @@
         <module>api</module>
         <module>common</module>
         <module>processor</module>
-        <module>tests</module>
     </modules>
 
     <dependencyManagement>

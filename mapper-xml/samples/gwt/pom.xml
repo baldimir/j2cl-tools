@@ -8,7 +8,7 @@
   <groupId>org.kie.j2cl.tools.xml.mapper</groupId>
   <artifactId>gwt-demo</artifactId>
   <packaging>war</packaging>
-  <version>0.10</version>
+  <version>0.11</version>
 
 
   <name>GWT/J2CL compatible JAXB-like XML marshallers GWT demo</name>
@@ -42,11 +42,11 @@
 
   <properties>
     <!-- Convenience property to set the GWT version -->
-    <gwt.version>2.12.2</gwt.version>
+    <gwt.version>2.13.0</gwt.version>
 
     <!-- GWT 2.8 requires 11 -->
-    <maven.compiler.source>11</maven.compiler.source>
-    <maven.compiler.target>11</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>

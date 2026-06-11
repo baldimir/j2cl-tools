@@ -6,7 +6,7 @@
     <groupId>org.kie.j2cl.tools.xml.mapper</groupId>
     <artifactId>j2cl-demo</artifactId>
     <packaging>war</packaging>
-    <version>0.10</version>
+    <version>0.11</version>
 
     <name>GWT/J2CL compatible JAXB-like XML marshallers J2CL demo</name>
     <description>GWT/J2CL compatible JAXB-like XML marshallers J2CL demo</description>
@@ -41,8 +41,8 @@
         <webappdir>${project.build.directory}/webapp</webappdir>
         <webapp.libdir>${webappdir}/WEB-INF/lib</webapp.libdir>
 
-        <maven.compiler.target>11</maven.compiler.target>
-        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
 
         <maven.compiler.plugin.version>3.8.0</maven.compiler.plugin.version>
         <maven.tomcat7.plugin.version>2.2</maven.tomcat7.plugin.version>
@@ -51,7 +51,7 @@
         <maven.resources.plugin.version>3.1.0</maven.resources.plugin.version>
         <maven.war.plugin.version>3.2.3</maven.war.plugin.version>
 
-        <j2cl.platform.version>20251001-1</j2cl.platform.version>
+        <j2cl.platform.version>20260527-1</j2cl.platform.version>
     </properties>
 
     <dependencyManagement>
@@ -140,6 +140,7 @@
             <plugin>
                 <groupId>org.kie.j2cl.tools</groupId>
                 <artifactId>j2cl-maven-plugin</artifactId>
+                <version>0.23.8</version>
                 <executions>
                     <execution>
                         <id>build-js</id>
