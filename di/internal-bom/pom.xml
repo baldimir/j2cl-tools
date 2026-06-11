@@ -6,7 +6,7 @@
 
     <groupId>org.kie.j2cl.tools.di</groupId>
     <artifactId>internal-bom</artifactId>
-    <version>0.9</version>
+    <version>0.10</version>
     <packaging>pom</packaging>
 
     <name>J2CL compatible Jakarta CDI-like dependency injection framework Internal BOM</name>
@@ -45,39 +45,37 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
 
-        <maven.compiler.plugin.version>3.8.0</maven.compiler.plugin.version>
-        <maven.source.plugin.version>3.0.1</maven.source.plugin.version>
-        <maven.deploy.plugin.version>3.0.0-M2</maven.deploy.plugin.version>
+        <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
+        <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
+        <maven.deploy.plugin.version>3.1.4</maven.deploy.plugin.version>
         <maven.license.plugin.version>3.0</maven.license.plugin.version>
-        <maven.gpg.plugin.version>1.6</maven.gpg.plugin.version>
-        <maven.scm.provider.gitexe.plugin.version>1.9.5</maven.scm.provider.gitexe.plugin.version>
-        <maven.enforcer.plugin.version>3.0.0-M3</maven.enforcer.plugin.version>
-        <maven.shade.plugin.version>3.2.4</maven.shade.plugin.version>
-        <maven.jar.plugin.version>3.2.0</maven.jar.plugin.version>
-        <maven.clean.plugin.version>3.1.0</maven.clean.plugin.version>
-        <maven.formatter.plugin.version>2.17.0</maven.formatter.plugin.version>
+        <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
+        <maven.scm.provider.gitexe.plugin.version>2.2.1</maven.scm.provider.gitexe.plugin.version>
+        <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
+        <maven.shade.plugin.version>3.6.2</maven.shade.plugin.version>
+        <maven.jar.plugin.version>3.5.0</maven.jar.plugin.version>
+        <maven.clean.plugin.version>3.5.0</maven.clean.plugin.version>
+        <maven.formatter.plugin.version>2.29.0</maven.formatter.plugin.version>
         <maven.license.plugin.version>3.0</maven.license.plugin.version>
-        <maven.javadoc.plugin.version>3.2.0</maven.javadoc.plugin.version>
-        <maven.central.publishing.plugin>0.9.0</maven.central.publishing.plugin>
+        <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
+        <maven.central.publishing.plugin>0.10.0</maven.central.publishing.plugin>
 
-        <apache.commons.commons-text.version>1.14.0</apache.commons.commons-text.version>
         <apache.commons.commons-lang3.version>3.19.0</apache.commons.commons-lang3.version>
-        <apache.commons.io.version>2.20.0</apache.commons.io.version>
 
-        <jsoup.version>1.11.3</jsoup.version>
+        <jsoup.version>1.22.2</jsoup.version>
         <javax.inject.version>1</javax.inject.version>
         <freemarker.version>2.3.30</freemarker.version>
-        <lesscss.version>1.10</lesscss.version>
+        <lesscss.version>1.12</lesscss.version>
         <google.guava.version>28.1-jre</google.guava.version>
         <classgraph.classgraph.version>4.8.181</classgraph.classgraph.version>
-        <org.kie.j2cl.tools.processors.version>0.9</org.kie.j2cl.tools.processors.version>
+        <org.kie.j2cl.tools.processors.version>0.10</org.kie.j2cl.tools.processors.version>
 
         <gwt.jakarta.version>0.7</gwt.jakarta.version>
         <j2cl.platform.version>20251001-1</j2cl.platform.version>
-        <javaparser.core.version>3.25.5</javaparser.core.version>
+        <javaparser.core.version>3.28.2</javaparser.core.version>
         <auto.common.version>1.2.2</auto.common.version>
         <auto.service.version>1.1.1</auto.service.version>
-        <mockito.core.version>4.6.1</mockito.core.version>
+        <mockito.core.version>5.21.0</mockito.core.version>
         <junit.version>4.13.2</junit.version>
     </properties>
 
@@ -119,19 +117,9 @@
                 <version>${auto.service.version}</version>
             </dependency>
             <dependency>
-                <groupId>commons-io</groupId>
-                <artifactId>commons-io</artifactId>
-                <version>${apache.commons.io.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>com.github.javaparser</groupId>
                 <artifactId>javaparser-core</artifactId>
                 <version>${javaparser.core.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-text</artifactId>
-                <version>${apache.commons.commons-text.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.freemarker</groupId>

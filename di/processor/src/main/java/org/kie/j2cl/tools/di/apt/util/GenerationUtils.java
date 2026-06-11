@@ -121,7 +121,7 @@ public class GenerationUtils {
         "get").addArgument(
             new MethodCallExpr(new NameExpr(Reflect.class.getSimpleName()), "objectProperty")
                 .addArgument(
-                    new StringLiteralExpr(j2CLUtils.createFieldDescriptor(field).getMangledName()))
+                    new StringLiteralExpr(j2CLUtils.getVariableMangledName(field)))
                 .addArgument("instance"));
   }
 
@@ -224,8 +224,7 @@ public class GenerationUtils {
                                 new MethodCallExpr(new NameExpr(Reflect.class.getCanonicalName()),
                                     "objectProperty")
                                         .addArgument(new StringLiteralExpr(
-                                            j2CLUtils.createDeclarationMethodDescriptor(method)
-                                                .getMangledName()))
+                                            j2CLUtils.getMethodMangledName(method)))
                                         .addArgument("instance"))),
                 "bind").addArgument("instance");
 
@@ -278,7 +277,7 @@ public class GenerationUtils {
   }
 
   private Statement generatePrivateJ2CLMethodCall(ExecutableElement method, Expression[] args) {
-    String mangleName = j2CLUtils.createDeclarationMethodDescriptor(method).getMangledName();
+    String mangleName = j2CLUtils.getMethodMangledName(method);
     TypeMirror parent =
         context.getGenerationContext().getTypes().erasure(method.getEnclosingElement().asType());
     String factoryName = TypeUtils.getQualifiedFactoryName(parent);
@@ -337,7 +336,7 @@ public class GenerationUtils {
     }
 
     String jsFieldName =
-        j2CLUtils.createFieldDescriptor(fieldPoint.getVariableElement()).getMangledName();
+        j2CLUtils.getVariableMangledName(fieldPoint.getVariableElement());
     MethodCallExpr reflect =
         new MethodCallExpr(new NameExpr(Reflect.class.getSimpleName()), "objectProperty")
             .addArgument(new StringLiteralExpr(jsFieldName))

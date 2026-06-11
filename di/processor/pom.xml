@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.kie.j2cl.tools.di</groupId>
         <artifactId>parent</artifactId>
-        <version>0.9</version>
+        <version>0.10</version>
     </parent>
 
     <artifactId>processor</artifactId>
@@ -59,11 +59,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
-            <artifactId>commons-text</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
+            <artifactId>commons-lang3</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.classgraph</groupId>

@@ -56,7 +56,7 @@ public class MethodCallGenerator {
       }
     } else {
       if (isPrivate) {
-        root.put("name", j2CLUtils.createDeclarationMethodDescriptor(method).getMangledName());
+        root.put("name", j2CLUtils.getMethodMangledName(method));
       } else {
         root.put("name", method.getSimpleName().toString());
       }

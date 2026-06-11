@@ -61,7 +61,6 @@ import elemental2.dom.DomGlobal;
 import elemental2.dom.EventListener;
 import elemental2.dom.HTMLElement;
 import jsinterop.base.Js;
-import org.apache.commons.io.IOUtils;
 import org.jboss.gwt.elemento.processor.AbortProcessingException;
 import org.jboss.gwt.elemento.processor.ExpressionParser;
 import org.jboss.gwt.elemento.processor.TemplateSelector;
@@ -177,7 +176,7 @@ public class TemplateGenerator extends IOCGenerator<BeanDefinition> {
             if (executableElement.isPresent()) {
                 templateDefinition.setInitRootElement(true);
                 String mangledName =
-                        j2CLUtils.createDeclarationMethodDescriptor(executableElement.get()).getMangledName();
+                        j2CLUtils.getMethodMangledName(executableElement.get());
                 templateDefinition.setRootElementPropertyName(mangledName);
             }
         }
@@ -279,7 +278,7 @@ public class TemplateGenerator extends IOCGenerator<BeanDefinition> {
                         "resolveElement").addArgument(instance)
                         .addArgument(new StringLiteralExpr(element.getName()));
             }
-            String mangleName = j2CLUtils.createFieldDescriptor(element.getField()).getMangledName();
+            String mangleName = j2CLUtils.getVariableMangledName(element.getField());
             MethodCallExpr fieldSetCallExpr =
                     new MethodCallExpr(
                             new MethodCallExpr(new NameExpr(Js.class.getSimpleName()), "asPropertyMap")
@@ -343,7 +342,7 @@ public class TemplateGenerator extends IOCGenerator<BeanDefinition> {
             if (templateContext.getStylesheet().isLess()) {
                 try {
                     String less =
-                            IOUtils.toString(templateContext.getStylesheet().getFile(), Charset.defaultCharset());
+                            new String(templateContext.getStylesheet().getFile().openStream().readAllBytes(), Charset.defaultCharset());
                     Less.compile(null, less, false);
                     final String compiledCss = Less.compile(null, less, false);
                     templateDefinition.setCss(templatedGeneratorUtils.escape(compiledCss));
@@ -354,7 +353,7 @@ public class TemplateGenerator extends IOCGenerator<BeanDefinition> {
             } else {
                 try {
                     String css =
-                            IOUtils.toString(templateContext.getStylesheet().getFile(), Charset.defaultCharset());
+                            new String(templateContext.getStylesheet().getFile().openStream().readAllBytes(), Charset.defaultCharset());
                     templateDefinition.setCss(templatedGeneratorUtils.escape(css));
                 } catch (IOException e) {
                     throw new GenerationException(
@@ -528,7 +527,7 @@ public class TemplateGenerator extends IOCGenerator<BeanDefinition> {
     }
 
     public MethodCallExpr getFieldAccessCallExpr(VariableElement field) {
-        String mangleName = j2CLUtils.createFieldDescriptor(field).getMangledName();
+        String mangleName = j2CLUtils.getVariableMangledName(field);
 
         return new MethodCallExpr(
                 new MethodCallExpr(new NameExpr(Js.class.getSimpleName()), "asPropertyMap")
@@ -582,7 +581,7 @@ public class TemplateGenerator extends IOCGenerator<BeanDefinition> {
                 abortWithError(type, "Cannot find template \"%s\". Please make sure the template exists.",
                         fqTemplate);
             }
-            String html = IOUtils.toString(url, Charset.defaultCharset());
+            String html = new String(url.openStream().readAllBytes(), Charset.defaultCharset());
             Document document = Jsoup.parse(html);
             if (templateSelector.hasSelector()) {
                 org.jsoup.nodes.Element rootElement = getRoot(document, templateSelector.selector);
