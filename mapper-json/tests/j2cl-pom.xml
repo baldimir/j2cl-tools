@@ -6,7 +6,7 @@
 
     <artifactId>j2cl-tests</artifactId>
     <groupId>org.kie.j2cl.tools.json.mapper</groupId>
-    <version>0.7</version>
+    <version>0.8</version>
 
     <name>GWT/J2CL Jakarta JSON Binding J2CL tests</name>
     <description>GWT/J2CL Jakarta JSON Binding J2CL tests</description>
